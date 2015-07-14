@@ -1,0 +1,7 @@
+rowname	gauge1	gauge2	wt
+InnerCorner	-0.0712933	-0.0635403	3
+OuterCorner	0.0736873	0.0655256	1
+SWA	5.82933	5.08412	1
+aiBlur	0.12909	0.253165	1
+defocus	0.494904	0.428504	1
+focusBlur	0.108785	0.105025	1
