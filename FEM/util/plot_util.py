@@ -8,6 +8,14 @@ import os
 
 workpath = os.path.dirname(os.path.abspath(__file__))
 
+def setPalette():
+    colors = ['#F0A3FF', '#0075DC', '#993F00', '#4C005C', '#191919', '#005C31', '#2BCE48', '#FFCC99', '#808080', '#94FFB5', '#8F7C00', '#9DCC00', '#C20088', '#003380', '#FFA405', '#FFA8BB', '#426600', '#FF0010', '#5EF1F2', '#00998F', '#E0FF66', '#740AFF', '#990000', '#FFFF00', '#FF5005']
+    #colors = reversed(colors)
+    colors_r = colors[::-1]
+    #pal = sns.xkcd_palette(colors)
+    pal = sns.color_palette(colors_r)
+    return pal 
+    
 def drawXY(df, x_col_name, y_col_name, filter_name, **args):    
     fig =  plt.figure()
     ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], label="ax") # rect [left, bottom, width, height]
@@ -263,3 +271,66 @@ def drawStackedBar(df, grouped_col, stacked_col, **args):
     if(args.has_key("save") & args["save"] == True):
         df_group_stat.T.to_csv(os.path.join(workpath, "results", "statistics_by_{}_{}.txt".format(grouped_col, stacked_col)), sep = '\t')
         fig.savefig(os.path.join(workpath, "results", "statistics_by_{}_{}.png".format(grouped_col, stacked_col)), frameon = False ) # dpi = 318
+        
+def drawStatisticsCompare(df1, df2, rows_col, value_col, **args):
+    # Default keyword arguments
+    df1_label = args.get("label1", "group1")
+    df2_label = args.get("label2", "group2")
+    
+    pivot1 = df1.pivot_table(values = value_col, rows=rows_col, aggfunc=lambda x: len(x.unique()))
+    df_pivot1 = pd.DataFrame({"count": pivot1})
+    # reset index, then the rows_col became a column of the pivot table
+    df_pivot1 = df_pivot1.reset_index()
+    pivot2 = df2.pivot_table(values = value_col, rows=rows_col, aggfunc=lambda x: len(x.unique()))
+    df_pivot2 = pd.DataFrame({"count": pivot2})
+    df_pivot2 = df_pivot2.reset_index()
+    #print(df_pivot1.head(3))
+    #print(df_pivot2.head(3))
+    df_pivot1 = df_pivot1.sort([rows_col], ascending=[True]) 
+    df_pivot2 = df_pivot2.sort([rows_col], ascending=[True]) 
+       
+    df_pivot1["group"] = df1_label
+    df_pivot2["group"] = df2_label
+    
+    df = df_pivot1
+    df = df.append(df_pivot2)
+    df['ID'] = df.index
+    print(df.head(3))
+    
+    # Draw a nested barplot to show survival for class and sex  
+    sns.set(style="whitegrid") 
+    g = sns.factorplot(x = rows_col , y="count", hue="group", data=df,
+                    size=6, kind="bar", palette="muted")
+    g.despine(left=True)
+    g.set_ylabels("{} number".format(value_col))
+    g.set_xticklabels(rotation=270)
+    plt.show()
+    
+def drawTwoGroupsCmp(df1, df2, rows_col, value_col, **args):
+    # Default keyword arguments
+    df1_label = args.get("label1", "group1")
+    df2_label = args.get("label2", "group2")
+    
+    pivot1 = df1.pivot_table(values = value_col, rows=rows_col, aggfunc=lambda x: len(x.unique()))
+    df_pivot1 = pd.DataFrame({df1_label: pivot1})
+    # reset index, then the rows_col became a column of the pivot table
+    df_pivot1 = df_pivot1.reset_index()
+    pivot2 = df2.pivot_table(values = value_col, rows=rows_col, aggfunc=lambda x: len(x.unique()))
+    df_pivot2 = pd.DataFrame({df2_label: pivot2})
+    df_pivot2 = df_pivot2.reset_index()
+    #print(df_pivot1.head(3))
+    #print(df_pivot2.head(3))
+    df = pd.merge(df_pivot1, df_pivot2, left_on = rows_col, right_on = rows_col, how = 'outer')
+    print(df)
+    
+    # Draw a nested barplot to show survival for class and sex  
+    sns.set(style="darkgrid") 
+    ax = df.plot(kind='bar', width=0.8) 
+    for p in ax.patches: 
+        ax.annotate(int(p.get_height()), (p.get_x()+p.get_width()/2., p.get_height()), ha='center', va='center', xytext=(0, 10), textcoords='offset points')
+    #for p in ax.patches:
+    #    ax.annotate(str(p.get_height()), (p.get_x() * 1.005, p.get_height() * 1.005))
+    ax.set_ylabel("{} number".format(value_col))
+    xlist = df[rows_col].values.tolist()
+    ax.set_xticklabels(xlist, rotation=270)
+    plt.show()
