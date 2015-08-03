@@ -8,5 +8,3 @@
     Dictionary-like `get()` method
     The `select()` Method
     The `lookup()` Method
-    [`df.stat`](http://pandas.pydata.org/pandas-docs/stable/basics.html)
-    [Statsmodels](http://statsmodels.sourceforge.net/)

@@ -35,7 +35,9 @@ def drawXY(df, x_col_name, y_col_name, filter_name, **args):
     ax.set_ylabel(r"{}($nm$)".format(y_col_name))
     ax.set_title("{}: {} Through {} Trend".format(filter_name, y_col_name, x_col_name))
     plt.show()
-    if(args.has_key("save") & args["save"] == True):
+    
+    save =  False or args.get("save")
+    if(save == True):
         fig.savefig(os.path.join(workpath, "results", "{}_{}_Thr_{}.png".format(filter_name, y_col_name, x_col_name)), frameon = False )
     
 def drawQuadState(df, filter_name, **args):    
@@ -333,4 +335,55 @@ def drawTwoGroupsCmp(df1, df2, rows_col, value_col, **args):
     ax.set_ylabel("{} number".format(value_col))
     xlist = df[rows_col].values.tolist()
     ax.set_xticklabels(xlist, rotation=270)
+    plt.show()
+    
+def drawAreaPlot(df, column_list, col_xlabel, **args):
+    ncol = len(column_list)
+    y = [ [] for x in range(ncol)]
+    
+    df_slice = df[column_list]
+    df_slice = df_slice.abs()
+    
+    # read the column lists
+    for i in range(ncol):
+        y[i] = df_slice.loc[:, column_list[i]].values.tolist()
+
+    # convert to a turple
+    #y_tuple = tuple(y)
+    
+    nrow = len(y[0])
+    #y_2dlist = np.row_stack(y_tuple) # ncol*nrow
+    
+    # this call to 'cumsum' (cumulative sum), passing in your y data, 
+    # is necessary to avoid having to manually order the datasets
+    xlabel = df.loc[:, col_xlabel].values.tolist()
+    x = np.arange(nrow)
+    y_stack =  np.cumsum(y, axis=0)
+    print("y = ", y)
+    print("y_stack = ", y_stack)
+    #print(x, xlabel, y, y_tuple, y_2dlist, y_stack)
+    fig = plt.figure()
+    ax1 = fig.add_axes([0.1, 0.1, 0.8, 0.7], label="ax1")
+    dict_stack = {"index": df.loc[:, col_xlabel].values.tolist(), "y_stack":  y_stack[ncol-1, :] }
+    df_stack = pd.DataFrame(dict_stack)
+    df_stack_slice = df_stack[ df_stack.y_stack > 10] 
+    print(df_stack_slice)
+    colors = ['#F0A3FF', '#0075DC', '#993F00', '#4C005C', '#191919', '#005C31', '#2BCE48', '#FFCC99', '#808080', '#94FFB5', '#8F7C00', '#9DCC00', '#C20088', '#003380', '#FFA405', '#FFA8BB', '#426600', '#FF0010', '#5EF1F2', '#00998F', '#E0FF66', '#740AFF', '#990000', '#FFFF00', '#FF5005']
+    for i in range(ncol):
+        if i == 0:
+            ax1.fill_between(x, 0, y_stack[0,:], facecolor=colors[i], alpha=.7)
+        else:
+            ax1.fill_between(x, y_stack[i-1,:], y_stack[i,:], facecolor=colors[i], alpha=.7) 
+    plt.show()
+    
+def dfAreaPlot(df, column_list, col_xlabel, **args):
+    sns.set(style="darkgrid")
+    df_slice = df[column_list]
+    df_slice = df_slice.abs()
+    ax = df_slice.plot(kind='area')
+    ax.set_xticks(df.index)
+    ax.set_xticklabels(df.loc[:, col_xlabel], rotation=90)
+    ax.set_xlabel(col_xlabel)
+    ax.set_ylabel("Uncertainty")
+    ax.set_title("Prcross Uncertainty plotting")
     plt.show()
