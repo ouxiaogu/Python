@@ -10,6 +10,7 @@ __pycache__/
 FEM/BF/
 FEM/data/
 FEM/results/
+FEM/util/results/
 env/
 build/
 develop-eggs/
