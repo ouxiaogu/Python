@@ -1,0 +1,1 @@
+ $$ \sum _{i}  \frac {1} {\sqrt {2*\pi} * \sigma}  * e ^ {\frac {(predict_i - obs_i)^2} { 2\pi{\sigma}^2  }  }  $$

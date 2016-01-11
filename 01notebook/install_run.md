@@ -31,3 +31,16 @@ for windows users:
 Another method
 
 `C:\Users\peyang\canopy\User\Scripts\python.exe setup.py build --compiler=mingw64 install --user` term of options can't be exchanged.
+
+
+### Anaconda Usage
+
+1. usage install OpenCV as an example
+
+```
+anaconda search -t conda opencv
+conda install 
+```
+
+
+2.

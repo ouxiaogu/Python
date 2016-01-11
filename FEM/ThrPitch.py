@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-# gauge statistics by group 
+# gauge statistics by group
 import os, os.path
 import pandas as pd
 import numpy as np
-import sys
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import sys
 sys.path.append('C:\Localdata\D\Note\Python\FEM')
 import plot_util as pltu
 
@@ -46,7 +46,7 @@ workpath = os.path.dirname(os.path.abspath(__file__))
 #    df_slice = df[df.GroupName == group]
 #    df_slice = df_slice.sort(["plot_CD", "draw_CD"], ascending=[True, True])
 #    pltu.drawQuadState(df_slice, group, save = True)
-    
+
 ####################################
 #        read gauge files          #
 ####################################
@@ -94,18 +94,18 @@ for cur_module in module_uniq:
     module_stat_dict[cur_module]['count'] = module_gauge_num
     total_gauge = total_gauge + module_gauge_num
     #print(df[cond_gauge])
-    # if we want multiple conditions with &, then bracket is mandatory 
+    # if we want multiple conditions with &, then bracket is mandatory
     for key in SubGroupId_uniq:
         SubGroupId = int(key)
         dirId = SubGroupId/8
         EMId = SubGroupId%8
-        EPSId = EMId/4    
+        EPSId = EMId/4
         MPId = EMId%4
-        module_stat_dict[cur_module][key] = df[(cond_gauge) & (df['EPSId'] == EPSId) & (df['MPId'] == MPId) & (df['dummy_dir'] == dirId)].count()['gauge']  
-    print("{} {}\t{} {} {} {} {}".format(count, cur_module, module_gauge_num, SubGroupId, dirId, EPSId, MPId))        
+        module_stat_dict[cur_module][key] = df[(cond_gauge) & (df['EPSId'] == EPSId) & (df['MPId'] == MPId) & (df['dummy_dir'] == dirId)].count()['gauge']
+    print("{} {}\t{} {} {} {} {}".format(count, cur_module, module_gauge_num, SubGroupId, dirId, EPSId, MPId))
 
 # module gauge percentage statistics
-if(total_gauge != 0):    
+if(total_gauge != 0):
     for cur_module in module_stat_dict:
         percentage = (module_stat_dict[cur_module]["count"])/(total_gauge+0.)
         print("{} {} {}".format(cur_module, module_stat_dict[cur_module]["count"], percentage))
@@ -115,12 +115,12 @@ df_module_stat = pd.DataFrame(module_stat_dict)
 # sort statistics gauge by count number
 df_module_stat = df_module_stat.T.sort('count', ascending=False).T
 df_module_stat.T.to_csv(os.path.join(workpath, "stage_result", "statistics_by_SubGroupId.txt"), sep = '\t')
-module_uniq_sorted = df_module_stat.columns.values.tolist() 
+module_uniq_sorted = df_module_stat.columns.values.tolist()
 
 ####################################
 #  gauges statistics plotting      #
-####################################   
-     
+####################################
+
 # sns setting: the rc have to set before plotting
 #sns.set_style("darkgrid")
 #rc = mpl.rcParams
@@ -142,7 +142,7 @@ for key in SubGroupId_uniq:
 count = df_module_stat.loc["count"].values
 percentage = df_module_stat.loc["percentage"].values
 # statistics bar plotting
-bar_width = 0.7 
+bar_width = 0.7
 barplot_list = []
 portion_len = len(portion_list)
 
@@ -156,9 +156,9 @@ for portion_idx in range(portion_len):
     if dirId == 1:
         dirId = 90
     EMId = SubGroupId%8
-    EPSId = EMId/4    
+    EPSId = EMId/4
     MPId = EMId%4
-    print("portion{} = {}".format(portion_idx, portion_list[portion_idx]))  
+    print("portion{} = {}".format(portion_idx, portion_list[portion_idx]))
     p = ax.bar(xaxis_index-bar_width/2., portion_list[portion_idx], bar_width,  bottom= position, color=color_list[portion_idx], label = 'Dir = {}, EPSId = {}, MPId = {}'.format(dirId, EPSId, MPId)) # alpha =0.8
     barplot_list.append(p)
 plt.xticks(xaxis_index, module_uniq_sorted, rotation=270 )
@@ -185,9 +185,9 @@ shif_y = ymin
 def autoLabelPoint(ax, xs, ys, labels):
     alignment = {'horizontalalignment':'center', 'verticalalignment':'baseline'}
     for x, y, label in zip(xs, ys, labels):
-      ax.text(x, float(y)+0.01, "{0:.2f}%".format(label*100), **alignment) 
-autoLabelPoint(axx, xaxis_index, percentage, percentage ) 
-axx.set_ylim(-0.03, ymax)       
+      ax.text(x, float(y)+0.01, "{0:.2f}%".format(label*100), **alignment)
+autoLabelPoint(axx, xaxis_index, percentage, percentage )
+axx.set_ylim(-0.03, ymax)
 
 # legend
 legend_handles = []
@@ -196,15 +196,15 @@ legend_labels = []
 # Not able to use append, but able to use "+"
 for ax in [ax, axx]:
     h, l = ax.get_legend_handles_labels()
-    legend_handles = legend_handles + h 
-    legend_labels = legend_labels +l 
-    # Shrink current axis by 20% 
+    legend_handles = legend_handles + h
+    legend_labels = legend_labels +l
+    # Shrink current axis by 20%
     #box = ax.get_position()
-    #ax.set_position([box.x0+box.width * 0.2, box.y0, box.width * 0.8, box.height])     
+    #ax.set_position([box.x0+box.width * 0.2, box.y0, box.width * 0.8, box.height])
 ax.legend(legend_handles, legend_labels, loc='upper right', fontsize=12, framealpha = 0.5) # bbox_to_anchor=(-0.1, 1)
 ax.grid(True, which='both', axis='both')
-ax.set_xlabel("ModuleId")  
-ax.set_ylabel("Gauge Number")  
-axx.set_ylabel("Gauge Percentage")  
-axx.grid(False, which='both', axis='both')      
+ax.set_xlabel("ModuleId")
+ax.set_ylabel("Gauge Number")
+axx.set_ylabel("Gauge Percentage")
+axx.grid(False, which='both', axis='both')
 plt.show()
