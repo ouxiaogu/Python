@@ -1,0 +1,13 @@
+<root>
+  <lsf>
+    <preproc>
+        <queue>fem</queue>
+        <applicationprofile>hostonly</applicationprofile>
+    </preproc>
+    <job>
+        <queue>fem</queue>
+	    <slots>8</slots>
+        <applicationprofile>core1</applicationprofile>
+    </job>
+</lsf>
+</root>

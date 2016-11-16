@@ -42,5 +42,13 @@ anaconda search -t conda opencv
 conda install 
 ```
 
+2. download a package to local and only install this file.
 
-2.
+
+    First, download this package under table `file`, https://anaconda.org/anaconda/seaborn/files .
+
+    Then,
+
+    ```
+    PS C:\Localdata\D\Note\Python> conda install win-64-seaborn-0.7.0-py27_0.tar.bz2
+    ```
