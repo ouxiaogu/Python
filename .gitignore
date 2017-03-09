@@ -5,13 +5,20 @@ __pycache__/
 # C extensions
 *.so
 
+# exclude image
+
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.pgm
+*.tif
+
+
 # Distribution / packaging
 .Python
-FEM
-FEM/BF/
-FEM/data/
-FEM/results/
-FEM/util/results/
+FEM/**
 env/
 build/
 develop-eggs/
