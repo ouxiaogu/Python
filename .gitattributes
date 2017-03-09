@@ -24,6 +24,16 @@
 *.[oa]
 *~
 
+# exclude image
+
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.pgm
+*.tif
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -43,7 +53,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-FEM
+FEM/**
 FEM/BF/
 FEM/data/
 FEM/results/
