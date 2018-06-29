@@ -10,8 +10,14 @@ from filters import *
 import sympy
 from sympy import Matrix, symbols, pprint
 
-class TestFilters(unittest.TestCase):
+def random_arrary(length, shape=None):
+    arr = np.arange(length)
+    np.random.shuffle(arr)
+    if shape is not None and isinstance(shape, tuple):
+        arr = arr.reshape(shape)
+    return arr
 
+class TestFilters(unittest.TestCase):
     def test_gaussian_filter(self):
         sigma = 2
         x = symbols('x') # n=1
@@ -39,24 +45,61 @@ class TestFilters(unittest.TestCase):
     def test_padding(self):
         padsize = 1
         padval = 0.
-        inarr = np.empty((3,) )
-        ouarr = padding(inarr, padsize, padval)
-        self.assertAlmostEqual(inarr.flatten().tolist(), ouarr[padsize:(padsize+3)].flatten().tolist() )
-        self.assertAlmostEqual(padval, ouarr[0])
+        src = random_arrary(3, (3,))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((5,), dst.shape)
+        self.assertAlmostEqual(src.flatten().tolist(), dst[padsize:(padsize+3)].flatten().tolist() )
+        self.assertAlmostEqual(padval, dst[0])
 
         padsize = 2
         padval = 3.
-        inarr = np.empty((3, 1) )
-        ouarr = padding(inarr, padsize, padval)
-        self.assertEqual(inarr.flatten().tolist(), ouarr[padsize:(padsize+3), 0].flatten().tolist() )
-        # self.assertAlmostEqual(padval, ouarr[0])
+        src = random_arrary(3, (3, 1))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((7, 1), dst.shape)
+        self.assertEqual(src.flatten().tolist(), dst[padsize:(padsize+3), 0].flatten().tolist() )
+        # self.assertAlmostEqual(padval, dst[0])
+
+        padsize = 3
+        padval = 3.
+        src = random_arrary(3, (1, 3))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((1, 9), dst.shape)
+        self.assertEqual(src.flatten().tolist(), dst[0, padsize:(padsize+3)].flatten().tolist() )
+        # self.assertAlmostEqual(padval, dst[0])
 
         padsize = 2
         padval = 5.
-        inarr = np.empty((2, 3) )
-        ouarr = padding(inarr, padsize, padval)
-        self.assertEqual(inarr.tolist(), ouarr[padsize:(padsize+2), padsize:(padsize+3)].tolist())
-        self.assertAlmostEqual(padval, ouarr[-1, -1])
+        src = random_arrary(6, (2, 3))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((6, 7), dst.shape)
+        self.assertEqual(src.tolist(), dst[padsize:(padsize+2), padsize:(padsize+3)].tolist())
+        self.assertAlmostEqual(padval, dst[-1, -1])
+
+    def test_convolve1D(self):
+        src = random_arrary(3, (1, 3))
+        flt_G = gaussian_filter(1, 0) # len=9
+        hlFltSz = (len(flt_G) - 1)/2  # 4
+        ref = convolve(src, flt_G, wipadding=True)
+
+        bas = np.convolve(src[0, :], flt_G, "same")
+        bas = bas[hlFltSz-1:hlFltSz+2] # extend size of src from bas center
+        self.assertEqual(bas.tolist(), ref[0, :].tolist() )
+
+    def test_convolve2D(self):
+        src = random_arrary(81, (9, 9))
+        # src = np.random.randn(9, 9)
+
+        flt_G = np.asarray(gaussian_filter(1, 0)) # len=9
+        hlFltSz = (len(flt_G) - 1)/2  # 4
+        ref = convolve(src, flt_G, wipadding=True)
+
+        tmp = np.zeros(src.shape)
+        for i in range(9):
+            tmp[i, :] = np.convolve(src[i, :], flt_G, "same")
+        bas = np.zeros(src.shape)
+        for j in range(9):
+            bas[:, j] = np.convolve(tmp[:, j], flt_G, "same")
+        np.testing.assert_almost_equal(bas, ref, decimal=5)
 
 if __name__ == '__main__':
     unittest.main()
