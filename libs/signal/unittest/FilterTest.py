@@ -1,0 +1,106 @@
+import math
+import unittest
+import numpy as np
+
+import sys
+import os.path
+sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath("../"))
+from filters import *
+
+import sympy
+from sympy import Matrix, symbols, pprint
+
+def random_arrary(length, shape=None):
+    arr = np.arange(length)
+    np.random.shuffle(arr)
+    if shape is not None and isinstance(shape, tuple):
+        arr = arr.reshape(shape)
+    return arr
+
+class TestFilters(unittest.TestCase):
+    def test_gaussian_filter(self):
+        sigma = 2
+        x = symbols('x') # n=1
+        G = 1./(sympy.sqrt(2. * sympy.pi)* sigma) * sympy.exp(-x**2/(2.*sigma**2))
+        dG = G.diff(x)
+        ddG = dG.diff(x)
+
+        flt_G = gaussian_filter(sigma, 0)
+        flt_dG = gaussian_filter(sigma, 1)
+        flt_ddG = gaussian_filter(sigma, 2)
+        hlFltSz = (len(flt_G) - 1)/2
+
+        for ix, val in enumerate(flt_G):
+            G_x = G.subs(x, ix - hlFltSz).evalf()
+            self.assertAlmostEqual(G_x, val)
+
+        for ix, val in enumerate(flt_G):
+            dG_x = dG.subs(x, ix - hlFltSz).evalf()
+            self.assertAlmostEqual(dG_x, flt_dG[ix], msg="%f != %f within 7 places at index %d" % (dG_x, flt_dG[ix], ix - hlFltSz))
+
+        for ix, val in enumerate(flt_G):
+            ddG_x = ddG.subs(x, ix - hlFltSz).evalf()
+            self.assertAlmostEqual(ddG_x, flt_ddG[ix])
+
+    def test_padding(self):
+        padsize = 1
+        padval = 0.
+        src = random_arrary(3, (3,))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((5,), dst.shape)
+        self.assertAlmostEqual(src.flatten().tolist(), dst[padsize:(padsize+3)].flatten().tolist() )
+        self.assertAlmostEqual(padval, dst[0])
+
+        padsize = 2
+        padval = 3.
+        src = random_arrary(3, (3, 1))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((7, 1), dst.shape)
+        self.assertEqual(src.flatten().tolist(), dst[padsize:(padsize+3), 0].flatten().tolist() )
+        # self.assertAlmostEqual(padval, dst[0])
+
+        padsize = 3
+        padval = 3.
+        src = random_arrary(3, (1, 3))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((1, 9), dst.shape)
+        self.assertEqual(src.flatten().tolist(), dst[0, padsize:(padsize+3)].flatten().tolist() )
+        # self.assertAlmostEqual(padval, dst[0])
+
+        padsize = 2
+        padval = 5.
+        src = random_arrary(6, (2, 3))
+        dst = padding(src, padsize, padval)
+        self.assertEqual((6, 7), dst.shape)
+        self.assertEqual(src.tolist(), dst[padsize:(padsize+2), padsize:(padsize+3)].tolist())
+        self.assertAlmostEqual(padval, dst[-1, -1])
+
+    def test_convolve1D(self):
+        src = random_arrary(3, (1, 3))
+        flt_G = gaussian_filter(1, 0) # len=9
+        hlFltSz = (len(flt_G) - 1)/2  # 4
+        ref = convolve(src, flt_G, wipadding=True)
+
+        bas = np.convolve(src[0, :], flt_G, "same")
+        bas = bas[hlFltSz-1:hlFltSz+2] # extend size of src from bas center
+        self.assertEqual(bas.tolist(), ref[0, :].tolist() )
+
+    def test_convolve2D(self):
+        src = random_arrary(81, (9, 9))
+        # src = np.random.randn(9, 9)
+
+        flt_G = np.asarray(gaussian_filter(1, 0)) # len=9
+        hlFltSz = (len(flt_G) - 1)/2  # 4
+        ref = convolve(src, flt_G, wipadding=True)
+
+        tmp = np.zeros(src.shape)
+        for i in range(9):
+            tmp[i, :] = np.convolve(src[i, :], flt_G, "same")
+        bas = np.zeros(src.shape)
+        for j in range(9):
+            bas[:, j] = np.convolve(tmp[:, j], flt_G, "same")
+        np.testing.assert_almost_equal(bas, ref, decimal=5)
+
+if __name__ == '__main__':
+    unittest.main()
