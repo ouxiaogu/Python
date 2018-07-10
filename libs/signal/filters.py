@@ -1,5 +1,5 @@
+# -*- coding: utf-8 -*-
 """
--*- coding: utf-8 -*-
 Created: ouxiaogu, 2018-06-28 15:00:06
 
 Underlying core functions to
@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-__all__ = ["gaussian_filter", "padding", "convolve", "fftconvolve"
-          "nearest_power"]
+__all__ = ["gaussian_filter", "padding", "padding_backward", "convolve",
+            "fftconvolve", "nearest_power", "dft"]
 
 SMALL_GAUSSIAN_TAB = [
     [1.],
@@ -63,7 +63,7 @@ def cv_gaussian_kernel(ksize, sigma=0):
         return cv_gaussian_kernel(SMALL_GAUSSIAN_TAB[ksize>>1] )
     if ksize % 2 == 0:
         tmp = ksize + 1
-        sys.stderr("Warning, kernel size should be odd, adjust ksize from {} to {}".format(ksize, tmp))
+        sys.stderr.write("Warning, kernel size should be odd, adjust ksize from {} to {}".format(ksize, tmp))
         ksize = tmp
     fltSz = ksize
     ksize = float(ksize)
@@ -99,8 +99,6 @@ def padding(src, padsize, padval=0):
     """
     padding data with padsize in both directions with given value padval
     """
-    if(not isinstance(padsize, int)):
-        raise ValueError("padsize should be int type!\n")
     arr = np.asarray(src)
     srcShape = arr.shape
     dst = None
@@ -125,8 +123,28 @@ def padding(src, padsize, padval=0):
         raise NotImplementedError("padding only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
     return dst
 
-def padding_col_row(src, padsize, padval=0):
-    pass
+def padding_backward(src, padshape, padval=0):
+    arr = np.asarray(src)
+    srcShape = arr.shape
+    dst = None
+    if(is_1D_array(arr) ):
+        if(not isinstance(padshape, int)):
+            raise ValueError("padshape should be int type!\n")
+        arrSz = array_long_axis_size(arr)
+        arr = arr.reshape((arrSz,) )
+        dst = padval * np.ones(arr, arr.dtype)
+        dst[0:arrSz] = arr
+        dst = dst.reshape(srcShape)
+    elif(len(srcShape) == 2):
+        if(len(padshape) != 2):
+            raise ValueError("padshape {} should be the same with src {}!\n".format(padshape, srcShape))
+        nrows, ncols = srcShape
+        newshape = tuple(np.sum(a) for a in zip(srcShape, padshape) )
+        dst = padval * np.ones(newshape, arr.dtype)
+        dst[0:nrows, 0:ncols] = arr
+    else:
+        raise NotImplementedError("padding_backward only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
+    return dst
 
 def convolve(src, flt1d, wipadding=True):
     """
@@ -292,7 +310,7 @@ def plot_flt_sz(sigma=2):
         ax.plot(x, flt_G, '-s', color=pal[ix], label="mode={}, sigma={}, hlFltSz={}".format(mode, sigma, hlFltSz) )
     addLegend([ax ])
 
-def plot_fft_rect():
+def plot_rect_func_fft():
     sys.path.append("../common")
     from MathUtil import rectFunc
     fig, axes = plt.subplots(nrows=3, ncols=1)
@@ -312,6 +330,107 @@ def plot_fft_rect():
     addLegend(axes)
     plt.show()
 
+def dft_1d_matrix(N):
+    '''build 1D dft matrix with W_i = u^i'''
+    x, y = np.meshgrid(np.arange(N), np.arange(N))
+    v = np.exp( - 2 * np.pi * 1J / N )
+    W = np.power(v, x*y) #/ np.sqrt(N)
+    return W
+
+def dft_2d_matrix(N, M):
+    '''build 2D dft matrix with W_ij = u^i*v^j
+    N: #rows, M: #columns,
+
+    Example
+    -------
+    # x, y = meshgrid(np.arange(M), np.arange(N))
+    # Think meshgrid(col, row) as a 2D x-y axis grids, then
+    # get x, y coordinates, firstly by column, then by row
+    x, y = np.meshgrid(np.arange(3), np.arange(2))
+    # => x = { [0, 1, 2], [0, 1, 2] }
+    # => y = { [0, 0, 0], [1, 1, 1] }
+    '''
+    u = np.exp( - 2. * np.pi * 1J / M )
+    v = np.exp( - 2. * np.pi * 1J / N )
+
+    x, y = np.meshgrid(np.arange(M), np.arange(M))
+    U = np.power(u, x*y) #/ np.sqrt(M)
+
+    x, y = np.meshgrid(np.arange(N), np.arange(N))
+    V = np.power(v, x*y) #/ np.sqrt(N)
+    return U, V
+
+def dft(src):
+    '''
+    DFT computation by directly matrix computation, complementary to fft
+    Note, unlike DIP book DFT convention, DFT has coefficients 1/sqrt(MN),
+    so as inverse DFT also should multiple 1/(MN).
+
+    Steps:
+        1. compute by: DFT = V * f(x, y) * U
+        2. DFT on Y, F(x, v) = sum(exp(-j2πvy/N), f(x,y)) | y=0->N-1
+        See x as known, then Y' = V*Y
+
+        V: size NxN, applied col by col
+            [       1,       1,     ..,       1],
+        V = [       1,     v^2,     ..,     v^N],
+            [      ..,      ..,     ..,      ..],
+            [       1,     v^N,     ..,v^(2N-2)]
+
+        3. DFT on X, F(u, v) = sum(exp(-j2πux/M), F(x, v)) | x=0->M-1
+        See v as known, then X' = X*U
+
+        U: size MxM, applied row by row
+            [       1,       1,     ..,       1],
+        U = [       1,     u^2,     ..,     u^M],
+            [      ..,      ..,     ..,      ..],
+            [       1,     u^M,     ..,u^(2M-2)]
+
+        size: DFT = (V* src * U), should be (NxN) * (N*M) * (M*M)
+
+        4. traceback back,
+            - for 2D DFT, we just need to prepare NxN matrix U and MxM matrix V
+              DFT = V* src * U
+            - for 1D DFT, is just 1 NxN matrix: DFT = V* src
+
+    Parameters
+    ----------
+    src : array_like
+        object to apply DFT, mostly likely is 2D image array, but 1D array
+        is also supported
+
+    Returns
+    -------
+    dst : array_like
+        DFT result object, same shape as src
+
+    Reference
+    ---------
+    https://stackoverflow.com/questions/19739503/dft-matrix-in-python
+    '''
+    arr = np.asarray(src)
+    srcShape = arr.shape
+    dst = None
+    if(is_1D_array(arr) ):
+        N = array_long_axis_size(arr)
+        arr = arr.reshape((1,N) )
+        W = dft_1d_matrix(N)
+        dst = W.dot(arr)
+        dst = dst.reshape(srcShape)
+    elif(len(srcShape) == 2):
+        N, M = srcShape
+        U, V = dft_2d_matrix(N, M)
+        dst = V.dot(arr).dot(U)
+    else:
+        raise NotImplementedError("DFT only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
+    return dst
+
+def dft_matrix(N):
+    i, j = np.meshgrid(np.arange(N), np.arange(N))
+    omega = np.exp( - 2 * np.pi * 1J / N )
+    W = np.power( omega, i * j ) #/ np.sqrt(N)
+    return W
+
 if __name__ == '__main__':
     # arr = np.random.randn(3, 4)
     # fltG = gaussian_filter(1)
@@ -328,4 +447,8 @@ if __name__ == '__main__':
     # import cv2
     # print(cv2.getGaussianKernel(11, -1))
 
-    plot_fft_rect()
+    # plot_rect_func_fft()
+
+    '''test dft matrix'''
+    print(dft_1d_matrix(3))
+    U, V = dft_2d_matrix(2, 2)
