@@ -12,6 +12,7 @@ import numpy as np
 import sys
 from ImGUI import imshowCmap, cvtFloat2Gray
 from ImFilters import *
+from ImGUI import imshowMultiple, imshowMultiple_TitleMatrix
 
 def try_paramid():
     """
@@ -96,7 +97,6 @@ def try_paramid():
 
 def try_fft(fftshift=True, method=None):
     from ImDescriptors import im_fft_amplitude_phase
-    from ImGUI import imshowMultiple, imshowMultiple_TitleMatrix
     prefix = "{}(fftshift = {})".format(method, fftshift)
 
     # raw image
@@ -133,6 +133,7 @@ def try_fft_power():
     imshowMultiple([im, amplitude, phase], titles=['im','{} amplitude'.format(prefix), '{} phase'.format(prefix)])
 
 def try_filter(option=None):
+    from ImFilters import imApplyFilter
     if option is None:
         option = 'LPF'
     if option == 'LPF':
@@ -142,8 +143,14 @@ def try_filter(option=None):
     funcname = [f.__name__ for f in funcs]
 
     # raw image
-    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif')
-
+    im = cv2.imread(r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif', 0)
+    imgs = [im]
+    titles = ['raw image']
+    for D0 in [10, 30, 60, 160, 460]:
+        kwargs = {'D0': D0}
+        imgs.append(imApplyFilter(im, ILPF, **kwargs) )
+        titles.append('ILPF, D0 = {}'.format(D0))
+    imshowMultiple(imgs, titles)
 
 
 if __name__ == '__main__':
@@ -154,4 +161,4 @@ if __name__ == '__main__':
     # for fftshift in [True, False]:
     #     try_fft(fftshift)
 
-    try_fft_power()
+    try_filter()
