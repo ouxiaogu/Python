@@ -24,23 +24,21 @@ Abid Rahman 3/14/12 debug Gary Bradski
 Part 2: Image merge overview functions
 '''
 
-from sys import platform
+import sys
 import numpy as np
-from FileUtil import FileScanner, getFileLabel
-from subprocess import call
-import logger
-import os.path
+
 import cv2
 import pandas as pd
-import re
 
-__all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
-            'calcHist', 'readDumpImage', 'readBBox',
-            ]
+__all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
+            'im_fft_amplitude_phase', 'im_dft_amplitude_phase'
+        ]
 
 RMS_BIN_RANGES = [0, 2, 4, 6, 8, 10, 15, 20, 30, 50, 100]
 ZNCC_BIN_RANGES = [0, 0.2, 0.5, 0.8]
 
+sys.path.append("../common")
+import logger
 logger.initlogging(debug=False)
 log = logger.getLogger("ImDescriptors")
 BINS = np.arange(256).reshape(256,1)
@@ -150,4 +148,40 @@ def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
     histDF = histDF.transpose() # for barplot, column as range lables
     return histDF
 
+def im_fft_amplitude_phase(im, freqshift=True, method=None):
+    '''get image DFT amplitude & phase for the input image by fft'''
+    if method is None:
+        method = 'fft'
+    if method == 'fft':
+        fourierfunc = np.fft.fft2
+    elif method == 'dft':
+        sys.path.append("../signal")
+        from filters import dft
+        fourierfunc = dft
+    if not freqshift:
+    # gen transform matrix T, so fft spectrum is zero-centered
+        sys.path.append("../signal")
+        T = np.zeros(im.shape, im.dtype)
+        nrows, ncols = im.shape
+        for y in range(nrows):
+            for x in range(ncols):
+                T[y, x] = (-1)**(x+y)
+        im = np.multiply(im, T)
 
+    # fft, and rescale the amplitude
+    imfft = fourierfunc(im)
+    if freqshift:
+        imfft = np.fft.fftshift(imfft)
+    amplitude = np.abs(imfft)
+    amplitude  = np.log(1+ amplitude) # refer to DIPum
+    # amplitude  = 1 + np.log(amplitude)
+    phase = np.angle(imfft)
+    return (amplitude, phase)
+
+def im_fft_power(im):
+    '''get DFT power'''
+    # fft, and rescale the amplitude
+    imfft = np.fft.fft2(im)
+    imfft = np.fft.fftshift(imfft)
+
+    fftpower = (np.abs(imfft))**2
