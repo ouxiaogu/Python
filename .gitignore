@@ -5,22 +5,13 @@ __pycache__/
 # C extensions
 *.so
 
-# exclude image
-
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.gif
-*.pgm
-*.tif
-
-
 # Distribution / packaging
-01notebook/.ipynb_checkpoints/*
 .Python
-01notebook/FEM/**
-!01notebook/FEM/*.py
+FEM
+FEM/BF/
+FEM/data/
+FEM/results/
+FEM/util/results/
 env/
 build/
 develop-eggs/
