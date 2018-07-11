@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-07-02 11:44:17
 
-Test the Code in DIP:
+Test the Code in DIP chapter 4: Filtering in Frequency Domain
 
 Last Modified by: ouxiaogu
 """
@@ -10,9 +10,12 @@ Last Modified by: ouxiaogu
 import cv2
 import numpy as np
 import sys
-from ImGUI import imshowCmap, cvtFloat2Gray
+import re
+
+sys.path.append("../imutil")
+from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_TitleMatrix
 from ImFilters import *
-from ImGUI import imshowMultiple, imshowMultiple_TitleMatrix
+
 
 def try_paramid():
     """
@@ -119,18 +122,27 @@ def try_fft(fftshift=True, method=None):
                     imT, amplitudeT, phaseT,
                     imR, amplitudeR, phaseR], 3, 3, ['im', 'im translate', 'im Rotation'], ['spatial', '{} amplitude'.format(prefix), '{} phase'.format(prefix)])
 
-def try_fft_power():
+def try_power_ratio_loci():
     from ImDescriptors import im_fft_amplitude_phase
     from ImGUI import imshowMultiple
     prefix='FFT'
 
     # raw image
     im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0441(a)(characters_test_pattern).tif', 0)
-    rows, cols = im.shape
-    amplitude, phase = im_fft_amplitude_phase(im)
+
+    # padding into 2X
+    sys.path.append("../signal")
+    from filters import padding_backward
+    rawShape = im.shape
+    fp = padding_backward(im, rawShape)
+    amplitude, phase = im_fft_amplitude_phase(fp, raw_amplitude=True)
 
     # plot
-    imshowMultiple([im, amplitude, phase], titles=['im','{} amplitude'.format(prefix), '{} phase'.format(prefix)])
+    # imshowMultiple([fp, amplitude, phase], titles=['im padding','{} amplitude'.format(prefix), '{} phase'.format(prefix)])
+
+    from ImDescriptors import power_ratio_in_cutoff_frequency
+    ratios = [power_ratio_in_cutoff_frequency(amplitude, D0) for D0 in [10, 30, 60, 160, 460]]
+    print(ratios)
 
 def try_filter(option=None):
     from ImFilters import imApplyFilter
@@ -138,20 +150,67 @@ def try_filter(option=None):
         option = 'LPF'
     if option == 'LPF':
         funcs = [ILPF, BLPF, GLPF]
+        cutoffs = [10, 30, 60, 160, 460]
     elif option == 'HPF':
         funcs = [IHPF, BHPF, GHPF]
+        cutoffs = [30, 60, 160]
     funcname = [f.__name__ for f in funcs]
 
     # raw image
-    im = cv2.imread(r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif', 0)
+    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif', 0)
     imgs = [im]
     titles = ['raw image']
-    for D0 in [10, 30, 60, 160, 460]:
-        kwargs = {'D0': D0}
-        imgs.append(imApplyFilter(im, ILPF, **kwargs) )
-        titles.append('ILPF, D0 = {}'.format(D0))
-    imshowMultiple(imgs, titles)
+    flt_imgs = []
+    flt_titles = []
+    n = 2
 
+    for func in funcs:
+        for D0 in cutoffs:
+            if re.match('^B\w+PF', func.__name__):
+                kwargs = {'D0': D0, 'n': n}
+            else:
+                kwargs = {'D0': D0}
+            argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
+            labels = [func.__name__] + argstrs
+            label = ', '.join(labels)
+            flt_imgs.append(imApplyFilter(im, func, **kwargs) )
+            flt_titles.append(label)
+        imshowMultiple(imgs + flt_imgs, titles + flt_titles)
+        flt_imgs.clear()
+        flt_titles.clear()
+
+def try_homomorphic_filter():
+    # raw image
+    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0462(a)(PET_image).tif', 0)
+
+    from ImFilters import imApplyHomomorphicFilter
+    kwargs = {'gamma_L': 0.5, 'gamma_H': 1.5, 'c': 1}
+    flt_im = imApplyHomomorphicFilter(im, 80, **kwargs)
+    imshowMultiple([im, flt_im], ['orig image', 'homomorphic filter'])
+    
+def try_display_filter():
+    funcs = [ILPF, IHPF, IBRF, IBPF,
+            BLPF, BHPF, BBRF, BBPF,
+            GLPF, GHPF, GBRF, GBPF]
+    shape = (400, 300)
+    D0 = 100
+    n = 2
+    W = 10
+    flts = []
+    titles = []
+    for func in funcs:
+        kwargs = {'D0': D0}
+        if re.match('^B\w{2}F', func.__name__):
+            kwargs['n'] = n
+        if re.match('^\w{1}B\w{1}F', func.__name__):
+            kwargs['W'] = W
+        flts.append(func(shape, **kwargs) )
+        
+        argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
+        labels = [func.__name__] + argstrs
+        label = ', '.join(labels)
+        titles.append(label)
+    imshowMultiple(flts, titles)
 
 if __name__ == '__main__':
     # try_paramid()
@@ -161,4 +220,11 @@ if __name__ == '__main__':
     # for fftshift in [True, False]:
     #     try_fft(fftshift)
 
-    try_filter()
+    # try_power_ratio_loci()
+
+    # try_filter('LPF')
+    # try_filter('HPF')
+
+    # try_homomorphic_filter()
+    
+    try_display_filter()

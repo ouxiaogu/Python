@@ -31,7 +31,7 @@ import cv2
 import pandas as pd
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
-            'im_fft_amplitude_phase', 'im_dft_amplitude_phase'
+            'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
         ]
 
 RMS_BIN_RANGES = [0, 2, 4, 6, 8, 10, 15, 20, 30, 50, 100]
@@ -148,7 +148,7 @@ def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
     histDF = histDF.transpose() # for barplot, column as range lables
     return histDF
 
-def im_fft_amplitude_phase(im, freqshift=True, method=None):
+def im_fft_amplitude_phase(im, freqshift=True, method=None, raw_amplitude=False):
     '''get image DFT amplitude & phase for the input image by fft'''
     if method is None:
         method = 'fft'
@@ -172,16 +172,40 @@ def im_fft_amplitude_phase(im, freqshift=True, method=None):
     imfft = fourierfunc(im)
     if freqshift:
         imfft = np.fft.fftshift(imfft)
-    amplitude = np.abs(imfft)
-    amplitude  = np.log(1+ amplitude) # refer to DIPum
-    # amplitude  = 1 + np.log(amplitude)
+    rawamplitude = np.abs(imfft)
+    amplitude  = np.log(1+ rawamplitude) # refer to DIPum
+    # amplitude  = 1 + np.log(amplitude) # DIP form
     phase = np.angle(imfft)
+    if raw_amplitude:
+        amplitude = rawamplitude
     return (amplitude, phase)
 
-def im_fft_power(im):
-    '''get DFT power'''
-    # fft, and rescale the amplitude
-    imfft = np.fft.fft2(im)
-    imfft = np.fft.fftshift(imfft)
+def power_ratio_in_cutoff_frequency(amplitude, D0):
+    '''
+    A way to compute the cutoff frequency loci for LPF
 
-    fftpower = (np.abs(imfft))**2
+    the ratio is defined as:
+
+        r = 100 * Sum( P{inside D0} ) / Sum( P{image power} )
+
+    Parameters
+    ----------
+    amplitude : 2D array
+        image frequency spectrum or amplitude
+    D0 : float
+        cutoff frequency
+
+    Returns:
+    --------
+    ratio : float
+        image power ratio inside cutoff frequency
+    '''
+    power = amplitude**2
+
+    from ImFilters import distance_map
+    D = distance_map(amplitude.shape)
+    mask = ~(D <= D0)
+    power_m = np.ma.array(power, mask=mask)
+
+    ratio = 100 * np.sum(power_m) / np.sum(power)
+    return ratio

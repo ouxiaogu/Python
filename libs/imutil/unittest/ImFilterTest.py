@@ -34,5 +34,17 @@ class TestFilters(unittest.TestCase):
         funcs = [ILPF, BLPF, GLPF]
         print([f.__name__ for f in funcs])
 
+    def test_mat(self):
+        shape = (3, 4)
+        nrows, ncols = shape
+        ref = np.zeros(shape)
+        for y in range(nrows):
+            for x in range(ncols):
+                ref[y, x] = (-1)**(x+y)
+
+        x, y = np.meshgrid(np.arange(ncols), np.arange(nrows))
+        bas = (-1)**(x + y)
+        np.testing.assert_equal(bas, ref)
+
 if __name__ == '__main__':
     unittest.main()
