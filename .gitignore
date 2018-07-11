@@ -17,8 +17,10 @@ __pycache__/
 
 
 # Distribution / packaging
+01notebook/.ipynb_checkpoints/*
 .Python
-FEM/**
+01notebook/FEM/**
+!01notebook/FEM/*.py
 env/
 build/
 develop-eggs/
