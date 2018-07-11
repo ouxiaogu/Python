@@ -1,0 +1,4 @@
+deploy:
+  type: git
+  repo: git@github.com:ouxiaogu/Python.git
+  branch: master
