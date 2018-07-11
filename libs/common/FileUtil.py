@@ -11,6 +11,7 @@ import os.path
 import string
 import re
 from PlatformUtil import inLinux, inWindows
+import sys
 
 __all__ = [ 'gpfs2WinPath',
             'splitFileName', 'getFileLabel', 'outfilePath'
@@ -31,7 +32,10 @@ def gpfs2WinPath(src):
 
 def splitFileName(src):
     dirname, basename = os.path.split(src)
-    filelabel, extension = string.rsplit(basename, sep='.', maxsplit=1)
+    if (sys.version_info > (3, )):
+        filelabel, extension = basename.rsplit(sep='.', maxsplit=1)
+    else:
+        filelabel, extension = string.rsplit(basename, sep='.', maxsplit=1)
     return dirname, filelabel, extension
 
 def getFileLabel(files):
@@ -59,7 +63,7 @@ class FileScanner(object):
             return False
         if postfix and (not basename.endswith(postfix)):
             return False
-        if regex_pattern and (not re.match(regex_pattern, basename)):
+        if regex_pattern and (re.search(regex_pattern, basename) is None):
             return False
         return True
 
@@ -97,14 +101,25 @@ class FileScanner(object):
         return subdir_list
 
 if __name__ == '__main__':
-    '''test 1'''
-    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/im_debug/doublechk/proc383/383'
-    INDIR = gpfs2WinPath(INDIR)
-    print INDIR
+    # '''test 1'''
+    # INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/im_debug/doublechk/proc383/383'
+    # INDIR = gpfs2WinPath(INDIR)
+    # print(INDIR)
 
-    '''test 2'''
-    fsn = FileScanner(INDIR)
-    files = fsn.scan_files(postfix=r'.pgm') ## , recursive=True)
+    # '''test 2'''
+    # fsn = FileScanner(INDIR)
+    # files = fsn.scan_files(postfix=r'.pgm') ## , recursive=True)
+    # labels = getFileLabel(files)
+    # print(files)
+    # print(labels)
+
+    '''test 3'''
+    path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\image"
+    fsn = FileScanner(path)
+    files = fsn.scan_files(regex_pattern=r'.tif') ## not use * in regex header
     labels = getFileLabel(files)
-    print files
-    print labels
+    print(files)
+    print(labels)
+
+    print(re.match('.tif', 'Tech_Demo_rectangular_BWALL_set_8img_08302015_merged.csv'))
+    print(re.search('.tif', r'a.tif'))

@@ -5,7 +5,6 @@ import numpy as np
 import sys
 import os.path
 sys.path.append(os.path.abspath("../"))
-sys.path.append(os.path.abspath("../"))
 from filters import *
 
 import sympy
@@ -33,15 +32,15 @@ class TestFilters(unittest.TestCase):
 
         for ix, val in enumerate(flt_G):
             G_x = G.subs(x, ix - hlFltSz).evalf()
-            self.assertAlmostEqual(G_x, val)
+            self.assertAlmostEqual(G_x, val, 2)
 
         for ix, val in enumerate(flt_G):
             dG_x = dG.subs(x, ix - hlFltSz).evalf()
-            self.assertAlmostEqual(dG_x, flt_dG[ix], msg="%f != %f within 7 places at index %d" % (dG_x, flt_dG[ix], ix - hlFltSz))
+            self.assertAlmostEqual(dG_x, flt_dG[ix], 2, msg="%f != %f within 7 places at index %d" % (dG_x, flt_dG[ix], ix - hlFltSz))
 
         for ix, val in enumerate(flt_G):
             ddG_x = ddG.subs(x, ix - hlFltSz).evalf()
-            self.assertAlmostEqual(ddG_x, flt_ddG[ix])
+            self.assertAlmostEqual(ddG_x, flt_ddG[ix], 2)
 
     def test_padding(self):
         padsize = 1
@@ -76,6 +75,15 @@ class TestFilters(unittest.TestCase):
         self.assertEqual(src.tolist(), dst[padsize:(padsize+2), padsize:(padsize+3)].tolist())
         self.assertAlmostEqual(padval, dst[-1, -1])
 
+    def test_padding_backward(self):
+        a = np.random.rand(4, 3)
+        padshape = (1, 3)
+        res = padding_backward(a, padshape)
+        myslice = tuple(slice(0, sz) for sz in a.shape)
+        np.testing.assert_almost_equal(a, res[myslice])
+        bas = np.zeros(padshape)
+        np.testing.assert_almost_equal(bas, res[-1:, -3:])
+
     def test_convolve1D(self):
         src = random_arrary(3, (1, 3))
         flt_G = gaussian_filter(1, 0) # len=9
@@ -100,6 +108,13 @@ class TestFilters(unittest.TestCase):
         bas = np.zeros(src.shape)
         for j in range(9):
             bas[:, j] = np.convolve(tmp[:, j], flt_G, "same")
+        np.testing.assert_almost_equal(bas, ref, decimal=5)
+
+    def test_dft(self):
+        '''test dft with fft'''
+        a = np.arange(6).reshape((3, 2))
+        bas = np.fft.fft2(a)
+        ref = dft(a)
         np.testing.assert_almost_equal(bas, ref, decimal=5)
 
 if __name__ == '__main__':

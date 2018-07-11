@@ -115,4 +115,4 @@ if __name__ == '__main__':
     INFILE = gpfs2WinPath(INFILE)
     SEM = SEMSpec()
     spec = SEM.from_mxp_ocf(INFILE)
-    print spec
+    print(spec)

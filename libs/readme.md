@@ -1,3 +1,13 @@
+### Directory
+
+| Name       | Usage                                             |
+|------------|---------------------------------------------------|
+| common     | "FileUtil", "logger", "MathUtil", "StrUtil", "XmlUtil" "PlatformUtil" "PlotConfig"       |
+| DIP        | Implementation of book "Digital Image Processing                                         |
+| imutil     | 'ImDescriptors', 'ImFilter', 'ImGUI'                                                     |
+| optimize   | optimization algorithms: 'nonlinear_lsq', 'nonlinear_unconstrained', 'root_finding', QP  |
+| signal     | "filters", "interpolation"                                                               |
+
 
 ### Reference
 

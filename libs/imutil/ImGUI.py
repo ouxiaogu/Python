@@ -303,7 +303,7 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
 
 if __name__ == '__main__':
     '''test 1'''
-    path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\image"
+    # path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\image"
     path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\orth\avgImage"
     images, labels = imreadFolder(path, reg_pattern='.tif') # not "*" in regex
     # print(labels)

@@ -1,24 +1,22 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+*checkpoint.ipynb
+iCal
 
 # C extensions
 *.so
 
-# exclude image
-
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.gif
-*.pgm
-*.tif
-
-
 # Distribution / packaging
+
 .Python
-FEM/**
+FEM
+FEM/BF/
+FEM/data/
+FEM/results/
+FEM/util/results/
 env/
 build/
 develop-eggs/

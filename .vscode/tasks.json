@@ -1,0 +1,13 @@
+{
+    // https://www.stevefenton.co.uk/2015/05/Custom-Tasks-In-Visual-Studio-Code/
+    "version": "0.1.0",
+    "command":  "C:\\Users\\ouxiaogu\\AppData\\Local\\Continuum\\anaconda3\\python.exe",
+    "args": ["app.py"],
+    "problemMatcher": {
+        "fileLocation": ["relative", "${workspaceRoot}"],
+        "pattern": {
+            "regexp": "^(.*)+s$",
+            "message": 1
+        }
+    }
+}
