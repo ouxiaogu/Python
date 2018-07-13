@@ -15,7 +15,9 @@ import re
 sys.path.append("../imutil")
 from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_TitleMatrix
 from ImFilters import *
+from ImDescriptors import im_fft_amplitude_phase
 
+IMFILE = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples\calaveras_v3_LDose_p3544.bmp'
 
 def try_paramid():
     """
@@ -34,9 +36,8 @@ def try_paramid():
     sys.path.append("../common")
     # from PlatformUtil import home
     # import os
-    # imfile = os.path.join(home(), r"github\OpenCV-3.3.1\samples\data\building.jpg")
-    imfile = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0417(a)(barbara).tif'
-    im = cv2.imread(imfile, 0)
+    # IMFILE = os.path.join(home(), r"github\OpenCV-3.3.1\samples\data\building.jpg")
+    im = cv2.imread(IMFILE, 0)
     nrows, ncols = im.shape
     if(im is None):
        sys.exit("Failed to read image!\n")
@@ -99,11 +100,11 @@ def try_paramid():
     cv2.destroyAllWindows()
 
 def try_fft(fftshift=True, method=None):
-    from ImDescriptors import im_fft_amplitude_phase
     prefix = "{}(fftshift = {})".format(method, fftshift)
 
     # raw image
-    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0424(a)(rectangle).tif', 0)
+    # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0424(a)(rectangle).tif', 0)
+    im = cv2.imread(IMFILE, 0)
     rows, cols = im.shape
     amplitude, phase = im_fft_amplitude_phase(im, fftshift, method)
 
@@ -123,12 +124,12 @@ def try_fft(fftshift=True, method=None):
                     imR, amplitudeR, phaseR], 3, 3, ['im', 'im translate', 'im Rotation'], ['spatial', '{} amplitude'.format(prefix), '{} phase'.format(prefix)])
 
 def try_power_ratio_loci():
-    from ImDescriptors import im_fft_amplitude_phase
     from ImGUI import imshowMultiple
     prefix='FFT'
 
     # raw image
-    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0441(a)(characters_test_pattern).tif', 0)
+    # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0441(a)(characters_test_pattern).tif', 0)
+    im = cv2.imread(IMFILE, 0)
 
     # padding into 2X
     sys.path.append("../signal")
@@ -141,7 +142,7 @@ def try_power_ratio_loci():
     # imshowMultiple([fp, amplitude, phase], titles=['im padding','{} amplitude'.format(prefix), '{} phase'.format(prefix)])
 
     from ImDescriptors import power_ratio_in_cutoff_frequency
-    ratios = [power_ratio_in_cutoff_frequency(amplitude, D0) for D0 in [10, 30, 60, 160, 460]]
+    ratios = [(D0, power_ratio_in_cutoff_frequency(amplitude, D0)) for D0 in np.linspace(10, 600, 8)]
     print(ratios)
 
 def try_filter(option=None):
@@ -149,27 +150,38 @@ def try_filter(option=None):
     if option is None:
         option = 'LPF'
     if option == 'LPF':
-        funcs = [ILPF, BLPF, GLPF]
-        cutoffs = [10, 30, 60, 160, 460]
+        funcs = [GLPF]
+        # cutoffs = [10, 30, 60, 160, 460]
+        # cutoffs = [160, 300, 460]
+        cutoffs = np.linspace(30, 60, 7)
     elif option == 'HPF':
-        funcs = [IHPF, BHPF, GHPF]
-        cutoffs = [30, 60, 160]
+        funcs = [ GHPF] # IHPF, BHPF,
+        cutoffs = [30, 60, 160, 460, 760]
+    elif option == 'BPF':
+        funcs = [ GBPF]
+        cutoffs = np.linspace(30, 60, 7)
     funcname = [f.__name__ for f in funcs]
 
     # raw image
-    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif', 0)
+    # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif', 0)
+    im = cv2.imread(IMFILE, 0)
+    im = cv2.medianBlur(im, 3)
     imgs = [im]
-    titles = ['raw image']
+    # titles = ['raw image']
+    titles = ['image w/i medianBlur']
     flt_imgs = []
     flt_titles = []
     n = 2
 
     for func in funcs:
         for D0 in cutoffs:
-            if re.match('^B\w+PF', func.__name__):
-                kwargs = {'D0': D0, 'n': n}
-            else:
-                kwargs = {'D0': D0}
+            kwargs = {'D0': D0}
+            if re.match('^B\w{1}PF', func.__name__):
+                kwargs['n'] = n
+            if re.match('^\w{1}B\w{1}F', func.__name__):
+                W = D0*0.4
+                kwargs['W'] = W
+
             argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
             labels = [func.__name__] + argstrs
             label = ', '.join(labels)
@@ -179,16 +191,38 @@ def try_filter(option=None):
         flt_imgs.clear()
         flt_titles.clear()
 
+def try_HFEF():
+    # read image
+    im = cv2.imread(IMFILE, 0)
+    im = cv2.medianBlur(im, 3)
+    imgs = [im]
+    # titles = ['raw image']
+    titles = ['image w/i medianBlur']
+
+    cutoffs = [160, 300, 460]
+    func = HFEF
+    subfunc = GHPF
+    flt_imgs = []
+    flt_titles = []
+    for D0 in cutoffs:
+        kwargs = {'HPFfunc': subfunc, 'D0': D0}
+        argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
+        labels = [func.__name__, subfunc.__name__] + argstrs
+        label = ', '.join(labels)
+        flt_imgs.append(imApplyFilter(im, func, **kwargs) )
+        flt_titles.append(label)
+    imshowMultiple(imgs + flt_imgs, titles + flt_titles)
+
 def try_homomorphic_filter():
     # raw image
     # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0462(a)(PET_image).tif', 0)
-    im = cv2.imread(r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH04\Fig0462(a)(PET_image).tif', 0)
+    im = cv2.imread(IMFILE, 0)
 
     from ImFilters import imApplyHomomorphicFilter
     kwargs = {'gamma_L': 0.5, 'gamma_H': 1.5, 'c': 1}
     flt_im = imApplyHomomorphicFilter(im, 80, **kwargs)
     imshowMultiple([im, flt_im], ['orig image', 'homomorphic filter'])
-    
+
 def try_display_filter():
     funcs = [ILPF, IHPF, IBRF, IBPF,
             BLPF, BHPF, BBRF, BBPF,
@@ -206,26 +240,58 @@ def try_display_filter():
         if re.match('^\w{1}B\w{1}F', func.__name__):
             kwargs['W'] = W
         flts.append(func(shape, **kwargs) )
-        
+
         argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
         labels = [func.__name__] + argstrs
         label = ', '.join(labels)
         titles.append(label)
     imshowMultiple(flts, titles)
 
+def try_notch_filter():
+    # raw image
+    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0464(a)(car_75DPI_Moire).tif', 0)
+
+    # padding into 2X
+    sys.path.append("../signal")
+    from filters import padding_backward
+    rawShape = im.shape
+    fp = padding_backward(im, rawShape)
+    amplitude, _  = im_fft_amplitude_phase(fp)
+
+    notches = [(108.3, 169.6), (222.1, 161.4), (107.6, 86.6), (222.1, 79.1)]
+    D0s = [10 for n in notches]
+    kwargs = {'notches': notches, 'D0s': D0s, 'n': 4}
+    H = BNRF(fp.shape, **kwargs)
+    Fp = np.fft.fft2(fp)
+    Fp = np.fft.fftshift(Fp)
+    Gp = Fp*H
+    Gp_A = np.log(1 + np.absolute(Gp))
+
+    res = imApplyFilter(im, BNRF, **kwargs)
+
+    imshowMultiple([fp, amplitude, H, Gp_A], ['im', 'fft', 'BNRF', 'frequency result'])
+    imshowMultiple([im, res], ['im', 'BNRF result'])
+
+
 if __name__ == '__main__':
     # try_paramid()
 
     #import itertools
     # for fftshift, method in itertools.product([True, False],  ['fft', 'dft']):
-    # for fftshift in [True, False]:
-    #     try_fft(fftshift)
+
+    # for fftshift in [True]: #False
+    #    try_fft(fftshift)
 
     # try_power_ratio_loci()
 
-    # try_filter('LPF')
+    try_filter('LPF')
     # try_filter('HPF')
+    try_filter('BPF')
+
+    # try_HFEF()
 
     # try_homomorphic_filter()
-    
-    try_display_filter()
+
+    # try_display_filter()
+
+    # try_notch_filter()

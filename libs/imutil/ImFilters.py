@@ -12,19 +12,21 @@ import sys
 import re
 
 __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
-            'BLPF', 'BHPF', 'BBRF', 'BBPF',
+            'BLPF', 'BHPF', 'BBRF', 'BBPF', 'BNRF', 'BNPF',
             'GLPF', 'GHPF', 'GBRF', 'GBPF',
             'HFEF', 'LaplaceFilter',
             'imApplyFilter', 'distance_map',
             'HomomorphicFilter', 'imApplyHomomorphicFilter'
             ]
 
-def distance_map(shape):
+def distance_map(shape, notch=None):
     """distance = sqrt((x-cx)^2 + (y-cy)^2)"""
     N, M = shape
     x, y = np.meshgrid(np.arange(M), np.arange(N))
     cx = (M - 1)/2
     cy = (N - 1)/2
+    if notch is not None:
+        cx, cy = notch
     z = np.sqrt((x - cx)**2 + (y - cy)**2)
     return z
 
@@ -71,7 +73,9 @@ def BHPF(shape, D0, n):
     return 1 - BLPF(shape, D0, n)
 
 def BBRF(shape, D0, n, W):
+    '''Butterworth Band Reject Filter'''
     D = distance_map(shape)
+
     z1 = np.power(D**2 - D0**2, 2*n)
     z2 = np.power(D*W, 2*n)
     z = z1/(z1 + z2)
@@ -79,6 +83,50 @@ def BBRF(shape, D0, n, W):
 
 def BBPF(shape, D0, n, W):
     return 1 - BBRF(shape, D0, n, W)
+
+def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left'):
+    '''
+    Butterworth Notch Reject filter
+    BNRF = ∏ H_i_{k} * H_i_{-k}
+
+    Parameters
+    ----------
+    notches : array-like object
+        each element is a pair of notch: (u, v), origin defined by
+        `notch_origin`
+    D0s : array-like object
+        each element is a cut-off frequency
+    n : int
+        Butterworth filer order, default n = 2
+    notch_origin : string, 'top-left' or 'center'
+        - 'top-left', means input notch's origin is at top left of the image,
+          need switch to image center to get the real (u, v)
+    '''
+    inline_origins = ['top-left', 'center']
+    if len(notches) != len(D0s):
+        raise ValueError("'notches' and 'D0s' have different length: {} & {}!\n".format(len(notches), len(D0s)))
+    if notch_origin not in inline_origins:
+        raise ValueError("input 'notch_origin' {} is not in supported list {}!\n".format(notch_origin, str(notch_origin)))
+    N, M = shape
+    if notch_origin == 'center':
+        notches = [(u + (M - 1)/2, v + (N - 1)/2) for u, v in notches]
+        inv_notches = [(-u, -v) for u, v in notches]
+    elif notch_origin == 'top-left':
+        inv_notches = [(M-1-u, N-1-v) for u, v in notches]
+    z = np.ones(shape)
+    for ix, notch in enumerate(notches):
+        u, v = notch
+        D0 = D0s[ix]
+        D_p = distance_map(shape, (u, v))
+        z_p = 1 - 1/(1 + np.power(D_p/D0, 2*n))
+
+        D_n = distance_map(shape, inv_notches[ix])
+        z_n = 1 - 1/(1 + np.power(D_n/D0, 2*n))
+        z = z*z_p*z_n
+    return z
+
+def BNPF(shape, notches, D0s, n=2, notch_origin='top-left'):
+    return 1 - BNRF(shape, notches, D0s, n, notch_origin)
 
 def GLPF(shape, D0):
     D = distance_map(shape)
@@ -96,7 +144,7 @@ def GBRF(shape, D0, W):
 def GBPF(shape, D0, W):
     return 1 - GBRF(shape, D0, W)
 
-def HFEF(shape, HPFfunc, k1=0.5, k2=0.75, *args):
+def HFEF(shape, HPFfunc=None, k1=0.5, k2=0.75, **kwargs):
     '''
     g(x, y) = f + k*(f - f_LP)
     G = F + k * (F - H_LP*F) = F + k * {(1- H_LP)*F} = (1 + k*H_HP)*F
@@ -108,16 +156,18 @@ def HFEF(shape, HPFfunc, k1=0.5, k2=0.75, *args):
     Parameters
     ----------
     HPFfunc : function object
-        specify the High Pass Filter function
+        specify the High Pass Filter function, default is GHPF
     k1 : float
         k1 control the distance to zero frequency wt plane, all the weight
         raw image frequency
     k2 : float
         k2 control the weight of high frequency
-    args: list like object
-        will pass into HPF functions in order
+    kwargs: dict like object
+        will pass into HPF functions
     '''
-    HPF = HPFfunc(shape, *args)
+    if HPFfunc is None:
+        HPFfunc = GHPF
+    HPF = HPFfunc(shape, **kwargs)
     return k1 + k2*HPF
 
 def LaplaceFilter(shape):
@@ -181,15 +231,6 @@ def imApplyFilter(src, fltFunc, **kwargs):
 
     # 3. fft & filtering
     Fp = np.fft.fft2(fp)
-    if 'D0' not in kwargs:
-        kwargs['D0'] = min(M, N)//4
-    if re.match('^B\w{2}F', fltFunc.__name__):
-        if 'n' not in kwargs :
-            kwargs['n'] = 2
-    if re.match('^\w{1}B\w{1}F', fltFunc.__name__):
-        if 'W' not in kwargs :
-            kwargs['W'] = min(M, N)//8
-
     H = fltFunc(Fp.shape, **kwargs)
     Gp = Fp * H
 

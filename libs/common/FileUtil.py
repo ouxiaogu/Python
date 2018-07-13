@@ -102,9 +102,9 @@ class FileScanner(object):
 
 if __name__ == '__main__':
     # '''test 1'''
-    # INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/im_debug/doublechk/proc383/383'
-    # INDIR = gpfs2WinPath(INDIR)
-    # print(INDIR)
+    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/1Data/LowDosage/Images/3583'
+    INDIR = gpfs2WinPath(INDIR)
+    print(INDIR)
 
     # '''test 2'''
     # fsn = FileScanner(INDIR)
@@ -114,12 +114,12 @@ if __name__ == '__main__':
     # print(labels)
 
     '''test 3'''
-    path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\image"
-    fsn = FileScanner(path)
-    files = fsn.scan_files(regex_pattern=r'.tif') ## not use * in regex header
-    labels = getFileLabel(files)
-    print(files)
-    print(labels)
+    # path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\image"
+    # fsn = FileScanner(path)
+    # files = fsn.scan_files(regex_pattern=r'.tif') ## not use * in regex header
+    # labels = getFileLabel(files)
+    # print(files)
+    # print(labels)
 
-    print(re.match('.tif', 'Tech_Demo_rectangular_BWALL_set_8img_08302015_merged.csv'))
-    print(re.search('.tif', r'a.tif'))
+    # print(re.match('.tif', 'Tech_Demo_rectangular_BWALL_set_8img_08302015_merged.csv'))
+    # print(re.search('.tif', r'a.tif'))
