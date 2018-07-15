@@ -102,8 +102,10 @@ def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
 
     Parameters
     ----------
-    series_ : Pandas Series to be analyzed
-    ranges : Array of the histogram bin boundaries.
+    series_ : Pandas Series
+        object to calculate Histogram fro
+    ranges : array like
+        Array of the histogram bin boundaries.
 
     Returns
     -------
