@@ -64,16 +64,20 @@ def hist_lines(im):
     hist_item is normalized into [0, 255]
     the hist height is set as 300 as default, a little higher than max->255
     '''
-    h = np.zeros((300,256,3))
+
+    # h = np.zeros((300,256,3), dtype=np.uint8)
+    h = np.zeros((300,256), dtype=np.uint8) # output histogram in grayscale
     if len(im.shape)!=2:
         print("hist_lines applicable only for grayscale images")
         #print("so converting image to grayscale for representation"
         im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     hist_item = cv2.calcHist([im],[0],None,[256],[0,256])
     cv2.normalize(hist_item,hist_item,0,255,cv2.NORM_MINMAX)
-    hist=np.int32(np.around(hist_item))
+
+    hist=np.uint8(np.around(hist_item)) # normalized hist as UC3
     for x,y in enumerate(hist):
-        cv2.line(h,(x,0),(x,y),(255,255,255))
+
+        cv2.line(h,(x,0),(x,y),(255,255)) # (255,255,255)
     y = np.flipud(h)
     return y
 

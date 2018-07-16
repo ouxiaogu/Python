@@ -220,7 +220,7 @@ def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray"):
         ax.imshow(images[ix], cmap=cmap)
         ax.set_title(titles[ix])
 
-def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None):
+def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None, cbar=True, **kwargs):
     '''
     similar with `imshowMultiple`, but share the X axis& Y axis title
 
@@ -236,15 +236,22 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
         titles in in row head
     col_titles : array like, container of string
         titles in in column head
+    cbar : bool
+        whether to show colorbar
+    kwargs : dict like
+        pass args like {'vmin': 0, 'vmax': 255} into plt.imshow
 
     Returns
     -------
     None, directly display multiple images
     '''
     nimg = len(images)
+    '''
+    # comment to support image with different size
     for dimSz in zip(*([im.shape for im in images])): # all images have the same shape
         if( dimSz.count(dimSz[0]) != len(dimSz) ):
             raise ValueError("input images have different size: {}".format(str(dimSz)))
+    '''
 
     if nrows is None or ncols is None or nrows*ncols < nimg:
         raise ValueError("input nrows/ncols is none or invalid: image number: {}, display row x col: {} x {}\n".format(nimg, nrows, ncols) )
@@ -298,8 +305,9 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
         ax = fig.add_axes( [field_l, field_b, field_w, field_h] );
         ax.set_axis_off()
         cmap = cmap if x_cmap is None else x_cmap[col]
-        cax = ax.imshow(images[ix], cmap=cmap)
-        fig.colorbar(cax)
+        cax = ax.imshow(images[ix], cmap=cmap, **kwargs)
+        if cbar:
+            fig.colorbar(cax)
 
 if __name__ == '__main__':
     '''test 1'''

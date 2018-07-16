@@ -1,63 +1,113 @@
 # -*- coding: utf-8 -*-
 """
-Created: ouxiaogu, 2018-07-15 20:20:07
+Created: peyang, 2018-07-16 10:29:47
 
-Spatial domain processing for image, include:
-1. intensity transformation
-2. spactial domain filter
-
-Tools includes:
-1. Histogram
-2. Operator like average, median, gradient, Laplace
-3. Fussy set
+Image intensity transform and spatial filter
 
 Last Modified by: ouxiaogu
 """
 import numpy as np
-import cv2
 import math
+import cv2
 
-__all__ = ['equalizeHist', 'specifyHist']
+__all__ = ['Histogram', 'equalizeHisto', 'specifyHistoo']
 
-def equalizeHist(src):
-	'''
-	equalize the histogram for input image
+def Histogram(src):
+    '''
+    histogram for grayscale image, intensity level is 256
+    '''
+    src = np.array(src)
+    if src.dtype != np.uint8:
+        raise ValueError("Histogram only supports single channel grayscale image, src's dtype is {}".format(repr(src.dtype)))
+    if len(src.shape) != 2:
+        raise ValueError("Histogram only supports single channel grayscale image, src's shape is {}".format(repr(src.shape)))
 
-	Parameters
-	----------
-	src : 2D image like
-		current only grayscale image supported
+    hist = np.zeros(256, dtype=np.int32)
+    N, M = src.shape
+    for r in range(N):
+        for c in range(M):
+            hist[ src[r, c] ] += 1
+    return hist
 
-	Returns
-	-------
-	dst : 2D image like:
-		histogram-equalized result for src
-	'''
-	if src.dtype != np.uint8:
-		raise ValueError("Only single channel uint8 type image is supported, input src's dtype: {}!\n".format(repr(src.dtype)))
-	if len(src.shape) != 2:
-		raise ValueError("Only single channel uint8 type image is supported, input src's shape: {}!\n".format(repr(src.shape)))
-	N, M = src.shape
 
-	HBINS = 256 
-	histSize = [HBINS]
-	histRange = np.asarray([0, HBINS])
-	hist_item = cv2.calcHist([src], [0], None, histSize, histRange.astype('uint8'))
-	print(hist_item)
+def equalizeHisto(src):
+    '''
+    equalize the histogram for input image
 
-	hist_cdf = []
-	accu = 0
-	cdf_func = lambda x: min(255, max(0, uint8(math.floor((HBINS - 1) * x/(M * N) + 0.5)) ) )
-	for val in hist_item:
-		accu += val
-		hist_cdf.append(cdf_func(accu) )
+    Parameters
+    ----------
+    src : 2D image like
+        current only grayscale image supported
 
-	map_func = lambda i: hist_cdf[i]
-	dst = list(map(map_func, src.flatten()))
-	dst.reshape(src.shape)
-	return dst
+    Returns
+    -------
+    dst : 2D image like:
+        histogram-equalized result for src
+    '''
+    if src.dtype != np.uint8:
+        raise ValueError("equalizeHisto only supports single channel grayscale image, src's dtype is {}".format(repr(src.dtype)))
+    if len(src.shape) != 2:
+        raise ValueError("equalizeHisto only supports single channel grayscale image, src's shape is {}".format(repr(src.shape)))
 
-if __name__ == '__main__':
-	src = np.arange(12).astype('uint8').reshape((3, 4) )   
+    hist = Histogram(src)
+    mapping = cdfHisto(hist)
 
-	print(equalizeHist(src) )
+    map_func = lambda i: mapping[i]
+    dst = list(map(map_func, src.flatten() ) )
+    dst = np.array(dst, dtype=np.uint8).reshape(src.shape)
+    return dst
+
+def cdfHisto(hist):
+    L = 256
+    cdf_func = lambda x: max(0, min(255, int(math.ceil((L-1) * x / np.sum(hist) + 0.5) ) ) )
+    mapping = []
+    cumsum = 0
+    for v in hist:
+        cumsum += v
+        mapping.append(cdf_func(cumsum) )
+    return mapping
+
+def specifyHisto(src, ref):
+    '''
+    Histogram matching / specification
+    Specify src's Histogram into ref's
+    '''
+    if src.dtype != ref.dtype or src.shape != ref.shape:
+        raise ValueError("specifyHisto only supports single channel grayscale image, src's dtype is {}".format(repr(src.dtype)))
+    if src.dtype != np.uint8:
+        raise ValueError("specifyHisto only supports single channel grayscale image, src's dtype is {}".format(repr(src.dtype)))
+    if len(src.shape) != 2:
+        raise ValueError("specifyHisto only supports single channel grayscale image, src's shape is {}".format(repr(src.shape)))
+
+    # 1. src: histogram and cdf
+    sHist = Histogram(src)
+    sCdf = cdfHisto(src)
+
+    # 2. ref: histogram and cdf
+    rHist = Histogram(ref)
+    rCdf = cdfHisto(ref)
+
+    # 3. mapping function between src Cdf and ref Cdf
+    # mapping between 2 rigid increase function, and with same range [0, 255]
+    L = 256
+    assert(len(sHist) == L)
+    assert(len(rHist) == L)
+
+    mapping = []
+    rstart = 0
+    for si in range(L):
+        for ri in range(rstart, L):
+            if ri == 0:
+                if rCdf[ri] >= sCdf[si]:
+                    break
+            else:
+                if (rCdf[ri] - sCdf[si])*(rCdf[ri - 1] - sCdf[si]) <= 0:
+                    break
+        mapping.append(ri)
+        rstart = ri
+
+    # 4. intensity level mapping
+    map_func = lambda i: mapping[i]
+    dst = list(map(map_func, src.flatten() ) )
+    dst = np.array(dst, dtype=np.uint8).reshape(src.shape)
+    return dst
