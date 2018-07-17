@@ -87,11 +87,11 @@ class TestFilters(unittest.TestCase):
     def test_convolve1D(self):
         src = random_arrary(3, (1, 3))
         flt_G = gaussian_filter(1, 0) # len=9
-        hlFltSz = (len(flt_G) - 1)/2  # 4
+        hlFltSz = (len(flt_G) - 1)//2  # 4
         ref = convolve(src, flt_G, wipadding=True)
 
         bas = np.convolve(src[0, :], flt_G, "same")
-        bas = bas[hlFltSz-1:hlFltSz+2] # extend size of src from bas center
+        bas = bas[(hlFltSz-1):(hlFltSz+2)] # extend size of src from bas center
         self.assertEqual(bas.tolist(), ref[0, :].tolist() )
 
     def test_convolve2D(self):

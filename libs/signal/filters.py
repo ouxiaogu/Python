@@ -95,30 +95,36 @@ def gabor_filter(sigma, theta, Lambda, psi, gamma):
     gb = np.exp(-.5 * (x_theta ** 2 / sigma_x ** 2 + y_theta ** 2 / sigma_y ** 2)) * np.cos(2 * np.pi / Lambda * x_theta + psi)
     return gb
 
-def padding(src, padsize, padval=0):
+def padding(src, padshape, padval=0):
     """
     padding data with padsize in both directions with given value padval
     """
     arr = np.asarray(src)
     srcShape = arr.shape
     dst = None
-    if len(srcShape) == 1:
-        dstShape = (srcShape[0]+2*padsize, )
-        dst = padval*np.ones(dstShape)
-        dst[padsize:(padsize + srcShape[0])] = arr
-    elif len(srcShape) == 2:
-        if srcShape[1] == 1:
-            dstShape = (srcShape[0]+2*padsize, 1)
-            dst = padval*np.ones(dstShape)
-            dst[padsize:(padsize + srcShape[0]), 0] = arr.flatten()
-        elif srcShape[0] == 1:
-            dstShape = (1, srcShape[1]+2*padsize)
-            dst = padval*np.ones(dstShape)
-            dst[0, padsize:(padsize + srcShape[1])] = arr
-        else:
-            dstShape = list(map(lambda x: x + 2*padsize, srcShape) )
-            dst = padval*np.ones(dstShape)
-            dst[padsize:(padsize + srcShape[0]), padsize:(padsize + srcShape[1])] = arr
+    if(is_1D_array(arr) ):
+        import collections
+        if(isinstance(padshape, collections.Iterable)):
+            raise ValueError("padshape should be not iterable type, not {}!\n".format(str(type(padshape)) ))
+        n = padshape
+        arrSz = array_long_axis_size(arr)
+        arr = arr.reshape((arrSz,) )
+        dst = padval * np.ones(arrSz + 2*n, arr.dtype)
+        dst[n:(arrSz+n)] = arr
+
+        dstShape = tuple(a+2*n if a != 1 else a for a in srcShape)
+        dst = dst.reshape(dstShape)
+    elif(len(srcShape) == 2):
+        try:
+            if(len(padshape) != 2):
+               raise ValueError("padshape's dimension {} should be the same with src's {}!\n".format(padshape, srcShape))
+        except:
+            #sys.stderr.write("padshape {} should be the same with src {}!\n".format(padshape, srcShape))
+            padshape = (padshape, padshape)
+        n, m = padshape
+        dstShape = tuple(s + 2*a for s, a in zip(srcShape, padshape) )
+        dst = padval*np.ones(dstShape, arr.dtype)
+        dst[n:(n + srcShape[0]), m:(m + srcShape[1])] = arr
     else:
         raise NotImplementedError("padding only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
     return dst
@@ -128,16 +134,20 @@ def padding_backward(src, padshape, padval=0):
     srcShape = arr.shape
     dst = None
     if(is_1D_array(arr) ):
-        if(not isinstance(padshape, int)):
-            raise ValueError("padshape should be int type!\n")
+        import collections
+        if(isinstance(padshape, collections.Iterable)):
+            raise ValueError("padshape should be not iterable type, not {}!\n".format(str(type(padshape)) ))
         arrSz = array_long_axis_size(arr)
         arr = arr.reshape((arrSz,) )
-        dst = padval * np.ones(arr, arr.dtype)
+        dst = padval * np.ones(arrSz+padshape, arr.dtype)
         dst[0:arrSz] = arr
         dst = dst.reshape(srcShape)
     elif(len(srcShape) == 2):
-        if(len(padshape) != 2):
-            raise ValueError("padshape {} should be the same with src {}!\n".format(padshape, srcShape))
+        try:
+            if(len(padshape) != 2):
+                raise ValueError("padshape {} should be the same with src {}!\n".format(padshape, srcShape))
+        except:
+            padshape = (padshape, padshape)
         nrows, ncols = srcShape
         newshape = tuple(np.sum(a) for a in zip(srcShape, padshape) )
         dst = padval * np.ones(newshape, arr.dtype)

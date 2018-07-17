@@ -18,9 +18,18 @@ class TestImTransform(unittest.TestCase):
         np.testing.assert_equal(bas, ref[0:6])
 
     def test_equalize(self):
+        print("equalizeHisto")
         im = np.ones(self.shape, dtype=np.uint8)
+        hist = Histogram(im)
+        print(cdfHisto(hist)[:5] )
         ref = equalizeHisto(im)
-        print(Histogram(ref))
+        print(Histogram(ref)[:5] )
+
+    def test_cdfHisto(self):
+        print("cdfHisto")
+        hist = np.arange(10)
+        print(cdfHisto(hist) )
+
 
 if __name__ == '__main__':
     unittest.main()
