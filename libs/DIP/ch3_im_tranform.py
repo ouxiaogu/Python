@@ -9,7 +9,7 @@ Last Modified by: ouxiaogu
 
 import os
 import sys
-sys.path.append("../imutil")
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImTransform import *
 from ImGUI import imshowMultiple_TitleMatrix
 from ImDescriptors import hist_lines
@@ -75,23 +75,48 @@ def try_specifyHisto():
         cbar=False, **KWARGS)
 
 def try_localHistoEq():
+    # Elapsed time for equalizeHisto: 0.38696893308588187!
+    # Elapsed time for localHistoEqualize1: 15.967883523724595!
+    # Elapsed time for localHistoEqualize2: 14.640780619891302!
+    # Elapsed time for localHistoEqualize3: 24.334276688725367!
     infile = os.path.join(DIPPATH, r'Fig0326(a)(embedded_square_noisy_512).tif')
     im = cv2.imread(infile, 0)
     hist = hist_lines(im)
 
+    import timeit
+
+    start = timeit.default_timer()
     imE = equalizeHisto(im)
     histE = hist_lines(imE)
+    end = timeit.default_timer()
+    print("Elapsed time for equalizeHisto: {}!".format(end - start) )
 
-    imLE = localHistoEqualize(im)
-    histLE = hist_lines(imLE)
+    start = timeit.default_timer()
+    imLE1 = localHistoEqualize1(im)
+    histLE1 = hist_lines(imLE1)
+    end = timeit.default_timer()
+    print("Elapsed time for localHistoEqualize1: {}!".format(end - start) )
 
-    imshowMultiple_TitleMatrix([im, imE, imLE]+[hist, histE, histLE],
-        2, 3, ['image', 'Histogram'], ['raw', 'equalized', 'local equalized'],
+    start = timeit.default_timer()
+    imLE2 = localHistoEqualize2(im)
+    histLE2 = hist_lines(imLE2)
+    end = timeit.default_timer()
+    print("Elapsed time for localHistoEqualize2: {}!".format(end - start) )
+
+    start = timeit.default_timer()
+    imLE3 = localHistoEqualize3(im)
+    histLE3 = hist_lines(imLE3)
+    end = timeit.default_timer()
+    print("Elapsed time for localHistoEqualize3: {}!".format(end - start) )
+
+    imshowMultiple_TitleMatrix([im, imE, imLE2, imLE3]+
+        [hist, histE, histLE2, histLE3], 2, 4,
+        ['image', 'Histogram'],
+        ['raw', 'equalized', 'local equalized 2', 'local equalized 3'],
         cbar=False, **KWARGS)
 
 def main():
-    import timeit
-    start = timeit.default_timer()
+
 
     # try_equalizeHisto()
 
@@ -99,9 +124,10 @@ def main():
 
     # try_specifyHisto()
 
-    try_localHistoEq()
-    end = timeit.default_timer()
-    print("Elapsed time : {}!".format(end - start) )
+    # try_localHistoEq()
+    # import cProfile
+    # cProfile.run('try_localHistoEq()')
+
 
 if __name__ == '__main__':
     main()

@@ -4,8 +4,8 @@ import numpy as np
 
 import sys
 import os.path
-sys.path.append(os.path.abspath("../"))
-from ImFilters import *
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
+from FreqeuncyFlt import *
 
 class TestFilters(unittest.TestCase):
     def setUp(self):

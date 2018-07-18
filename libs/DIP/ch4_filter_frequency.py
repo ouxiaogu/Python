@@ -12,9 +12,9 @@ import numpy as np
 import sys
 import re
 
-sys.path.append("../imutil")
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_TitleMatrix
-from ImFilters import *
+from FreqeuncyFlt import *
 from ImDescriptors import im_fft_amplitude_phase
 
 IMFILE = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples\calaveras_v3_LDose_p3544.bmp'
@@ -33,7 +33,7 @@ def try_paramid():
     """
 
     """method 1, cv2.pyrDown"""
-    sys.path.append("../common")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
     # from PlatformUtil import home
     # import os
     # IMFILE = os.path.join(home(), r"github\OpenCV-3.3.1\samples\data\building.jpg")
@@ -68,7 +68,7 @@ def try_paramid():
     # imshowCmap(im_pyrDown, "freq. domain, step-by-step ideal half window filter",)
 
     """method 3, spatial domain, convolve Gaussian filter & downsample"""
-    sys.path.append(r'../signal')
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal')
     from filters import convolve, gaussian_filter
     flt_G = gaussian_filter(1)
     im_conv = convolve(im, flt_G)
@@ -132,7 +132,7 @@ def try_power_ratio_loci():
     im = cv2.imread(IMFILE, 0)
 
     # padding into 2X
-    sys.path.append("../signal")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import padding_backward
     rawShape = im.shape
     fp = padding_backward(im, rawShape)
@@ -146,7 +146,7 @@ def try_power_ratio_loci():
     print(ratios)
 
 def try_filter(option=None):
-    from ImFilters import imApplyFilter
+    from FreqeuncyFlt import imApplyFilter
     if option is None:
         option = 'LPF'
     if option == 'LPF':
@@ -218,7 +218,7 @@ def try_homomorphic_filter():
     # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0462(a)(PET_image).tif', 0)
     im = cv2.imread(IMFILE, 0)
 
-    from ImFilters import imApplyHomomorphicFilter
+    from FreqeuncyFlt import imApplyHomomorphicFilter
     kwargs = {'gamma_L': 0.5, 'gamma_H': 1.5, 'c': 1}
     flt_im = imApplyHomomorphicFilter(im, 80, **kwargs)
     imshowMultiple([im, flt_im], ['orig image', 'homomorphic filter'])
@@ -252,7 +252,7 @@ def try_notch_filter():
     im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0464(a)(car_75DPI_Moire).tif', 0)
 
     # padding into 2X
-    sys.path.append("../signal")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import padding_backward
     rawShape = im.shape
     fp = padding_backward(im, rawShape)

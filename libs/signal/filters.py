@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-__all__ = ["gaussian_filter", "padding", "padding_backward", "convolve",
-            "fftconvolve", "nearest_power", "dft"]
+__all__ = ['gaussian_filter', 'padding', 'padding_backward', 'convolve',
+        'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel']
 
 SMALL_GAUSSIAN_TAB = [
     [1.],
@@ -24,17 +24,19 @@ SMALL_GAUSSIAN_TAB = [
 ]
 SMALL_GAUSSIAN_SIZE = 7
 
-def gaussian_filter(sigma=2, derivative_order=0, mode='CV'):
+def gaussian_filter(sigma=2, derivative_order=0, mode='CV', dtype=None):
     """
     Generate Gaussian filter or its derivative with the input sigma
     g(x) = 1/ (sqrt(2*pi)*sigma) * e^(-1/2*x^2/sigma^2)
     g_n_(x) = -1/sigma^2 *( g_(n-1)_(x)*x + g_(n-2)*(x)*(n-1) )
     """
     hlFltSz = int(max(2, (sigma-0.8)/0.3 + 1))
+    lookuped = False
     if mode == 'CV': # default mode
         ksize = 2*hlFltSz + 1
         if(ksize <= SMALL_GAUSSIAN_SIZE and derivative_order == 0):
-            return SMALL_GAUSSIAN_TAB[ksize>>1]
+            dst = SMALL_GAUSSIAN_TAB[ksize>>1]
+            lookuped = True
     elif mode == 'RD':
         hlFltSz = int(max(3, math.ceil(3.5*sigma) ))
     elif mode == 'OCE':
@@ -42,25 +44,31 @@ def gaussian_filter(sigma=2, derivative_order=0, mode='CV'):
     else:
         raise ValueError("gaussian_filter, only support mode 'CV', 'RD', or 'OCE'!\n")
 
-    if derivative_order == 0:
-        a = 1. / (math.sqrt(2*math.pi) * sigma)
-        flt_G = np.asarray(list(map(lambda x: a * math.exp(- (x - hlFltSz)**2 / (2.*sigma**2) ), range(0, 2*hlFltSz+1) ) ))
-        ss = np.sum(flt_G)
-        return flt_G/ss
-    elif derivative_order == 1:
-        fltG0 = gaussian_filter(sigma, 0)
-        return np.asarray(list(map(lambda x, g0: -1./(sigma**2)*g0*(x - hlFltSz), range(len(fltG0)), fltG0) ) )
-    elif derivative_order >=2:
-        fltG0 = gaussian_filter(sigma, derivative_order-2)
-        fltG1 = gaussian_filter(sigma, derivative_order-1)
-        return np.asarray(list(map(lambda x, g0, g1: -1./(sigma**2)*(g1*(x - hlFltSz) + g0*(derivative_order - 1)), range(len(fltG0)), fltG0, fltG1) ) )
-    else:
-        raise NotImplementedError("gaussian_filter don't support negative derivative order: {}!\n".format(derivative_order) )
+    if not lookuped:
+        if derivative_order == 0:
+            a = 1. / (math.sqrt(2*math.pi) * sigma)
+            flt_G = np.asarray(list(map(lambda x: a * math.exp(- (x - hlFltSz)**2 / (2.*sigma**2) ), range(0, 2*hlFltSz+1) ) ))
+            ss = np.sum(flt_G)
+            dst = flt_G/ss
+        elif derivative_order == 1:
+            fltG0 = gaussian_filter(sigma, 0)
+            dst = np.asarray(list(map(lambda x, g0: -1./(sigma**2)*g0*(x - hlFltSz), range(len(fltG0)), fltG0) ) )
+        elif derivative_order >=2:
+            fltG0 = gaussian_filter(sigma, derivative_order-2)
+            fltG1 = gaussian_filter(sigma, derivative_order-1)
+            dst = np.asarray(list(map(lambda x, g0, g1: -1./(sigma**2)*(g1*(x - hlFltSz) + g0*(derivative_order - 1)), range(len(fltG0)), fltG0, fltG1) ) )
+        else:
+            raise NotImplementedError("gaussian_filter don't support negative derivative order: {}!\n".format(derivative_order) )
+    if dtype is not None:
+        vmin = np.min(dst)
+        dst = np.floor(dst/vmin + 0.5)
+        dst = dst.astype(dtype)
+    return dst
 
-def cv_gaussian_kernel(ksize, sigma=0):
+def cv_gaussian_kernel(ksize, sigma=0, dtype=None):
     ksize = int(ksize)
     if(ksize <= SMALL_GAUSSIAN_SIZE):
-        return cv_gaussian_kernel(SMALL_GAUSSIAN_TAB[ksize>>1] )
+        dst = SMALL_GAUSSIAN_TAB[ksize>>1]
     if ksize % 2 == 0:
         tmp = ksize + 1
         sys.stderr.write("Warning, kernel size should be odd, adjust ksize from {} to {}".format(ksize, tmp))
@@ -72,7 +80,12 @@ def cv_gaussian_kernel(ksize, sigma=0):
     func_G = lambda i: math.exp(- (i - (ksize-1)/2)**2 / (2*sigma**2) )
     flt_G = np.asarray(list(func_G(i) for i in range(fltSz)) )
     a = np.sum(flt_G)
-    return flt_G/a
+    dst = flt_G/a
+    if dtype is not None:
+        vmin = np.min(dst)
+        dst = np.floor(dst/vmin + 0.5)
+        dst = dst.astype(dtype)
+    return dst
 
 def gabor_filter(sigma, theta, Lambda, psi, gamma):
     sigma_x = sigma
@@ -288,7 +301,7 @@ def nearest_power(num, powbase=2):
     return powbase*nearest_power(num/powbase)
 
 def plot_flt_dG(sigma=2):
-    sys.path.append("../common")
+    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
     from PlotConfig import choosePalette, addLegend
     pal = choosePalette()
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
@@ -309,7 +322,7 @@ def plot_flt_dG(sigma=2):
     addLegend([axes[1]])
 
 def plot_flt_sz(sigma=2):
-    sys.path.append("../common")
+    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
     from PlotConfig import choosePalette, addLegend
     pal = choosePalette()
     fig, ax = plt.subplots()
@@ -321,7 +334,7 @@ def plot_flt_sz(sigma=2):
     addLegend([ax ])
 
 def plot_rect_func_fft():
-    sys.path.append("../common")
+    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
     from MathUtil import rectFunc
     fig, axes = plt.subplots(nrows=3, ncols=1)
 

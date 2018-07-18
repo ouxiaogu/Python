@@ -4,12 +4,16 @@ Created: peyang, 2018-07-10 16:37:18
 
 Frequency Domain Filters, so basically will have same shape with image
 
-Last Modified by: peyang
+Last Modified by: ouxiaogu
 """
 
 import numpy as np
-import sys
 import re
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+from filters import padding_backward
 
 __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
             'BLPF', 'BHPF', 'BBRF', 'BBPF', 'BNRF', 'BNPF',
@@ -218,8 +222,6 @@ def imApplyFilter(src, fltFunc, **kwargs):
         key word argument to specify the shape of filter
     '''
     # 1. padding into 2X
-    sys.path.append("../signal")
-    from filters import padding_backward
     rawShape = src.shape
     fp = padding_backward(src, rawShape)
 
@@ -243,8 +245,6 @@ def imApplyFilter(src, fltFunc, **kwargs):
 
 def imApplyHomomorphicFilter(src, D0, **kwargs):
     # 1. padding into 2X, add 1, natural log
-    sys.path.append("../signal")
-    from filters import padding_backward
     rawShape = src.shape
     src = src.astype(np.float32)
     fp = padding_backward(src, rawShape)

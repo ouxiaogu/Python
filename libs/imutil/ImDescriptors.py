@@ -24,11 +24,18 @@ Abid Rahman 3/14/12 debug Gary Bradski
 Part 2: Image merge overview functions
 '''
 
-import sys
 import numpy as np
-
 import cv2
 import pandas as pd
+
+import sys
+import os.path
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+
+import logger
+logger.initlogging(debug=False)
+log = logger.getLogger("ImDescriptors")
+BINS = np.arange(256).reshape(256,1)
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
@@ -36,12 +43,6 @@ __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
 
 RMS_BIN_RANGES = [0, 2, 4, 6, 8, 10, 15, 20, 30, 50, 100]
 ZNCC_BIN_RANGES = [0, 0.2, 0.5, 0.8]
-
-sys.path.append("../common")
-import logger
-logger.initlogging(debug=False)
-log = logger.getLogger("ImDescriptors")
-BINS = np.arange(256).reshape(256,1)
 
 def hist_curve(im):
     '''return histogram of an image drawn as curves'''
@@ -161,12 +162,12 @@ def im_fft_amplitude_phase(im, freqshift=True, method=None, raw_amplitude=False)
     if method == 'fft':
         fourierfunc = np.fft.fft2
     elif method == 'dft':
-        sys.path.append("../signal")
+        sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../signal")
         from filters import dft
         fourierfunc = dft
     if not freqshift:
     # gen transform matrix T, so fft spectrum is zero-centered
-        sys.path.append("../signal")
+        sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../signal")
         T = np.zeros(im.shape, im.dtype)
         nrows, ncols = im.shape
         for y in range(nrows):
@@ -208,7 +209,7 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
     '''
     power = amplitude**2
 
-    from ImFilters import distance_map
+    from FreqeuncyFlt import distance_map
     D = distance_map(amplitude.shape)
     mask = ~(D <= D0)
     power_m = np.ma.array(power, mask=mask)

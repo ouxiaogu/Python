@@ -42,6 +42,11 @@ class TestFilters(unittest.TestCase):
             ddG_x = ddG.subs(x, ix - hlFltSz).evalf()
             self.assertAlmostEqual(ddG_x, flt_ddG[ix], 2)
 
+        np.testing.assert_equal(gaussian_filter(0.5, dtype=np.int32), [1, 4, 6, 4, 1])
+
+    def test_cv_gaussian_kernel(self):
+        print(cv_gaussian_kernel(5, dtype=np.int32))
+
     def test_padding(self):
         padsize = 1
         padval = 0.
