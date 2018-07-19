@@ -21,7 +21,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 # INPATH = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples'
-DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
+# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
+DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
 
@@ -189,25 +190,35 @@ def try_HEF():
     imL = fftconvolve(im, flt_L)
     imL_norm = normalize(imL)
 
+    # im = cv2.medianBlur(im, 3)
     flt_sX = SobelFilter(fltShape)
-    imdX = np.abs(fftconvolve(im, flt_sX) )
+    imdX = fftconvolve(im, flt_sX)
     flt_sY = SobelFilter(fltShape, 1)
-    imdY = np.abs(fftconvolve(im, flt_sY) )
+    imdY = fftconvolve(im, flt_sY)
     im_Sobel = np.sqrt(imdX**2, imdY**2)
+    
+    imdX_cv = cv2.Sobel(im, cv2.CV_32F, 1, 0)
+    imdY_cv = cv2.Sobel(im, cv2.CV_32F, 0, 1) #cv2.CV_8U
+    im_Sobel_cv = np.sqrt(imdX_cv**2, imdY_cv**2)
 
-    imshowMultiple([im, imL_norm, im_Sobel],
-        ['raw', 'Laplace 3x3', 'Sobel'],
-        **KWARGS)
-
-    imLE = im + np.absolute(imL)
-    im_Sobel_G = fftconvolve(im_Sobel, GaussianFilter((5, 5) ) )
-    im_Sobel_G_M = im_Sobel_G >= 127
+    imLE = im + imL
+    im_Sobel_G = fftconvolve(im_Sobel_cv, GaussianFilter((5, 5) ) )
+    shist = hist_lines(normalize(im_Sobel_G))
+    im_Sobel_G_M = normalize(im_Sobel_G) >= 10
     mask = im_Sobel_G_M*imLE
 
     imShapened = im + mask
-    imshowMultiple([imLE, im_Sobel_G, mask, imShapened],
-        ['(1+L)I', 'Sobel*G', '(1+L)I*Sobel_G', 'I + (1+L)I*Sobel_G'],
+    imshowMultiple([im, imL_norm, im_Sobel_cv] + [imLE, normalize(im_Sobel_G), shist, mask, imShapened],
+        ['raw', 'Laplace 3x3', 'Sobel'] + ['(1+L)I', 'Sobel*G', 'Sobel*G hist', '(1+L)I*Sobel_G mask', 'I + (1+L)I*Sobel_G'],
         **KWARGS)
+    # imshowMultiple([im, imLE, mask, imShapened],
+    #     ['raw'] + ['(1+L)I', '(1+L)I*Sobel_G mask', 'I + (1+L)I*Sobel_G'],
+    #     **KWARGS)
+    
+    # imshowMultiple_TitleMatrix([imdX, imdY, im_Sobel, imdX_cv, imdY_cv, ], 2, 3,
+    #     ['spatial', 'cv'], ['dx', 'dy', 'Sobel'], 
+    #     **KWARGS)
+
 
 def main():
     import cProfile

@@ -177,9 +177,12 @@ def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray", **kwar
     if titles is None or len(titles) != nimg:
         sys.stderr.write("Warning, input titles is none or invalid, use default naming instead.\n")
         titles = ['image '+str(i) for i in range(nimg)]
+    '''
+    # comment to support image with different size
     for dimSz in zip(*([im.shape for im in images])): # all images have the same shape
         if( dimSz.count(dimSz[0]) != len(dimSz) ):
             raise ValueError("input images have different size: {}".format(str(dimSz)))
+    '''
 
     if nrows is None or ncols is None or nrows*ncols < nimg:
         # sys.stderr.write("Warning, input nrows/ncols is none or invalid, use build-in smart setting instead\n")

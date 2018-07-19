@@ -58,14 +58,16 @@ def SobelFilter(shape=None, axis=0, Prewitt=False):
     ----------
     axis : 0 or 1
         The axis of x or y
-        - `0`: x, column
-        [[-1.  0.  1.]      [-1.  0.  1.] X     [1]
-         [-2.  0.  2.]                          [2]
-         [-1.  0.  1.]]                         [1]
+        - `0`: x, column, Sobel-x
+         -1  0  1  =   [-1.  0.  1.] X  [1]
+         -2  0  2                       [2]
+         -1  0  1                       [1]
+        because of convolve flipud filter, so what we input is [1.  0.  -1.]
         - `1`: y, row
         [[-1. -2. -1.]
          [ 0.  0.  0.]
          [ 1.  2.  1.]]
+        because of convolve flipud filter, so what we input is [1.  0.  -1.]
 
     '''
     if shape is None:
@@ -76,7 +78,7 @@ def SobelFilter(shape=None, axis=0, Prewitt=False):
     cy, cx = (s//2 for s in shape)
     if axis == 0:
         sobel_flt = np.ones(M)
-        sobel_flt[0:cx] = -1
+        sobel_flt[cx:] = -1
         sobel_flt[cx] = 0
         if Prewitt:
             sobel_smooth = np.ones(N)
@@ -86,7 +88,7 @@ def SobelFilter(shape=None, axis=0, Prewitt=False):
         rowT = sobel_smooth.reshape((N, 1) )
     else:
         sobel_flt = np.ones(N)
-        sobel_flt[0:cy] = -1
+        sobel_flt[cy:] = -1
         sobel_flt[cy] = 0
         if Prewitt:
             sobel_smooth = np.ones(M)

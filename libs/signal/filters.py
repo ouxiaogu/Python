@@ -224,7 +224,7 @@ def is_1D_array(src):
     """len(shape)==1 or min(shape)=1"""
     arr = np.asarray(src)
     srcShape = arr.shape
-    if(len(srcShape) == 1 or min(srcShape)== 1):
+    if(len(srcShape) == 1 or np.min(srcShape)== 1):
         return True
     return False
 
@@ -281,7 +281,7 @@ def fftconvolve(src, flt, mode='same'):
     fslice = tuple([slice(0, int(sz)) for sz in shape])
     sp1 = np.fft.rfftn(arr, fshape)
     sp2 = np.fft.rfftn(fltRes, fshape)
-    ret = (np.fft.irfftn(sp1 * sp2, fshape)[fslice].copy())
+    ret = np.fft.irfftn(sp1 * sp2, fshape)[fslice].copy()
 
     if mode == "same":
         return _centered(ret, s1)
