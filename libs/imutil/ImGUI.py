@@ -151,7 +151,7 @@ def cvtFloat2Gray(im):
     return np.array((im - vmin)/(vmax - vmin)*255, dtype = np.uint8)
 
 
-def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray"):
+def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray", **kwargs):
     '''
     show Multiple Image in one function
 
@@ -165,6 +165,8 @@ def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray"):
         subplot row number
     ncols : int
         subplot column number, default value is 4
+    kwargs : dict like
+        pass args like {'vmin': 0, 'vmax': 255} into plt.imshow
 
     Returns
     -------
@@ -217,7 +219,7 @@ def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray"):
         # %  plot the subplot
         ax = fig.add_axes( [field_l, field_b, field_w, field_h] );
         ax.set_axis_off()
-        ax.imshow(images[ix], cmap=cmap)
+        ax.imshow(images[ix], cmap=cmap, **kwargs)
         ax.set_title(titles[ix])
 
 def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None, cbar=True, **kwargs):

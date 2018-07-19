@@ -27,6 +27,11 @@ class TestFilters(unittest.TestCase):
         print(LaplaceFilter(self.shape) )
         print(LaplaceFilter(self.shape, True) )
 
+    def test_SobelFilter(self):
+        print(SobelFilter((5,3) ) )
+        print(SobelFilter((3,5), 1) )
+        print(PrewittFilter((3,5), 1))
+
 
 if __name__ == '__main__':
     unittest.main()

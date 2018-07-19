@@ -11,9 +11,14 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImTransform import *
-from ImGUI import imshowMultiple_TitleMatrix
+from SpatialFlt import *
+from ImGUI import imshowMultiple_TitleMatrix, imshowMultiple
 from ImDescriptors import hist_lines
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+from filters import fftconvolve
+
 import cv2
+import matplotlib.pyplot as plt
 
 # INPATH = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples'
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
@@ -115,8 +120,97 @@ def try_localHistoEq():
         ['raw', 'equalized', 'local equalized 2', 'local equalized 3'],
         cbar=False, **KWARGS)
 
-def main():
+def try_Laplace_LoG():
+    infile = os.path.join(DIPPATH, r'Fig0338(a)(blurry_moon).tif')
+    im = cv2.imread(infile, 0)
 
+    fltShape = (3, 3)
+
+    flt_L = LaplaceFilter(fltShape)
+    imL = fftconvolve(im, flt_L)
+    imL_norm = normalize(imL)
+
+    flt_LoG = LaplaceFilter(fltShape, True)
+    imLoG = fftconvolve(im, flt_LoG)
+    imLoG_norm = normalize(imLoG)
+
+    imLD_norm = normalize(imLoG - imL)
+
+    imshowMultiple([im, imL, imL_norm, imLoG, imLoG_norm, imLD_norm],
+        ['raw', 'Laplace', 'Laplace Norm', 'LoG', 'LoG Norm', 'imLoG - imL'], **KWARGS)
+
+    fltShape = (5, 5)
+    flt_L2 = LaplaceFilter(fltShape)
+    imL2 = fftconvolve(im, flt_L2)
+    imL2_norm = normalize(imL2)
+
+    imLD_norm = imL2 - imL
+
+    imshowMultiple([im, imL, imL_norm, imL2, imL2_norm, imLD_norm],
+        ['raw', 'Laplace 3x3', 'L 3 Norm', 'Laplace 5x5', 'L 5 Norm', 'im L5 - im L3'], **KWARGS)
+
+def try_1st_2nd_deriative():
+    profile = np.ones(30)
+    profile[0:5] = 6 # flat high
+    profile[5:10] = np.linspace(5, 1, 5) # Ramp
+    profile[14] = 2 # small noise
+    # profile[18] = 10 # sharp noise
+    profile[25:] = 6 # sharp step, then flat high
+
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+    from filters import padding
+    hlPadSz = 1
+    profilePad = padding(profile, hlPadSz)
+
+    derivative_1st  = [profilePad[i+hlPadSz] - profilePad[i+hlPadSz-1]  for i in range(len(profile))]
+    derivative_2nd  = [profilePad[i+hlPadSz+1] + profilePad[i+hlPadSz-1] - 2*profilePad[i+hlPadSz] for i in range(len(profile))]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    profile = profile[hlPadSz:-hlPadSz]
+    derivative_1st  = derivative_1st [hlPadSz:-hlPadSz]
+    derivative_2nd  = derivative_2nd [hlPadSz:-hlPadSz]
+    xx = range(1, len(profile)+1)
+    ax.plot(xx, profile, 'k-s', label='profile')
+    ax.plot(xx, derivative_1st , 'o--', label='derivative_1st ')
+    ax.plot(xx, derivative_2nd , 'g-.', label='derivative_2nd ')
+
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+    from PlotConfig import addLegend
+    addLegend([ax])
+
+def try_HEF():
+    IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
+    im = cv2.imread(IMFILE, 0)
+
+    fltShape = (3, 3)
+
+    flt_L = LaplaceFilter(fltShape)
+    imL = fftconvolve(im, flt_L)
+    imL_norm = normalize(imL)
+
+    flt_sX = SobelFilter(fltShape)
+    imdX = np.abs(fftconvolve(im, flt_sX) )
+    flt_sY = SobelFilter(fltShape, 1)
+    imdY = np.abs(fftconvolve(im, flt_sY) )
+    im_Sobel = np.sqrt(imdX**2, imdY**2)
+
+    imshowMultiple([im, imL_norm, im_Sobel],
+        ['raw', 'Laplace 3x3', 'Sobel'],
+        **KWARGS)
+
+    imLE = im + np.absolute(imL)
+    im_Sobel_G = fftconvolve(im_Sobel, GaussianFilter((5, 5) ) )
+    im_Sobel_G_M = im_Sobel_G >= 127
+    mask = im_Sobel_G_M*imLE
+
+    imShapened = im + mask
+    imshowMultiple([imLE, im_Sobel_G, mask, imShapened],
+        ['(1+L)I', 'Sobel*G', '(1+L)I*Sobel_G', 'I + (1+L)I*Sobel_G'],
+        **KWARGS)
+
+def main():
+    import cProfile
 
     # try_equalizeHisto()
 
@@ -125,9 +219,14 @@ def main():
     # try_specifyHisto()
 
     # try_localHistoEq()
-    # import cProfile
     # cProfile.run('try_localHistoEq()')
 
+    # cProfile.run('try_Laplace_LoG()')
+    # try_Laplace_LoG()
+
+    # try_1st_2nd_deriative()
+
+    try_HEF()
 
 if __name__ == '__main__':
     main()

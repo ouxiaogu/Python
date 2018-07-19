@@ -9,15 +9,17 @@ Last Modified by: ouxiaogu
 
 import cv2
 import numpy as np
-import sys
 import re
 
+import sys
+import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_TitleMatrix
 from FreqeuncyFlt import *
 from ImDescriptors import im_fft_amplitude_phase
 
-IMFILE = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples\calaveras_v3_LDose_p3544.bmp'
+DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04'
+WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 
 def try_paramid():
     """
@@ -68,7 +70,7 @@ def try_paramid():
     # imshowCmap(im_pyrDown, "freq. domain, step-by-step ideal half window filter",)
 
     """method 3, spatial domain, convolve Gaussian filter & downsample"""
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal')
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import convolve, gaussian_filter
     flt_G = gaussian_filter(1)
     im_conv = convolve(im, flt_G)
@@ -191,23 +193,27 @@ def try_filter(option=None):
         flt_imgs.clear()
         flt_titles.clear()
 
-def try_HFEF():
+def try_HEF():
     # read image
+    IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
     im = cv2.imread(IMFILE, 0)
-    im = cv2.medianBlur(im, 3)
+    # im = cv2.medianBlur(im, 3)
     imgs = [im]
-    # titles = ['raw image']
-    titles = ['image w/i medianBlur']
+    titles = ['raw image']
+    # titles = ['image w/i medianBlur']
+    amplitude, _  = im_fft_amplitude_phase(im)
+    imgs += [amplitude]
+    titles += ['fft']
 
-    cutoffs = [160, 300, 460]
-    func = HFEF
+    cutoffs = [10, 20, 50, 100]
+    func = HEF
     subfunc = GHPF
     flt_imgs = []
     flt_titles = []
     for D0 in cutoffs:
-        kwargs = {'HPFfunc': subfunc, 'D0': D0}
+        kwargs = {'HPFfunc': subfunc, 'D0': D0, 'k1':1, 'k2':3}
         argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
-        labels = [func.__name__, subfunc.__name__] + argstrs
+        labels = [func.__name__, subfunc.__name__] + argstrs[1:]
         label = ', '.join(labels)
         flt_imgs.append(imApplyFilter(im, func, **kwargs) )
         flt_titles.append(label)
@@ -284,11 +290,11 @@ if __name__ == '__main__':
 
     # try_power_ratio_loci()
 
-    try_filter('LPF')
+    # try_filter('LPF')
     # try_filter('HPF')
-    try_filter('BPF')
+    # try_filter('BPF')
 
-    # try_HFEF()
+    try_HEF()
 
     # try_homomorphic_filter()
 

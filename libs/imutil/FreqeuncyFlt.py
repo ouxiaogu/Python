@@ -18,7 +18,7 @@ from filters import padding_backward
 __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
             'BLPF', 'BHPF', 'BBRF', 'BBPF', 'BNRF', 'BNPF',
             'GLPF', 'GHPF', 'GBRF', 'GBPF',
-            'HFEF', 'LaplaceFilter',
+            'HEF', 'LaplaceFilter',
             'imApplyFilter', 'distance_map',
             'HomomorphicFilter', 'imApplyHomomorphicFilter'
             ]
@@ -148,13 +148,15 @@ def GBRF(shape, D0, W):
 def GBPF(shape, D0, W):
     return 1 - GBRF(shape, D0, W)
 
-def HFEF(shape, HPFfunc=None, k1=0.5, k2=0.75, **kwargs):
+def HEF(shape, HPFfunc=None, k1=0.5, k2=0.75, **kwargs):
     '''
     g(x, y) = f + k*(f - f_LP)
     G = F + k * (F - H_LP*F) = F + k * {(1- H_LP)*F} = (1 + k*H_HP)*F
-    when k2 > k1, this is 'highboost filter', corresponding filter in
-    Frequency domain is, High Frequency Emphasis Filter(HFEF), as:
-    HFEF = k1 + k2*HPF
+    More generally, corresponding filter in Frequency domain is
+
+    HEF = k1 + k2*HPF
+
+    when k2 > k1, this is 'highboost filter', High-Emphasis Filtering(HEF),
     when k2 < k1, g(x, y) is so-called 'unsharp mask'
 
     Parameters

@@ -93,7 +93,7 @@ class TestFilters(unittest.TestCase):
         src = random_arrary(3, (1, 3))
         flt_G = gaussian_filter(1, 0) # len=9
         hlFltSz = (len(flt_G) - 1)//2  # 4
-        ref = convolve(src, flt_G, wipadding=True)
+        ref = convolve(src, flt_G)
 
         bas = np.convolve(src[0, :], flt_G, "same")
         bas = bas[(hlFltSz-1):(hlFltSz+2)] # extend size of src from bas center
@@ -103,16 +103,19 @@ class TestFilters(unittest.TestCase):
         src = random_arrary(81, (9, 9))
         # src = np.random.randn(9, 9)
 
-        flt_G = np.asarray(gaussian_filter(1, 0)) # len=9
-        hlFltSz = (len(flt_G) - 1)/2  # 4
-        ref = convolve(src, flt_G, wipadding=True)
+        flt_G = np.asarray(gaussian_filter(1, 0))
+        hlFltSz = (len(flt_G) - 1)/2
+        print(flt_G)
+        flt_Gy = cv_gaussian_kernel(3)
+        print(flt_Gy)
+        ref = convolve(src, flt_G, flt_Gy)
 
         tmp = np.zeros(src.shape)
         for i in range(9):
             tmp[i, :] = np.convolve(src[i, :], flt_G, "same")
         bas = np.zeros(src.shape)
         for j in range(9):
-            bas[:, j] = np.convolve(tmp[:, j], flt_G, "same")
+            bas[:, j] = np.convolve(tmp[:, j], flt_Gy, "same")
         np.testing.assert_almost_equal(bas, ref, decimal=5)
 
     def test_dft(self):
@@ -121,6 +124,17 @@ class TestFilters(unittest.TestCase):
         bas = np.fft.fft2(a)
         ref = dft(a)
         np.testing.assert_almost_equal(bas, ref, decimal=5)
+
+    def test_fft(self):
+        a = np.random.randn(4, 3)
+        b = np.random.randn(3, 3)
+
+        from scipy import signal
+        bas = signal.fftconvolve(a, b, 'same')
+
+        ref = fftconvolve(a, b)
+        np.testing.assert_almost_equal(bas, ref, decimal=5)
+
 
 if __name__ == '__main__':
     unittest.main()

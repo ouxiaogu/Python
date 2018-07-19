@@ -18,7 +18,7 @@ from filters import padding
 __all__ = ['calcHist', 'equalizeHisto', 'specifyHisto', 'cdfHisto',
         'localHistoEqualize1', 'localHistoEqualize2', 'localHistoEqualize3',
         'addOrdereddDict', 'subOrdereddDict', 'Histogram',
-        'localHistoEqualize', 'genLaplacian']
+        'localHistoEqualize', 'normalize']
 
 class Histogram(object):
     """docstring for Histogram"""
@@ -146,7 +146,7 @@ def intensityTransfrom(src, mapping=None):
             raise ValueError("intensityTransfrom, dict type mapping's key should in range of [0, 255]!\n")
         mfunc = lambda k: max(0, min(255, mapping[k]))
     dst = list(map(mfunc, src.flatten() ) )
-    if src.shape == ():
+    if np.ndim(src) == 0:
         dst = np.asscalar(np.array(dst, dtype=np.uint8) )
     else:
         dst = np.array(dst, dtype=np.uint8).reshape(src.shape)
@@ -406,4 +406,10 @@ def localHistoEqualize3(src, ksize=None): # 24.33s
                 dst[r, c] = intensityTransfrom(slices[cx, cy], mapping=cdfcenter)
     return dst
 
-def LaplaceFilter()
+def normalize(src):
+    vmin = np.min(src)
+    vmax = np.max(src)
+    L = 256
+    mfunc = lambda v: (L-1) * (v - vmin)/(vmax - vmin)
+    dst = intensityTransfrom(src, mfunc)
+    return dst

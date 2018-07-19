@@ -169,7 +169,7 @@ def padding_backward(src, padshape, padval=0):
         raise NotImplementedError("padding_backward only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
     return dst
 
-def convolve(src, flt1d, wipadding=True):
+def convolve(src, fltx, flty=None):
     """
     Convolve src with flt1d, by default, padding src with 0
 
@@ -179,8 +179,6 @@ def convolve(src, flt1d, wipadding=True):
           input object to be convolved
     flt1d : 1D array_like
           filter, will convolve into all dimension of src
-    wipadding : bool
-          whether to pad the input `src`, default is True
 
     Returns
     -------
@@ -191,39 +189,35 @@ def convolve(src, flt1d, wipadding=True):
     srcShape = arr.shape
     if(len(srcShape) > 2):
         raise NotImplementedError("convolve only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
+    if flty is None:
+        flty = fltx
 
-    flt = np.asarray(flt1d)
-    if(not is_1D_array(flt) ):
-        raise NotImplementedError("convolve only support 1D filter, input shape is %s!\n".format(str(flt.shape)) )
-    hlFltSz = (array_long_axis_size(flt) - 1)//2
-    flt = flt.flatten() # as 1D flt
-    fltFlipUd = np.flipud(flt)
-
-    arrPad = None
-    if wipadding:
-        arrPad = padding(arr, hlFltSz)
-    else:
-        arrPad = arr.copy()
-
-    if( (is_1D_array(arrPad) and max(arrPad.shape) < len(flt) ) or
-        (not is_1D_array(arrPad) and min(arrPad.shape) < len(flt) ) ):
-        raise NotImplementedError("convolve, array or padded array size {} should larger than filter size {}!\n".format(str(arrPad.shape), str(flt.shape)))
+    fltx = np.asarray(fltx)
+    flty = np.asarray(flty)
+    if(np.ndim(fltx) != 1 or np.ndim(flty) != 1):
+        raise NotImplementedError("convolve only support 1D filter, input  fltx shape: %s, fltx shape: %s!\n".format(str(fltx.shape), str(flty.shape) ) )
+    hlFltXSz = array_long_axis_size(fltx)//2
+    hlFltYSz = array_long_axis_size(flty)//2
+    fltXFlipUd = np.flipud(fltx)
+    fltYFlipUd = np.flipud(flty)
 
     dst = None
     if is_1D_array(arr):
         arrSz = array_long_axis_size(arr)
+        arrPad = padding(arr, hlFltXSz)
         tmp = arrPad.flatten()
-        dst = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltSz+1)], fltFlipUd), range(arrSz)))) # already in src's length
+        dst = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltXSz+1)], fltXFlipUd), range(arrSz)))) # already in src's length
         dst = dst.reshape(srcShape)
     else:
         nrows, ncols = srcShape
+        arrPad = padding(arr, (hlFltYSz, hlFltXSz))
         tmp = 1.0*arrPad.copy()
         for row in range(nrows): # apply flt1d in x axis
-            tmp[row+hlFltSz, hlFltSz:(ncols+hlFltSz)] = np.asarray(list(map(lambda i: np.dot(arrPad[row+hlFltSz, i:(i + 2*hlFltSz+1)].flatten(), fltFlipUd), range(ncols) ) ) )
+            tmp[row+hlFltYSz, hlFltXSz:(ncols+hlFltXSz)] = np.asarray(list(map(lambda i: np.dot(arrPad[row+hlFltYSz, i:(i + 2*hlFltXSz+1)].flatten(), fltXFlipUd), range(ncols) ) ) )
         dst = tmp.copy()
         for col in range(ncols): # apply flt1d in y axis
-            dst[hlFltSz:(nrows+hlFltSz), col+hlFltSz] = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltSz+1), col+hlFltSz].flatten(), fltFlipUd), range(nrows) ) ) )
-        dst = dst[hlFltSz:(hlFltSz+nrows), hlFltSz:(hlFltSz+ncols)]
+            dst[hlFltYSz:(nrows+hlFltYSz), col+hlFltXSz] = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltYSz+1), col+hlFltXSz].flatten(), fltYFlipUd), range(nrows) ) ) )
+        dst = dst[hlFltYSz:(hlFltYSz+nrows), hlFltXSz:(hlFltXSz+ncols)]
     return dst
 
 def is_1D_array(src):
@@ -247,7 +241,7 @@ def _centered(arr, newshape):
     myslice = [slice(startind[k], endind[k]) for k in range(len(endind))]
     return arr[tuple(myslice)]
 
-def fftconvolve(src, flt1d, mode='same'):
+def fftconvolve(src, flt, mode='same'):
     """
     What different from spatial convolve is:
         1. use a nearest shape as 2^i*3^j*5^k to compute fft will save runtime,
@@ -256,23 +250,26 @@ def fftconvolve(src, flt1d, mode='same'):
            because of the separability of 2D convolution
            f(x,y)*g(x,y) = f(x,y)*(g(x).g(y)) = f(x,y)*g(x)*g(y)
            http://www.songho.ca/dsp/convolution/convolution2d_separable.html
+        3. minimum shape: shape = s1 + s2 - 1, then mapping to nearest_power
+            for fft accelerate
     """
     arr = np.asarray(src)
     srcShape = arr.shape
-    if(len(srcShape) > 2):
-        raise NotImplementedError("convolve only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
-
-    flt = np.asarray(flt1d)
-    if(not is_1D_array(flt) ):
-        raise NotImplementedError("convolve only support 1D filter, input shape is %s!\n".format(str(flt.shape)) )
+    flt = np.asarray(flt)
     fltSz = array_long_axis_size(flt)
 
     if is_1D_array(arr):
-        fltRes = flt.reshape(srcShape)
-    else:
-        fltRes = flt.reshape((fltSz, 1) ) * flt.reshape((1, fltSz) )
+        fltShape = ( 1 if s==1 else fltSz for s in srcShape)
+        fltRes = flt.reshape(fltShape )
+    elif np.ndim(arr) == 2:
+        if np.ndim(flt) == 1:
+            fltRes = flt.reshape((fltSz, 1) ) * flt.reshape((1, fltSz) )
+        else:
+            fltRes = flt
+    elif(arr.ndim > 2):
+        raise NotImplementedError("convolve only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
 
-    if not arr.ndim == fltRes.ndim:
+    if arr.ndim != fltRes.ndim:
         raise ValueError("array and filter should have the same dimensionality")
 
     s1 = np.asarray(arr.shape)
