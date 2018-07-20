@@ -21,8 +21,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 # INPATH = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples'
-# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
-DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
+DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
+# DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
 
@@ -180,45 +180,105 @@ def try_1st_2nd_deriative():
     from PlotConfig import addLegend
     addLegend([ax])
 
-def try_HEF():
+def try_Combined_Enhance():
+    '''Bone Combining Spatial Enhancement
+    Sobel*G masked HEF
+    '''
     IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
     im = cv2.imread(IMFILE, 0)
 
     fltShape = (3, 3)
 
-    flt_L = LaplaceFilter(fltShape)
+    # Laplace
+    flt_L = LaplaceFilter3()
     imL = fftconvolve(im, flt_L)
-    imL_norm = normalize(imL)
+    imL_cv = cv2.Laplacian(im, cv2.CV_32F)
+    print(imL.dtype, np.percentile(imL, np.linspace(0, 100, 6)), sep='\n')
+    print(imL_cv.dtype, np.percentile(imL_cv, np.linspace(0, 100, 6)), sep='\n')
 
-    # im = cv2.medianBlur(im, 3)
+    # Sobel py
     flt_sX = SobelFilter(fltShape)
     imdX = fftconvolve(im, flt_sX)
     flt_sY = SobelFilter(fltShape, 1)
     imdY = fftconvolve(im, flt_sY)
     im_Sobel = np.sqrt(imdX**2, imdY**2)
-    
+    pyimages = [imdX, imdY, im_Sobel, imL]
+    print(imdX.dtype, np.percentile(imdX, np.linspace(0, 100, 6)), sep='\n')
+
+    # Sobel cv
     imdX_cv = cv2.Sobel(im, cv2.CV_32F, 1, 0)
     imdY_cv = cv2.Sobel(im, cv2.CV_32F, 0, 1) #cv2.CV_8U
     im_Sobel_cv = np.sqrt(imdX_cv**2, imdY_cv**2)
+    cvimages = [imdX_cv, imdY_cv, im_Sobel_cv, imL_cv]
+    diffs = list(np.array(pyimages) - np.array(cvimages))
+    print(imdX_cv.dtype, np.percentile(imdX_cv, np.linspace(0, 100, 6)), sep='\n')
 
+    # Laplace enhanced
     imLE = im + imL
-    im_Sobel_G = fftconvolve(im_Sobel_cv, GaussianFilter((5, 5) ) )
-    shist = hist_lines(normalize(im_Sobel_G))
-    im_Sobel_G_M = normalize(im_Sobel_G) >= 10
-    mask = im_Sobel_G_M*imLE
+    imLE = np.clip(imLE, 0, 255)
 
+    # Sobel*G x Laplace enhanced
+    im_Sobel = np.abs(imdX) + np.abs(imdY)
+    im_Sobel = np.clip(im_Sobel, 0, 255)
+    # im_Sobel_G = fftconvolve(im_Sobel, GaussianFilter((5, 5) ) )
+    im_Sobel_G = fftconvolve(im_Sobel, BoxFilter((5, 5) ) )
+    im_Sobel_G = np.clip(im_Sobel_G, 0, 255)
+    #shist = hist_lines(normalize(im_Sobel_G))
+    mask = im_Sobel_G.astype(np.int32)*imLE.astype(np.int32)
+    print(mask.dtype, np.percentile(mask, np.linspace(0, 100, 6)), sep='\n')
+    mask = normalize(mask)
+    print(mask.dtype, np.percentile(mask, np.linspace(0, 100, 6)), sep='\n')
+
+    # Final enhanced = im + Sobel*G x Laplace enhanced
     imShapened = im + mask
-    imshowMultiple([im, imL_norm, im_Sobel_cv] + [imLE, normalize(im_Sobel_G), shist, mask, imShapened],
-        ['raw', 'Laplace 3x3', 'Sobel'] + ['(1+L)I', 'Sobel*G', 'Sobel*G hist', '(1+L)I*Sobel_G mask', 'I + (1+L)I*Sobel_G'],
-        **KWARGS)
+    imShapened = np.clip(imShapened, 0, 255)
+    # imShapenedPower = intensityTransform(imShapened, lambda x: x**0.5) #wrong
+    imShapenedPower = intensityTransform(imShapened, powerFunc(1, 0.5))
+    imshowMultiple([im, normalize(imL), normalize(imLE), normalize(im_Sobel)] + [normalize(im_Sobel_G), mask, imShapened, imShapenedPower],
+        ['raw', 'Laplace 3x3', '(1+L)I', 'Sobel'] + [ 'Sobel*G',  '(1+L)I*Sobel_G mask', 'I + (1+L)I*Sobel_G', 'Fig 7 gamma=0.5'], **KWARGS
+        )
+
     # imshowMultiple([im, imLE, mask, imShapened],
     #     ['raw'] + ['(1+L)I', '(1+L)I*Sobel_G mask', 'I + (1+L)I*Sobel_G'],
     #     **KWARGS)
-    
-    # imshowMultiple_TitleMatrix([imdX, imdY, im_Sobel, imdX_cv, imdY_cv, ], 2, 3,
-    #     ['spatial', 'cv'], ['dx', 'dy', 'Sobel'], 
+
+    # imshowMultiple_TitleMatrix(pyimages + cvimages + diffs,
+    #     3, 4,
+    #     ['spatial', 'cv', 'diff'], ['dx', 'dy', 'Sobel', 'Laplace'],
     #     **KWARGS)
 
+def try_Combined_Enhance_Ops():
+    # use the newly add image enhancement operators
+
+    IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
+    im = cv2.imread(IMFILE, 0)
+
+    fltShape = (3, 3)
+
+    # Laplace
+    flt_L = LaplaceFilter3()
+    imL = fftconvolve(im, flt_L)
+    imLE = imAdd(im, imL, 255)
+
+    # Sobel py
+    flt_sX = SobelFilter(fltShape)
+    imdX = fftconvolve(im, flt_sX)
+    flt_sY = SobelFilter(fltShape, 1)
+    imdY = fftconvolve(im, flt_sY)
+    # im_Sobel = np.sqrt(imdX**2, imdY**2)
+    # im_Sobel = normalize(im_Sobel, Imax=255)
+    im_Sobel = imAdd(np.abs(imdX), np.abs(imdY), 255)
+
+    # Sobel*G x Laplace enhanced
+    im_Sobel_G = fftconvolve(im_Sobel, BoxFilter((5, 5) ) )
+    im_Sobel_G = normalize(im_Sobel_G, 255)
+    sharp = imMul(imLE, im_Sobel_G, 255)
+    imShapened = imAdd(im, sharp, 255)
+    imShapenedPower = intensityTransform(imShapened, powerFunc(1, 0.5))
+
+    imshowMultiple([im, normalize(imL), normalize(imLE), normalize(im_Sobel)] + [normalize(im_Sobel_G), sharp, imShapened, imShapenedPower],
+        ['raw', 'Laplace 3x3', '(1+L)I', 'Sobel'] + [ 'Sobel*G',  '(1+L)I*Sobel_G sharp mask', 'I + (1+L)I*Sobel_G', 'Fig 7 gamma=0.5'], **KWARGS
+        )
 
 def main():
     import cProfile
@@ -237,7 +297,9 @@ def main():
 
     # try_1st_2nd_deriative()
 
-    try_HEF()
+    # try_Combined_Enhance()
+
+    try_Combined_Enhance_Ops()
 
 if __name__ == '__main__':
     main()

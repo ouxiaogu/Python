@@ -59,7 +59,7 @@ def gaussian_filter(sigma=2, derivative_order=0, mode='CV', dtype=None):
             dst = np.asarray(list(map(lambda x, g0, g1: -1./(sigma**2)*(g1*(x - hlFltSz) + g0*(derivative_order - 1)), range(len(fltG0)), fltG0, fltG1) ) )
         else:
             raise NotImplementedError("gaussian_filter don't support negative derivative order: {}!\n".format(derivative_order) )
-    if dtype is not None:
+    if dtype is not None and 'int' in str(dtype):
         vmin = np.min(dst)
         dst = np.floor(dst/vmin + 0.5)
         dst = dst.astype(dtype)

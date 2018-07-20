@@ -19,7 +19,7 @@ from ImTransform import normalize
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import fftconvolve, convolve
 
-DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
+DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
 
 class TestFilters(unittest.TestCase):
     def setUp(self):
@@ -38,23 +38,31 @@ class TestFilters(unittest.TestCase):
         print(PrewittFilter((3,5), 1))
 
     def test_Sobel(self):
+        '''
+        summary the difference:
+        1. python method: scipy and convolve/fftconvolve from filters.py both
+           flipUD the filters, so need to use [1 0 -1], correct
+        2. opencv method: no flip, directly use sum(column * kx), so
+           kx = [-1 0 1], correct
+        3. mxp method:  no flip, directly use sum(column * kx), but use
+           kx = {1, 0, -1}, wrong
+        '''
         IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
         im = cv2.imread(IMFILE, 0)
 
         imdX_cv = cv2.Sobel(im, cv2.CV_32F, 1, 0)
         imdX_sp = convolve(im, [1, 0, -1], [1, 2, 1])
-        
+
         fltShape = (3, 3)
         flt_sX = SobelFilter(fltShape)
-        
+
         from scipy import signal
         bas = signal.fftconvolve(im, flt_sX, 'same')
-        imdX = fftconvolve(im, flt_sX) 
+        imdX = fftconvolve(im, flt_sX)
         np.testing.assert_almost_equal(bas, imdX, decimal=5)
         np.testing.assert_almost_equal(bas, imdX_sp, decimal=5)
-        print(np.percentile(imdX, np.linspace(0, 100, 6)))
-        print(np.percentile(imdX_cv, np.linspace(0, 100, 6)))
-        #np.testing.assert_almost_equal(bas, imdX_cv, decimal=1)
+        np.testing.assert_almost_equal(np.percentile(imdX, np.linspace(0, 100, 6)), np.percentile(imdX_cv, np.linspace(0, 100, 6)))
+        np.testing.assert_almost_equal(bas[1:-1, 1:-1], imdX_cv[1:-1, 1:-1], decimal=5) #difference come from padding
 
 if __name__ == '__main__':
     unittest.main()

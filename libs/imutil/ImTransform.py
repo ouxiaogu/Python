@@ -18,7 +18,8 @@ from filters import padding
 __all__ = ['calcHist', 'equalizeHisto', 'specifyHisto', 'cdfHisto',
         'localHistoEqualize1', 'localHistoEqualize2', 'localHistoEqualize3',
         'addOrdereddDict', 'subOrdereddDict', 'Histogram',
-        'localHistoEqualize', 'normalize']
+        'localHistoEqualize', 'normalize', 'intensityTransform', 'powerFunc',
+        'imAdd', 'imMul']
 
 class Histogram(object):
     """docstring for Histogram"""
@@ -119,8 +120,14 @@ def subOrdereddDict(lhs, rhs):
         lhs[rk] -= rhs[rk]
     return lhs
 
+def powerFunc(c=1, gamma=0):
+    '''
+    power transformation function:
+    s = T(r) = c * (s/255)^gamma * 255
+    '''
+    return lambda s: c*(s/255)**gamma * 255
 
-def intensityTransfrom(src, mapping=None):
+def intensityTransform(src, mapping=None, dtype=None):
     '''
     image intensity transform
 
@@ -138,18 +145,22 @@ def intensityTransfrom(src, mapping=None):
         mfunc = lambda i: max(0, min(255, mapping(i) ) )
     elif isinstance(mapping, list):
         if len(mapping) != 256:
-            raise ValueError("intensityTransfrom, only support list type mapping with length=256, input mapping's is {}!\n".format(len(mapping)))
+            raise ValueError("intensityTransform, only support list type mapping with length=256, input mapping's is {}!\n".format(len(mapping)))
         mfunc = lambda i: max(0, min(255, mapping[i]))
     elif isinstance(mapping, dict) or isinstance(mapping, OrderedDict):
-        kArr = np.array(list(mapping.keys()), dtype=np.uint8)
+        kArr = np.array(list(mapping.keys()))
         if any(kArr < 0 ) or any(kArr > 255):
-            raise ValueError("intensityTransfrom, dict type mapping's key should in range of [0, 255]!\n")
+            raise ValueError("intensityTransform, dict type mapping's key should in range of [0, 255]!\n")
         mfunc = lambda k: max(0, min(255, mapping[k]))
     dst = list(map(mfunc, src.flatten() ) )
     if np.ndim(src) == 0:
-        dst = np.asscalar(np.array(dst, dtype=np.uint8) )
+        dst = np.asscalar(np.array(dst) )
+        if dtype is not None and callable(dtype):
+            dst = dtype(dst)
     else:
-        dst = np.array(dst, dtype=np.uint8).reshape(src.shape)
+        dst = np.array(dst).reshape(src.shape)
+        if dtype is not None and callable(dtype):
+            dst = dst.astype(dtype)
     return dst
 
 def calcHist(src, hist_type='list'):
@@ -207,7 +218,7 @@ def equalizeHisto(src, hist_type='list'):
     hist = calcHist(src, hist_type)
     mapping = cdfHisto(hist)
 
-    dst = intensityTransfrom(src, mapping)
+    dst = intensityTransform(src, mapping)
     return dst
 
 def specifyHisto(src, ref):
@@ -250,7 +261,7 @@ def specifyHisto(src, ref):
         rstart = ri
 
     # 4. intensity level mapping
-    dst = intensityTransfrom(src, mapping)
+    dst = intensityTransform(src, mapping)
     return dst
 
 def localHistoEqualize(src, ksize): # choose method 2
@@ -333,7 +344,7 @@ def localHistoEqualize2(src, ksize=None): # 14.64s
             hist = calcHist(slices, hist_type='OrderedDict')
             cdf = cdfHisto(hist)
             cdfcenter = OrderedDict({slices[cx, cy]: cdf[slices[cx, cy]] } )
-            dst[r, c] = intensityTransfrom(slices[cx, cy], mapping=cdfcenter)
+            dst[r, c] = intensityTransform(slices[cx, cy], mapping=cdfcenter)
     return dst
 
 def localHistoEqualize3(src, ksize=None): # 24.33s
@@ -383,7 +394,7 @@ def localHistoEqualize3(src, ksize=None): # 24.33s
                     hist = hist + hist_right - hist_left
                 cdf = hist.cdf()
                 cdfcenter = OrderedDict({slices[cx, cy]: cdf[slices[cx, cy]] } )
-                dst[r, c] = intensityTransfrom(slices[cx, cy], mapping=cdfcenter)
+                dst[r, c] = intensityTransform(slices[cx, cy], mapping=cdfcenter)
     else: # 112.674s, much less than runtime of the 'list' type hist: 405.66s
         hist_tl = calcHist(slices)
         for r in range(N):
@@ -403,13 +414,54 @@ def localHistoEqualize3(src, ksize=None): # 24.33s
                     hist = hist + hist_right - hist_left
                 cdf = cdfHisto(hist)
                 cdfcenter = OrderedDict({slices[cx, cy]: cdf[slices[cx, cy]] } )
-                dst[r, c] = intensityTransfrom(slices[cx, cy], mapping=cdfcenter)
+                dst[r, c] = intensityTransform(slices[cx, cy], mapping=cdfcenter)
     return dst
 
-def normalize(src):
+def normalize(src, Imax=255, dtype=None):
     vmin = np.min(src)
     vmax = np.max(src)
-    L = 256
-    mfunc = lambda v: (L-1) * (v - vmin)/(vmax - vmin)
-    dst = intensityTransfrom(src, mfunc)
+
+    mfunc = lambda v: Imax * (v - vmin)/(vmax - vmin)
+    dst = intensityTransform(src, mfunc, dtype)
     return dst
+
+def imAdd(src, mask, Imax=None):
+    '''
+    Image add here means, image enhancement
+    There may be overflow for image Add and multiply, as the example below:
+
+    In [164]: a = np.array([255, 255 ], dtype=np.uint8)
+
+    In [165]: b = np.array([6, 7 ], dtype=np.uint8)
+
+    In [166]: a + b
+    Out[166]: array([5, 6], dtype=uint8)
+
+    The solution here is, transform the dtype into np.float64 first,
+    convert the dtype of src at the end
+    '''
+    # disable the dtype check, by use higher accuracy dtype firstly
+    '''
+    if src.dtype == mask.dtype:
+        raise ValueError("imAdd, input images have different dtype, src: {}, mask: {}!\n".format(str(src), str(mask)))
+    '''
+    src = src.astype(np.float64)
+    mask = mask.astype(np.float64)
+    dst = src + mask
+
+    if Imax is None:
+        sys.stderr.write("imAdd, intensity upper bound Imax is not given")
+    elif Imax > 0:
+        dst = np.clip(dst, 0, Imax)
+    return dst.astype(src.dtype)
+
+def imMul(src, mask, Imax=None):
+    '''image multiply usually is for src*mask'''
+    src = src.astype(np.float64)
+    mask = mask.astype(np.float64)
+    dst = src * mask
+    if Imax is None:
+        sys.stderr.write("imAdd, intensity upper bound Imax is not given")
+    elif Imax > 0:
+        dst = normalize(dst, Imax=Imax)
+    return dst.astype(src.dtype)
