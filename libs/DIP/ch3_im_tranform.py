@@ -21,8 +21,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 # INPATH = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples'
-DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
-# DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
+# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
+DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
 
@@ -265,9 +265,9 @@ def try_Combined_Enhance_Ops():
     imdX = fftconvolve(im, flt_sX)
     flt_sY = SobelFilter(fltShape, 1)
     imdY = fftconvolve(im, flt_sY)
-    # im_Sobel = np.sqrt(imdX**2, imdY**2)
-    # im_Sobel = normalize(im_Sobel, Imax=255)
-    im_Sobel = imAdd(np.abs(imdX), np.abs(imdY), 255)
+    im_Sobel = np.sqrt(imdX**2, imdY**2)
+    im_Sobel = normalize(im_Sobel, Imax=255)
+    #im_Sobel = imAdd(np.abs(imdX), np.abs(imdY), 255)
 
     # Sobel*G x Laplace enhanced
     im_Sobel_G = fftconvolve(im_Sobel, BoxFilter((5, 5) ) )

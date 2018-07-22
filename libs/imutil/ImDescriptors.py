@@ -39,10 +39,15 @@ BINS = np.arange(256).reshape(256,1)
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
+            'printImageInfo'
         ]
 
 RMS_BIN_RANGES = [0, 2, 4, 6, 8, 10, 15, 20, 30, 50, 100]
 ZNCC_BIN_RANGES = [0, 0.2, 0.5, 0.8]
+
+def printImageInfo(im):
+    shape = 'X'.join(map(str, im.shape))
+    print(shape, im.dtype, np.percentile(im, np.linspace(0, 100, 6)), sep=', ')
 
 def hist_curve(im):
     '''return histogram of an image drawn as curves'''
@@ -75,7 +80,7 @@ def hist_lines(im):
     hist_item = cv2.calcHist([im],[0],None,[256],[0,256])
     cv2.normalize(hist_item,hist_item,0,255,cv2.NORM_MINMAX)
 
-    hist=np.uint8(np.around(hist_item)) # normalized hist as UC3
+    hist=np.uint8(np.around(hist_item)) # normalized hist as CV_U8
     for x,y in enumerate(hist):
 
         cv2.line(h,(x,0),(x,y),(255,255)) # (255,255,255)
@@ -84,20 +89,20 @@ def hist_lines(im):
 
 def hist_rect(im, hbins=100):
     '''return histogram of any image as some rectangle bins'''
-    im = im.astype('float32')
+    im = im.astype(np.float32)
     histSize = [hbins]
     minVal = np.amin(im)
     maxVal = np.amax(im)
-    histRange = np.asarray([minVal, maxVal])
-    hist_item = cv2.calcHist([im], [0], None, histSize, histRange.astype('float32'))
+    histRange = np.asarray([minVal, maxVal], dtype=np.float32)
+    hist_item = cv2.calcHist([im], [0], None, histSize, histRange)
     cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
-    hist = np.int32(np.around(hist_item))
+    hist=np.uint8(np.around(hist_item)) # normalized hist as CV_U8
 
     scale = 301/hbins
-    histImg = np.zeros((300, hbins*scale, 3))
+    histImg = np.zeros((300, hbins*scale))
     for ix in range(hbins):
         binVal = hist[ix]
-        cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), (255,255,255))
+        cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), (255,255))
     histImg = np.flipud(histImg)
     return histImg
 
@@ -198,7 +203,8 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
     Parameters
     ----------
     amplitude : 2D array
-        image frequency spectrum or amplitude
+        image frequency amplitude or
+        fourier transform result as complex data type
     D0 : float
         cutoff frequency
 
@@ -207,7 +213,10 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
     ratio : float
         image power ratio inside cutoff frequency
     '''
-    power = amplitude**2
+    if 'complex' in str(amplitude.dtype):
+        power = ff * np.conjugate(ff)
+    else:
+        power = amplitude**2
 
     from FreqeuncyFlt import distance_map
     D = distance_map(amplitude.shape)
