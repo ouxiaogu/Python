@@ -1,27 +1,10 @@
+# -*- coding: utf-8 -*-
 '''
--*- coding: utf-8 -*-
 Created: peyang, 2018-01-15 16:07:20
-
-Last Modified by: ouxiaogu
 
 ImDescriptors: Image Descriptors Module
 
-Part 1: some histogram functions:
-This is a sample for histogram plotting for RGB images and grayscale images for better understanding of colour distribution
-
-Benefit : Learn how to draw histogram of images
-          Get familiar with cv2.calcHist, cv2.equalizeHist,cv2.normalize and some drawing functions
-
-Level : Beginner or Intermediate
-
-Functions : 1) hist_curve : returns histogram of an image drawn as curves
-            2) hist_lines : return histogram of an image drawn as bins ( only for grayscale images )
-
-Usage : python hist.py <image_file>
-
-Abid Rahman 3/14/12 debug Gary Bradski
-
-Part 2: Image merge overview functions
+Last Modified by: ouxiaogu
 '''
 
 import numpy as np
@@ -35,19 +18,19 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 logger.initlogging(debug=False)
 log = logger.getLogger("ImDescriptors")
-BINS = np.arange(256).reshape(256,1)
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
             'printImageInfo'
         ]
 
+BINS = np.arange(256).reshape(256,1)
 RMS_BIN_RANGES = [0, 2, 4, 6, 8, 10, 15, 20, 30, 50, 100]
 ZNCC_BIN_RANGES = [0, 0.2, 0.5, 0.8]
 
 def printImageInfo(im):
     shape = 'X'.join(map(str, im.shape))
-    print(shape, im.dtype, np.percentile(im, np.linspace(0, 100, 6)), sep=', ')
+    print(shape, im.dtype, np.percentile(im, np.linspace(0, 100, 6),  interpolation='nearest'), sep=', ')
 
 def hist_curve(im):
     '''return histogram of an image drawn as curves'''
@@ -74,7 +57,7 @@ def hist_lines(im):
     # h = np.zeros((300,256,3), dtype=np.uint8)
     h = np.zeros((300,256), dtype=np.uint8) # output histogram in grayscale
     if len(im.shape)!=2:
-        print("hist_lines applicable only for grayscale images")
+        sys.stderr.write("hist_lines applicable only for grayscale images!\n")
         #print("so converting image to grayscale for representation"
         im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     hist_item = cv2.calcHist([im],[0],None,[256],[0,256])
@@ -82,23 +65,29 @@ def hist_lines(im):
 
     hist=np.uint8(np.around(hist_item)) # normalized hist as CV_U8
     for x,y in enumerate(hist):
-
         cv2.line(h,(x,0),(x,y),(255,255)) # (255,255,255)
     y = np.flipud(h)
     return y
 
 def hist_rect(im, hbins=100):
-    '''return histogram of any image as some rectangle bins'''
-    im = im.astype(np.float32)
-    histSize = [hbins]
-    minVal = np.amin(im)
-    maxVal = np.amax(im)
-    histRange = np.asarray([minVal, maxVal], dtype=np.float32)
-    hist_item = cv2.calcHist([im], [0], None, histSize, histRange)
-    cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
-    hist=np.uint8(np.around(hist_item)) # normalized hist as CV_U8
+    '''return histogram of any image as some rectangle bins
+    In python, it seems cv2 don't support the float type image,
+    But for c++, it's supported
+    '''
+    # h = np.zeros((300,256,3), dtype=np.uint8)
+    h = np.zeros((300,256), dtype=np.uint8) # output histogram in grayscale
+    if len(im.shape)!=2:
+        sys.stderr.write("hist_lines applicable only for grayscale images!\n")
+        #print("so converting image to grayscale for representation"
+        im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    hist_item = cv2.calcHist([im],[0],None,[256],[0,256])
+    cv2.normalize(hist_item,hist_item,0,255,cv2.NORM_MINMAX)
 
-    scale = 301/hbins
+    hist_item = cv2.calcHist([im], [0], None, [hbins], [0, 255])
+    cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
+    hist = np.uint8(np.around(hist_item)) # normalized hist as CV_U8
+
+    scale = 301//hbins
     histImg = np.zeros((300, hbins*scale))
     for ix in range(hbins):
         binVal = hist[ix]

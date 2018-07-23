@@ -18,7 +18,9 @@ import cv2
 
 __all__ = ['readDumpImage', 'readBBox', 'gen_multi_image_overview',
         'imshowCmap', 'cvtFloat2Gray', 'imreadFolder', 'imshowMultiple',
-        'imshowMultiple_TitleMatrix', 'read_pgm', 'write_pgm']
+        'imshowMultiple_TitleMatrix', 'read_pgm', 'write_pgm',
+        'POINTS', 'collect_clicks']
+POINTS = []
 
 def read_pgm(filename, byteorder='>'):
     """Return image data from a raw PGM file as numpy array.
@@ -313,6 +315,15 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
         cax = ax.imshow(images[ix], cmap=cmap, **kwargs)
         if cbar:
             fig.colorbar(cax)
+
+def collect_clicks(event, x, y, flags, param):
+    # grab references to the global variables
+    global POINTS
+
+    # if the left mouse button was clicked, record the current
+    # (x, y) coordinates
+    if event == cv2.EVENT_LBUTTONDOWN:
+        POINTS.append((x, y) )
 
 if __name__ == '__main__':
     '''test 1'''
