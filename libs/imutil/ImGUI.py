@@ -1,5 +1,5 @@
+# -*- coding: utf-8 -*-
 """
--*- coding: utf-8 -*-
 Created: ouxiaogu, 2018-07-03 11:19:46
 
 ImGUI:
@@ -12,15 +12,17 @@ Last Modified by: ouxiaogu
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+import matplotlib
 import sys
 import math
 import cv2
 
+from ImDescriptors import printImageInfo
+
 __all__ = ['readDumpImage', 'readBBox', 'gen_multi_image_overview',
         'imshowCmap', 'cvtFloat2Gray', 'imreadFolder', 'imshowMultiple',
         'imshowMultiple_TitleMatrix', 'read_pgm', 'write_pgm',
-        'POINTS', 'collect_clicks']
-POINTS = []
+        'PolygonDrawer', 'getPolyROI']
 
 def read_pgm(filename, byteorder='>'):
     """Return image data from a raw PGM file as numpy array.
@@ -227,7 +229,7 @@ def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray", **kwar
         ax.imshow(images[ix], cmap=cmap, **kwargs)
         ax.set_title(titles[ix])
 
-def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None, cbar=True, **kwargs):
+def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None, cbar=False, **kwargs):
     '''
     similar with `imshowMultiple`, but share the X axis& Y axis title
 
@@ -316,14 +318,103 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
         if cbar:
             fig.colorbar(cax)
 
-def collect_clicks(event, x, y, flags, param):
-    # grab references to the global variables
-    global POINTS
+class PolygonDrawer(object):
+    def __init__(self, im, window_name):
+        if np.ndim(im) == 2:
+            self.im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR);
+        else:
+            self.im = im
+        self.window_name = window_name
+        self._init_parms()
 
-    # if the left mouse button was clicked, record the current
-    # (x, y) coordinates
-    if event == cv2.EVENT_LBUTTONDOWN:
-        POINTS.append((x, y) )
+    def _init_parms(self):
+        self.final = self.im
+        self.done = False # Flag signalling we're done
+        self.current = (0, 0) # Current position, so we can draw the line-in-progress
+        self.points = [] # List of points defining our polygon
+        self.FINAL_LINE_COLOR = (0, 255, 255)
+        self.WORKING_LINE_COLOR = (127, 127, 127)
+
+
+    def on_mouse(self, event, x, y, buttons, user_param):
+        # Mouse callback that gets called for every mouse event (i.e. moving, clicking, etc.)
+
+        if self.done: # Nothing more to do
+            return
+
+        if event == cv2.EVENT_MOUSEMOVE:
+            # We want to be able to draw the line-in-progress, so update current mouse position
+            self.current = (x, y)
+        elif event == cv2.EVENT_LBUTTONDOWN:
+            # Left click means adding a point at current position to the list of points
+            sys.stdout.write("Adding point #{} with position({},{})!\n".format(len(self.points), x, y))
+            self.points.append((x, y))
+        elif event == cv2.EVENT_RBUTTONDOWN:
+            # Right click means we're done
+            print("Completing polygon with {} points.".format(len(self.points) ))
+            self.done = True
+
+    def run(self):
+        # Let's create our working window and set a mouse callback to handle events
+        cv2.namedWindow(self.window_name, flags=cv2.WINDOW_AUTOSIZE)
+        cv2.imshow(self.window_name, self.im)
+        cv2.waitKey(1)
+        cv2.setMouseCallback(self.window_name, self.on_mouse)
+
+        while(not self.done):
+            # This is our drawing loop, we just continuously draw new images
+            # and show them in the named window
+            if (len(self.points) > 0):
+                # Draw all the current polygon segments
+                cv2.polylines(self.im, np.array([self.points]), False, self.FINAL_LINE_COLOR, 1)
+                # And  also show what the current segment would look like
+                cv2.line(self.im, self.points[-1], self.current, self.WORKING_LINE_COLOR)
+            # Update the window
+            cv2.imshow(self.window_name, self.im)
+            # And wait 50ms before next iteration (this will pump window messages meanwhile)
+            if cv2.waitKey(50) == 27: # ESC hit
+                self.done = True
+
+        # User finised entering the polygon points, so let's make the final drawing
+        # of a final polygon
+        if (len(self.points) > 0):
+            #cv2.fillPoly(self.im, np.array([self.points]), self.FINAL_LINE_COLOR)
+            cv2.polylines(self.final, np.array([self.points]), True, self.FINAL_LINE_COLOR, 1)
+        # And show it
+        cv2.imshow(self.window_name, self.im)
+        # Waiting for the user to press any key
+        cv2.waitKey()
+        cv2.destroyWindow(self.window_name)
+        return self.final
+
+def getPolyROI(im, vertexes, masked_mat=False):
+    '''
+    Access the image data under the input vertexes defined polygon ROI.
+
+    Parameters
+    ----------
+    im : 2D array like
+        input image object
+    vertexes : list of vertex
+        vertex without self intersection, which define a polygon
+
+    Returns
+    -------
+    dst : list
+        roi data
+    '''
+    if(np.ndim(im) != 2):
+        raise ValueError("getPolyROI only support 2D image, input im's shape is {}!\n".format())
+    mask = np.zeros(im.shape, np.uint8)
+    rc = np.array(vertexes)
+    cv2.fillPoly(mask, [rc], 255)
+    matrix = np.ma.array(im, mask=~(mask>128))
+    if masked_mat:
+        roi = matrix
+    else:
+        roi = matrix.compressed()
+        # roi = matrix[~matrix.mask]
+    return roi
 
 if __name__ == '__main__':
     '''test 1'''

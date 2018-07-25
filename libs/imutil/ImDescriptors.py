@@ -16,10 +16,9 @@ import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 
 import logger
-logger.initlogging(debug=False)
-log = logger.getLogger("ImDescriptors")
+log = logger.setup(level='info')
 
-__all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHist',
+__all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHistSeries',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
             'printImageInfo'
         ]
@@ -34,19 +33,20 @@ def printImageInfo(im):
 
 def hist_curve(im):
     '''return histogram of an image drawn as curves'''
-    h = np.zeros((300,256,3))
+    h = np.zeros((256,256,3))
     if len(im.shape) == 2:
-        color = [(255,255,255)]
+        h = np.zeros((256,256))
+        colors = [(255,255)]
     elif im.shape[2] == 3:
-        color = [ (255,0,0),(0,255,0),(0,0,255) ]
-    for ch, col in enumerate(color):
+        colors = [ (255,0,0),(0,255,0),(0,0,255) ]
+    for ch, colr in enumerate(colors):
         hist_item = cv2.calcHist([im],[ch],None,[256],[0,256])
         cv2.normalize(hist_item,hist_item,0,255,cv2.NORM_MINMAX)
         hist=np.int32(np.around(hist_item))
         pts = np.int32(np.column_stack((BINS,hist)))
-        cv2.polylines(h,[pts],False,col)
-    y=np.flipud(h)
-    return y
+        cv2.polylines(h,[pts],False, colr)
+    h=np.flipud(h)
+    return h
 
 def hist_lines(im):
     '''return histogram of an image drawn as BINS ( only for grayscale images )
@@ -55,7 +55,7 @@ def hist_lines(im):
     '''
 
     # h = np.zeros((300,256,3), dtype=np.uint8)
-    h = np.zeros((300,256), dtype=np.uint8) # output histogram in grayscale
+    h = np.zeros((256,256), dtype=np.uint8) # output histogram in grayscale
     if len(im.shape)!=2:
         sys.stderr.write("hist_lines applicable only for grayscale images!\n")
         #print("so converting image to grayscale for representation"
@@ -66,36 +66,42 @@ def hist_lines(im):
     hist=np.uint8(np.around(hist_item)) # normalized hist as CV_U8
     for x,y in enumerate(hist):
         cv2.line(h,(x,0),(x,y),(255,255)) # (255,255,255)
-    y = np.flipud(h)
-    return y
+    h = np.flipud(h)
+    return h
 
-def hist_rect(im, hbins=100):
+def hist_rect(im=None, hbins=100, hist=None):
     '''return histogram of any image as some rectangle bins
     In python, it seems cv2 don't support the float type image,
     But for c++, it's supported
-    '''
-    # h = np.zeros((300,256,3), dtype=np.uint8)
-    h = np.zeros((300,256), dtype=np.uint8) # output histogram in grayscale
-    if len(im.shape)!=2:
-        sys.stderr.write("hist_lines applicable only for grayscale images!\n")
-        #print("so converting image to grayscale for representation"
-        im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
-    hist_item = cv2.calcHist([im],[0],None,[256],[0,256])
-    cv2.normalize(hist_item,hist_item,0,255,cv2.NORM_MINMAX)
 
-    hist_item = cv2.calcHist([im], [0], None, [hbins], [0, 255])
-    cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
+    Parameters
+    ----------
+    hist : None or 1D list-like
+        if hist is None, use OpenCV to calcHist
+        if hist is 1D list, it should be grayscale histogram, list or dict
+    '''
+    if hist is None:
+        if len(im.shape)!=2:
+            sys.stderr.write("hist_lines applicable only for grayscale images!\n")
+            #print("so converting image to grayscale for representation"
+            im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+        hist_item = cv2.calcHist([im], [0], None, [hbins], [0, 256])
+        cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
+    else:
+        hist_item = hist
+        hbins = len(hist_item)
     hist = np.uint8(np.around(hist_item)) # normalized hist as CV_U8
 
-    scale = 301//hbins
-    histImg = np.zeros((300, hbins*scale))
+    assert(hbins <= 256)
+    scale = 256//hbins
+    histImg = np.zeros((256, hbins*scale), np.uint8)
     for ix in range(hbins):
         binVal = hist[ix]
         cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), (255,255))
     histImg = np.flipud(histImg)
     return histImg
 
-def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
+def calcHistSeries(series_, ranges=RMS_BIN_RANGES, column=None):
     """
     calculate the histogram of given Pandas Serires
 
@@ -115,7 +121,7 @@ def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
     filts = []
     hists = np.zeros((len(series_), len(ranges)))
     nitems = len(ranges)
-    log.debug("ranges, %s" % str(ranges))
+    log.debug("ranges, {}\n".format(str(ranges)) )
 
     for i in range(nitems):
         if i == nitems - 1:
@@ -126,8 +132,8 @@ def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
             filt  = lambda x, y=ranges[i], z=ranges[i+1]: (x >= y) & (x < z)
         labels.append(label)
         filts.append(filt)
-    log.debug(labels)
-    log.debug("%s" % str([ff==filts[0] for ff in filts]))
+    log.debug(', '.join(labels))
+    log.debug("{}".format(str([ff==filts[0] for ff in filts])) )
 
     for i, series in enumerate(series_):
         if column is not None:
@@ -141,10 +147,10 @@ def calcHist(series_, ranges=RMS_BIN_RANGES, column=None):
             except ValueError:
                 raise ValueError("Error occurs when converting input into Pandas Series")
         series = series.sort_values()
-        log.debug("series_: %s" % str(series.values ))
+        log.debug("series_: {}".format(str(series.values )))
         for j, filt in enumerate(filts):
             hists[i, j] = len(series.ix[ series.apply(filt) ] )
-            log.debug("%s: %d" % (labels[j], hists[i, j]))
+            log.debug("{}: {}".format((labels[j], hists[i, j])) )
     histDF = pd.DataFrame(hists, columns=labels).astype('int32')
     histDF = histDF.transpose() # for barplot, column as range lables
     return histDF

@@ -35,7 +35,6 @@ def decompose2DIntegerFilter(flt2d):
     '''
     if 'int' not in str(flt2d.dtype):
         raise ValueError('decompose2DIntegerFilter, only support array of int dtype, input array is in {} type!\n'.format(str(flt2d.dtype)))
-    N, M = flt2d.shape
     X = flt2d[0, :]
     Y = flt2d[:, 0]
     gcdX = gcdArray(X)
@@ -79,9 +78,10 @@ def test_gcd():
     np.testing.assert_equal(2**2 * 5**3 * 7**2, gcd(2**3 * 5**3 * 7**5, 2**2 * 5**4 * 7**2))
 
 def test_decompose2DIntegerFilter():
-    print(decompose2DIntegerFilter(GaussianFilter((3,3) ) ), sep='\n')
+    # print(decompose2DIntegerFilter(GaussianFilter((3,3) ), sep='\n')
     print(decompose2DIntegerFilter(SobelFilter((3,3), 1, dtype=np.int32) ), sep='\n')
     print(getDerivKernels('Sobel', 0, 1) )
+    print(decompose2DIntegerFilter(np.ones((3,3), dtype=np.int32) ) )
 
 def main():
     # test_decompose2DFilter()

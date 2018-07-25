@@ -14,7 +14,8 @@ import numpy as np
 import sys
 
 __all__ = ['gaussian_filter', 'padding', 'padding_backward', 'convolve',
-        'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel']
+        'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel',
+        'correlate', 'applySepFilter']
 
 SMALL_GAUSSIAN_TAB = [
     [1.],
@@ -171,54 +172,73 @@ def padding_backward(src, padshape, padval=0):
 
 def convolve(src, fltx, flty=None):
     """
-    Convolve src with flt1d, by default, padding src with 0
+    Convolve src with 2 1D-filters, also support convolve 1D array with fltx
+    """
+    fltx = np.flipud(fltx)
+    if flty is not None:
+        flty = np.flipud(flty)
+    dst = applySepFilter(src, fltx, flty)
+    return dst
+
+def applySepFilter(src, fltx, flty=None):
+    """
+    Convolve src with fltx/flty, by default, padding src with 0
 
     Parameters
     ----------
     src : array_like
           input object to be convolved
-    flt1d : 1D array_like
+    fltx : 1D array_like
           filter, will convolve into all dimension of src
 
     Returns
     -------
     dst : array_like
-          convolution result, same shape as src
+          apply filters result, same shape as src
     """
     arr = np.asarray(src)
     srcShape = arr.shape
     if(len(srcShape) > 2):
-        raise NotImplementedError("convolve only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
+        raise NotImplementedError("applySepFilter only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
     if flty is None:
         flty = fltx
 
     fltx = np.asarray(fltx)
     flty = np.asarray(flty)
     if(np.ndim(fltx) != 1 or np.ndim(flty) != 1):
-        raise NotImplementedError("convolve only support 1D filter, input  fltx shape: %s, fltx shape: %s!\n".format(str(fltx.shape), str(flty.shape) ) )
+        raise NotImplementedError("applySepFilter only support 1D filter, input  fltx shape: %s, fltx shape: %s!\n".format(str(fltx.shape), str(flty.shape) ) )
+    n, m = array_long_axis_size(flty), array_long_axis_size(fltx)
+    if n%2 == 0 or m%2 == 0:
+        raise ValueError("applySepFilter only support odd filter size, fltx: {}, flty: {}".format(str(fltx.shape), str(flty.shape)))
     hlFltXSz = array_long_axis_size(fltx)//2
     hlFltYSz = array_long_axis_size(flty)//2
-    fltXFlipUd = np.flipud(fltx)
-    fltYFlipUd = np.flipud(flty)
 
     dst = None
     if is_1D_array(arr):
         arrSz = array_long_axis_size(arr)
         arrPad = padding(arr, hlFltXSz)
         tmp = arrPad.flatten()
-        dst = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltXSz+1)], fltXFlipUd), range(arrSz)))) # already in src's length
+        dst = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltXSz+1)], fltx), range(arrSz)))) # already in src's length
         dst = dst.reshape(srcShape)
     else:
         nrows, ncols = srcShape
         arrPad = padding(arr, (hlFltYSz, hlFltXSz))
         tmp = 1.0*arrPad.copy()
         for row in range(nrows): # apply flt1d in x axis
-            tmp[row+hlFltYSz, hlFltXSz:(ncols+hlFltXSz)] = np.asarray(list(map(lambda i: np.dot(arrPad[row+hlFltYSz, i:(i + 2*hlFltXSz+1)].flatten(), fltXFlipUd), range(ncols) ) ) )
+            tmp[row+hlFltYSz, hlFltXSz:(ncols+hlFltXSz)] = np.asarray(list(map(lambda i: np.dot(arrPad[row+hlFltYSz, i:(i + 2*hlFltXSz+1)].flatten(), fltx), range(ncols) ) ) )
         dst = tmp.copy()
         for col in range(ncols): # apply flt1d in y axis
-            dst[hlFltYSz:(nrows+hlFltYSz), col+hlFltXSz] = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltYSz+1), col+hlFltXSz].flatten(), fltYFlipUd), range(nrows) ) ) )
+            dst[hlFltYSz:(nrows+hlFltYSz), col+hlFltXSz] = np.asarray(list(map(lambda i: np.dot(tmp[i:(i + 2*hlFltYSz+1), col+hlFltXSz].flatten(), flty), range(nrows) ) ) )
         dst = dst[hlFltYSz:(hlFltYSz+nrows), hlFltXSz:(hlFltXSz+ncols)]
     return dst
+
+def correlate(src, fltx, flty=None):
+    '''
+    Flow of correlation is similar with convolve, just don't need to flip
+    '''
+    dst = applySepFilter(src, fltx, flty)
+    return dst
+
 
 def is_1D_array(src):
     """len(shape)==1 or min(shape)=1"""

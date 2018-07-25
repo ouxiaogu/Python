@@ -10,13 +10,20 @@ Last Modified by: ouxiaogu
 import math
 import unittest
 import numpy as np
+import cv2
 
 import sys
 import os.path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../common")
+import logger
+log = logger.setup(name='SpatialTest', level='debug')
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
 from SpatialFlt import *
 from ImTransform import normalize
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../../signal")
 from filters import fftconvolve, convolve
 
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
@@ -24,18 +31,23 @@ DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
 class TestFilters(unittest.TestCase):
     def setUp(self):
         self.shape = (5, 5)
+        self.debug1 = False
+        self.debug2 = True
 
     def test_GaussianFilter(self):
-        print(GaussianFilter(self.shape) )
+        if self.debug1:
+            print(GaussianFilter(self.shape) )
 
     def test_LaplaceFilter(self):
-        print(LaplaceFilter(self.shape) )
-        print(LaplaceFilter(self.shape, True) )
+        if self.debug1:
+            print(LaplaceFilter(self.shape) )
+            print(LaplaceFilter(self.shape, True) )
 
     def test_SobelFilter(self):
-        print(SobelFilter((5,3) ) )
-        print(SobelFilter((3,5), 1) )
-        print(PrewittFilter((3,5), 1))
+        if self.debug1:
+            print(SobelFilter((5,3) ) )
+            print(SobelFilter((3,5), 1) )
+            print(PrewittFilter((3,5), 1))
 
     def test_Sobel(self):
         '''
@@ -63,6 +75,24 @@ class TestFilters(unittest.TestCase):
         np.testing.assert_almost_equal(bas, imdX_sp, decimal=5)
         np.testing.assert_almost_equal(np.percentile(imdX, np.linspace(0, 100, 6)), np.percentile(imdX_cv, np.linspace(0, 100, 6)))
         np.testing.assert_almost_equal(bas[1:-1, 1:-1], imdX_cv[1:-1, 1:-1], decimal=5) #difference come from padding
+
+
+    def test_ContraHarmonicMean(self):
+        DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH05'
+        ksize = 3
+        m = n = ksize//2
+        r, c = 35, 88
+        IMFILE = os.path.join(DIPPATH, r'Fig0508(b)(circuit-board-salt-prob-pt1).tif')
+        im = cv2.imread(IMFILE, 0)
+        im = im[(r-n):(r+n+1), (c-m):(c+m+1)]
+        ContraHarmonicMean(im, 3, -1.5)
+
+    def test_TrimedMean(self):
+        np.random.seed(0)
+        im = np.random.randn(3, 3)
+        log.debug('im\n{}'.format(str(im)))
+        log.debug('TrimedMean(im, 3, 8)\n{}\n'.format(str(TrimedMean(im, 3, 8))))
+        np.testing.assert_almost_equal(TrimedMean(im, 3, 0)[1,1], np.mean(im))
 
 if __name__ == '__main__':
     unittest.main()

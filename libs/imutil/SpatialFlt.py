@@ -8,17 +8,21 @@ Last Modified by: ouxiaogu
 """
 
 import numpy as np
+import cv2
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-from filters import cv_gaussian_kernel
+from filters import cv_gaussian_kernel, padding, correlate
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+import logger
+log = logger.setup('SpatialFlt', level='info')
 
 __all__ = ['GaussianFilter', 'LaplaceFilter', 'SobelFilter', 'PrewittFilter',
         'SOBEL_EDGE', 'SOBEL_SMOOTH', 'PREWITT_EDGE', 'PREWITT_SMOOTH',
         'SCHARR_EDGE', 'SCHARR_SMOOTH', 'LaplaceFilter3', 'BoxFilter',
-        'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivKernels'
-        ]
+        'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivKernels',
+        'ContraHarmonicMean', 'TrimedMean', 'kernelPreProc']
 
 SOBEL_EDGE = np.array([1, 0, -1])
 SOBEL_SMOOTH = np.array([1, 2, 1])
@@ -174,6 +178,109 @@ def getDerivKernels(ktype, xorder, yorder, normalize=False):
     else:
         raise ValueError("Input xorder {} yorder {} should one is 0, another is 1 !\n".format(xorder, yorder))
     return kx, ky
+
+def ContraHarmonicMean(src, ksize=None, Q=1.5):
+    '''
+    Contra Harmonic filter for center pixel of current kernel:
+
+    f'_c = g_k^(Q+1)/g_k^Q
+
+    - Q > 0, good for pepper noise
+    - Q < 0, good for salt noise
+    - Q=0, Contra-harmonic Mean Filters = Arithmetic Mean Filters
+    - Q=-1, Contra-harmonic Mean Filters = Harmonic Mean Filters
+
+    if numsum=0, it means all non-negative pixel power sum is 0,
+    only reason is this is a pure black flat area, should keep
+    original pixel value;
+    if numsum!=0, should have numsum>0, if just a pepper noise,
+    densum increase quickly than numsum, then we can suppress or
+    eliminate the pepper noise
+    '''
+    if ksize is None:
+        ksize = (3, 3)
+    elif np.ndim(ksize) == 0:
+        ksize = (ksize, ksize)
+    n, m = ksize
+    fltX = np.full(m, 1.0)
+    fltY = np.full(n, 1.0)
+
+    src = src.astype(np.float64)
+    d_eps = 1e-9
+    addEps = False
+    if np.min(src) == 0:
+        log.debug("apply src add Eps\n")
+        src += d_eps
+        addEps = True
+    denumerator = np.power(src, Q+1.)
+    log.debug("denumerator:\n {}\n".format( str(denumerator)) )
+    numerator = np.power(src, Q)
+    log.debug("numerator:\n {}\n".format( str(numerator)) )
+    densum = correlate(denumerator, fltX, fltY)
+    log.debug("densum:\n {}\n".format( str(densum)) )
+    numsum = correlate(numerator, fltX, fltY)
+    log.debug("numsum:\n {}\n".format( str(numsum)) )
+    dst = np.divide(densum, numsum, out=np.zeros_like(src), where=(numsum!=0))
+    if addEps:
+        log.debug("clear apply src add Eps\n")
+        dst = np.subtract(dst, d_eps, out=dst, where=(dst>=d_eps))
+    return dst
+
+def kernelPreProc(src, ksize=None):
+    '''
+    Parameters
+    ----------
+    src : 2D array-like
+        padded image array
+    ksize : int or tuple
+        kernel size
+
+    Returns
+    -------
+    dst : 2D array-like
+        dst, as zeros_like of the src
+    gp : 2D array-like
+        padded src image array
+    N, M : int
+        image #rows, #columns
+    n, m : int
+        kernel #rows, #columns, both should be odd
+    hlFltSzY, hlFltSzX :
+        half kernel size in rows(Y) and columns(X)
+    '''
+    if ksize is None:
+        ksize = (3, 3)
+    elif np.ndim(ksize) == 0:
+        ksize = (ksize, ksize)
+    N, M = src.shape
+    n, m = ksize
+    if n%2 == 0 or m%2 == 0:
+        raise ValueError("ksize shape {} should be odd!\n".format(repr(ksize)))
+    hlFltSzY, hlFltSzX = n//2, m//2
+    gp = padding(src, (hlFltSzY, hlFltSzX) )
+    dst = np.zeros_like(src)
+    return dst, gp, N, M, n, m
+
+def TrimedMean(src, ksize=None, d=0):
+    '''alpha trimmed mean filter'''
+    dst, gp, N, M, n, m = kernelPreProc(src, ksize=ksize)
+    log.debug("dst\n {}\n".format( str(dst)) )
+    log.debug("gp\n {}\n".format( str(gp)) )
+    log.debug("{} {} {} {}\n".format( N, M, n, m) )
+    if d >= n*m:
+        raise ValueError("TrimedMean filter, removed elements number d {} should be less than kernel elements {}={}x{}!\n".format(d, n*m, n, m))
+    hlTrim = d//2
+    for r in range(N):
+        for c in range(M):
+            slices = gp[r:(r+n), c:(c+m)]
+            arr = np.sort(slices, axis=None)
+            if hlTrim > 0:
+                arr = arr[hlTrim:-hlTrim]
+            dst[r, c] = np.mean(arr)
+    return dst
+
+def adpM(src, ksize):
+
 
 if __name__ == '__main__':
     print(eval('SOBEL_SMOOTH'))

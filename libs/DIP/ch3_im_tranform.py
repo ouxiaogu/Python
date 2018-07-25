@@ -290,7 +290,7 @@ def main():
     # try_specifyHisto()
 
     # try_localHistoEq()
-    # cProfile.run('try_localHistoEq()')
+    cProfile.run('try_localHistoEq()')
 
     # cProfile.run('try_Laplace_LoG()')
     # try_Laplace_LoG()

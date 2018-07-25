@@ -52,21 +52,20 @@ class Histogram(object):
     def cdf(self):
         return cdfHisto(self.hist)
 
-def cdfHisto(hist, normalized=True):
+def cdfHisto(hist, Lmax=255):
     '''
     hist: list with length = 256
     cdf: cumulative distribution function
     mapping: convert cdf into 0-255 grayscale levels
     '''
-    L = 256
     cumsum = 0
     if isinstance(hist, OrderedDict):
         mapping = OrderedDict()
         cumsum = np.cumsum(list(hist.values() ) )
         hist = list(hist.items())
-        if normalized:
+        if Lmax>1:
             tolsum = cumsum[-1]
-            cdf_func = lambda x: int(math.floor((L-1) * x / tolsum  + 0.5) )
+            cdf_func = lambda x: int(math.floor(Lmax * x / tolsum  + 0.5) )
             for i, kv in enumerate(hist):
                 mapping[kv[0]] = cdf_func(cumsum[i])
         else:
@@ -74,9 +73,9 @@ def cdfHisto(hist, normalized=True):
                 mapping[kv[0]] = cumsum[i]
     else:
         cumsum = np.cumsum(hist)
-        if normalized:
+        if Lmax>1:
             tolsum = cumsum[-1]
-            cdf_func = lambda x: int(math.floor((L-1) * x / tolsum + 0.5) )
+            cdf_func = lambda x: int(math.floor(Lmax * x / tolsum + 0.5) )
             mapping = [cdf_func(s) for s in cumsum]
         else:
             mapping = cumsum

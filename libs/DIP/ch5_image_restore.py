@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
 from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve
 from ImTransform import normalize, intensityTransform, calcHist
-from SpatialFlt import ContraHarmonic
+from SpatialFlt import ContraHarmonicMean
 
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH05'
 PROJECTPATH = r'C:\Localdata\D\Book\DIP\DIPum\DIPUM2E_Projects\SAMPLE_DIPUM2E_PROJECT_IMAGES'
@@ -97,25 +97,42 @@ def try_pepper_salt():
     impepper = cv2.imread(IMFILE, 0)
 
     imsalt_m = cv2.medianBlur(imsalt, 3)
-    imsalt_ch = ContraHarmonic(imsalt, 3, -1.5)
+    imsalt_ch = ContraHarmonicMean(imsalt, 3, -1.5)
 
     impepper_m = cv2.medianBlur(impepper, 3)
-    impepper_ch = ContraHarmonic(impepper, 3, 1.5)
+    impepper_ch = ContraHarmonicMean(impepper, 3, 1.5)
 
     imshowMultiple_TitleMatrix([imsalt, imsalt_m, imsalt_ch] +
         [impepper, impepper_m, impepper_ch], 2, 3,
         ['salt', 'pepper'], ['raw', 'median', 'contra harmonic'],
         cbar=False)
 
+def try_pepper_salt2():
+    IMFILE = os.path.join(PROJECTPATH, r'FigP0502(a)(salt_only).tif')
+    imsalt = cv2.imread(IMFILE, 0)
+    IMFILE = os.path.join(PROJECTPATH, r'FigP0502(b)(pepper_only).tif')
+    impepper = cv2.imread(IMFILE, 0)
+
+    imsalt_m = cv2.medianBlur(imsalt, 5)
+    imsalt_ch = ContraHarmonicMean(imsalt, 3, -5)
+
+    impepper_m = cv2.medianBlur(impepper, 5)
+    impepper_ch = ContraHarmonicMean(impepper, 3, 1.5)
+
+    imshowMultiple_TitleMatrix([imsalt, imsalt_m, imsalt_ch] +
+        [impepper, impepper_m, impepper_ch], 2, 3,
+        ['salt', 'pepper'], ['raw', 'median', 'contra harmonic'],
+        cbar=False)
 
 def main():
     # try_noise_fft()
 
     # try_noise()
 
-    try_polyroi()
+    # try_polyroi()
 
-    # try_pepper_salt()
+    try_pepper_salt()
+    try_pepper_salt2()
 
 if __name__ == '__main__':
     main()
