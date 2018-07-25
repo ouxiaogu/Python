@@ -21,8 +21,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 # INPATH = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples'
-# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
-DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
+DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
+#DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
 
@@ -93,7 +93,7 @@ def try_localHistoEq():
 
     start = timeit.default_timer()
     imE = equalizeHisto(im)
-    histE = hist_lines(imE)
+    histE = hist_lines(normalize(imE, 255, np.uint8))
     end = timeit.default_timer()
     print("Elapsed time for equalizeHisto: {}!".format(end - start) )
 
@@ -289,8 +289,8 @@ def main():
 
     # try_specifyHisto()
 
-    # try_localHistoEq()
-    cProfile.run('try_localHistoEq()')
+    try_localHistoEq()
+    # cProfile.run('try_localHistoEq()')
 
     # cProfile.run('try_Laplace_LoG()')
     # try_Laplace_LoG()
@@ -299,7 +299,7 @@ def main():
 
     # try_Combined_Enhance()
 
-    try_Combined_Enhance_Ops()
+    # try_Combined_Enhance_Ops()
 
 if __name__ == '__main__':
     main()

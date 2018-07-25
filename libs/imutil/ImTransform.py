@@ -63,23 +63,18 @@ def cdfHisto(hist, Lmax=255):
         mapping = OrderedDict()
         cumsum = np.cumsum(list(hist.values() ) )
         hist = list(hist.items())
-        if Lmax>1:
-            tolsum = cumsum[-1]
-            cdf_func = lambda x: int(math.floor(Lmax * x / tolsum  + 0.5) )
-            for i, kv in enumerate(hist):
-                mapping[kv[0]] = cdf_func(cumsum[i])
-        else:
-            for i, kv in enumerate(hist):
-                mapping[kv[0]] = cumsum[i]
+        coeff = Lmax / cumsum[-1]
+        for i, kv in enumerate(hist):
+            mapping[kv[0]] = coeff*cumsum[i]
     else:
         cumsum = np.cumsum(hist)
+        tolsum = cumsum[-1]
+        coeff = Lmax / cumsum[-1]
         if Lmax>1:
-            tolsum = cumsum[-1]
-            cdf_func = lambda x: int(math.floor(Lmax * x / tolsum + 0.5) )
+            cdf_func = lambda x: int(math.floor(coeff * x + 0.5) )
             mapping = [cdf_func(s) for s in cumsum]
         else:
-            mapping = cumsum
-
+            mapping = coeff*cumsum
     return mapping
 
 def addOrdereddDict(lhs, rhs):

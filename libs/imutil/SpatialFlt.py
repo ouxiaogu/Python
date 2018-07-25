@@ -280,7 +280,7 @@ def TrimedMean(src, ksize=None, d=0):
     return dst
 
 def adpM(src, ksize):
-
+    pass
 
 if __name__ == '__main__':
     print(eval('SOBEL_SMOOTH'))
