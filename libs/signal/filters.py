@@ -12,10 +12,13 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import collections
 
 __all__ = ['gaussian_filter', 'padding', 'padding_backward', 'convolve',
         'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel',
-        'correlate', 'applySepFilter']
+        'correlate', 'applySepFilter', 'kernelPreProc',
+        'applyKernelOperator',
+        ]
 
 SMALL_GAUSSIAN_TAB = [
     [1.],
@@ -67,24 +70,30 @@ def gaussian_filter(sigma=2, derivative_order=0, mode='CV', dtype=None):
     return dst
 
 def cv_gaussian_kernel(ksize, sigma=0, dtype=None):
-    ksize = int(ksize)
+    try:
+        ksize = int(ksize)
+    except:
+        raise TypeError("cv_gaussian_kernel is to generate linear Gaussian filter, ksize should be int, but input is: {}!\n".format(str(ksize)))
     if(ksize <= SMALL_GAUSSIAN_SIZE):
-        dst = SMALL_GAUSSIAN_TAB[ksize>>1]
-    if ksize % 2 == 0:
-        tmp = ksize + 1
-        sys.stderr.write("Warning, kernel size should be odd, adjust ksize from {} to {}".format(ksize, tmp))
-        ksize = tmp
-    fltSz = ksize
-    ksize = float(ksize)
-    if(sigma <= 0):
-        sigma = 0.3*((ksize-1)*0.5 - 1) + 0.8
-    func_G = lambda i: math.exp(- (i - (ksize-1)/2)**2 / (2*sigma**2) )
-    flt_G = np.asarray(list(func_G(i) for i in range(fltSz)) )
-    a = np.sum(flt_G)
-    dst = flt_G/a
+        dst = np.array(SMALL_GAUSSIAN_TAB[ksize>>1])
+    else:
+        if ksize % 2 == 0:
+            tmp = ksize + 1
+            sys.stderr.write("Warning, kernel size should be odd, adjust ksize from {} to {}!\n".format(ksize, tmp))
+            ksize = tmp
+        fltSz = ksize
+        ksize = float(ksize)
+        if(sigma <= 0):
+            sigma = 0.3*((ksize-1)*0.5 - 1) + 0.8
+        func_G = lambda i: math.exp(- (i - (ksize-1)/2)**2 / (2*sigma**2) )
+        flt_G = np.asarray(list(func_G(i) for i in range(fltSz)) )
+        a = np.sum(flt_G)
+        dst = flt_G/a
+
     if dtype is not None:
-        vmin = np.min(dst)
-        dst = np.floor(dst/vmin + 0.5)
+        if 'int' in str(dtype):
+            vmin = np.min(dst)
+            dst = np.floor(dst/vmin + 0.5)
         dst = dst.astype(dtype)
     return dst
 
@@ -117,7 +126,6 @@ def padding(src, padshape, padval=0):
     srcShape = arr.shape
     dst = None
     if(is_1D_array(arr) ):
-        import collections
         if(isinstance(padshape, collections.Iterable)):
             raise ValueError("padshape should be not iterable type, not {}!\n".format(str(type(padshape)) ))
         n = padshape
@@ -133,7 +141,6 @@ def padding(src, padshape, padval=0):
             if(len(padshape) != 2):
                raise ValueError("padshape's dimension {} should be the same with src's {}!\n".format(padshape, srcShape))
         except:
-            #sys.stderr.write("padshape {} should be the same with src {}!\n".format(padshape, srcShape))
             padshape = (padshape, padshape)
         n, m = padshape
         dstShape = tuple(s + 2*a for s, a in zip(srcShape, padshape) )
@@ -148,7 +155,6 @@ def padding_backward(src, padshape, padval=0):
     srcShape = arr.shape
     dst = None
     if(is_1D_array(arr) ):
-        import collections
         if(isinstance(padshape, collections.Iterable)):
             raise ValueError("padshape should be not iterable type, not {}!\n".format(str(type(padshape)) ))
         arrSz = array_long_axis_size(arr)
@@ -470,6 +476,79 @@ def dft_matrix(N):
     omega = np.exp( - 2 * np.pi * 1J / N )
     W = np.power( omega, i * j ) #/ np.sqrt(N)
     return W
+
+def kernelPreProc(src, ksize=None):
+    '''
+    Parameters
+    ----------
+    src : 2D array-like
+        padded image array
+    ksize : int or tuple
+        kernel size
+
+    Returns
+    -------
+    dst : 2D array-like
+        dst, as zeros_like of the src
+    gp : 2D array-like
+        padded src image array
+    N, M : int
+        image #rows, #columns
+    n, m : int
+        kernel #rows, #columns, both should be odd
+    hlFltSzY, hlFltSzX (cy, cx):
+        half kernel size in rows(Y) and columns(X), also the center x/y
+        of the kernel, named as (cy, cx)
+    '''
+    if ksize is None:
+        ksize = (3, 3)
+    elif np.ndim(ksize) == 0:
+        ksize = (ksize, ksize)
+    N, M = src.shape
+    n, m = ksize
+    if n%2 == 0 or m%2 == 0:
+        raise ValueError("ksize shape {} should be odd!\n".format(repr(ksize)))
+    hlFltSzY, hlFltSzX = n//2, m//2
+    gp = padding(src, (hlFltSzY, hlFltSzX) )
+    dst = np.zeros_like(src)
+    return dst, gp, N, M, n, m, hlFltSzY, hlFltSzX
+
+def fltGenPreProc(shape=None):
+    '''
+    N, M : int
+        kernel #rows, #columns, both should be odd
+    cy, cx :
+        half kernel size in rows(Y) and columns(X)
+    '''
+    if shape is None:
+        shape = (3, 3)
+    elif np.ndim(shape) == 0:
+        shape = (shape, shape)
+    N, M = shape
+    if N%2 == 0 or M%2 == 0:
+        raise ValueError("filter shape size {} should be odd!\n".format(repr(shape)))
+    cy, cx = (s//2 for s in shape)
+    return N, M, cy, cx
+
+def applyKernelOperator(src, ksize, operator=None):
+    '''
+    apply kernel level operator, return one value from the kernel pixels
+
+    operators like:
+        - statistics: min, max, mean, std
+    '''
+    dst, fp, N, M, n, m, _, _ = kernelPreProc(src, ksize)
+    if(isinstance(operator, collections.Iterable)):
+        dst = tuple(dst for i in range(len(operator)))
+    for r in range(N):
+        for c in range(M):
+            slices = fp[r:(r+n), c:(c+m)]
+            if(isinstance(operator, collections.Iterable)):
+                for i, opt in enumerate(operator):
+                    dst[i][r, c] = opt(slices)
+            else:
+                dst[r, c] = operator(slices)
+    return dst
 
 if __name__ == '__main__':
     # arr = np.random.randn(3, 4)

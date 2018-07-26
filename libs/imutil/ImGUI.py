@@ -17,8 +17,6 @@ import sys
 import math
 import cv2
 
-from ImDescriptors import printImageInfo
-
 __all__ = ['readDumpImage', 'readBBox', 'gen_multi_image_overview',
         'imshowCmap', 'cvtFloat2Gray', 'imreadFolder', 'imshowMultiple',
         'imshowMultiple_TitleMatrix', 'read_pgm', 'write_pgm',

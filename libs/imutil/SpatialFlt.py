@@ -12,8 +12,13 @@ import cv2
 
 import sys
 import os
+
+from ImTransform import imSub
+from ImDescriptors import getImageInfo
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-from filters import cv_gaussian_kernel, padding, correlate
+from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('SpatialFlt', level='info')
@@ -21,8 +26,9 @@ log = logger.setup('SpatialFlt', level='info')
 __all__ = ['GaussianFilter', 'LaplaceFilter', 'SobelFilter', 'PrewittFilter',
         'SOBEL_EDGE', 'SOBEL_SMOOTH', 'PREWITT_EDGE', 'PREWITT_SMOOTH',
         'SCHARR_EDGE', 'SCHARR_SMOOTH', 'LaplaceFilter3', 'BoxFilter',
-        'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivKernels',
-        'ContraHarmonicMean', 'TrimedMean', 'kernelPreProc']
+        'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivXYKernel',
+        'getMeanXYKernel', 'ContraHarmonicMean', 'TrimedMean',
+        'adpMean', 'adpMedian']
 
 SOBEL_EDGE = np.array([1, 0, -1])
 SOBEL_SMOOTH = np.array([1, 2, 1])
@@ -34,21 +40,22 @@ LAPLACE_DIRECTIONAL = np.array([1, -2, 1])
 LAPLACE_POSITION = np.array([0, 1, 0])
 
 def BoxFilter(shape, normalize=True):
+    fltGenPreProc(shape)
     dst = np.ones(shape)
     if normalize:
         dst = dst / np.sum(dst)
     return dst
 
-def GaussianFilter(shape, normalize=True):
-    N, M = shape
-    if N%2 == 0 or M%2 == 0:
-        raise ValueError("shape size {} should be odd!\n".format(repr(shape)))
+def GaussianFilter(shape, normalize=True, **kwargs):
+    N, M, _, _ = fltGenPreProc(shape)
+
     dst = []
-    colG = cv_gaussian_kernel(M, dtype=np.int32).reshape((1, M) )
-    rowG = cv_gaussian_kernel(N, dtype=np.int32).reshape((N, 1) )
-    colT = np.tile(colG, (N, 1))
-    rowT = np.tile(rowG, (1, M))
-    dst = colT*rowT
+    colG = cv_gaussian_kernel(M, **kwargs).reshape((1, M) )
+    rowG = cv_gaussian_kernel(N, **kwargs).reshape((N, 1) )
+    # colT = np.tile(colG, (N, 1))
+    # rowT = np.tile(rowG, (1, M))
+    # dst = colT*rowT
+    dst = np.matmul(rowG, colG)
     if normalize:
         dst = dst / np.sum(dst)
     return dst
@@ -61,15 +68,12 @@ def LaplaceFilter(shape, gaussian=False):
 
         L = f(x, y)*g(x, y)   ΔL = Lxx + Lyy
     '''
-    N, M = shape
-    if N%2 == 0 or M%2 == 0:
-        raise ValueError("shape size {} should be odd!\n".format(repr(shape)))
+    N, M, cx, cy = fltGenPreProc(shape)
 
     dst = np.ones(shape)
     if gaussian:
         dst = GaussianFilter(shape, normalize=False)
 
-    cy, cx = (s//2 for s in shape)
     tolsum = np.sum(dst)
     dst[cy, cx] = dst[cy, cx] - tolsum
     return dst
@@ -101,12 +105,11 @@ def SobelFilter(shape=None, axis=0, Prewitt=False, dtype=np.int32, normalize=Fal
         because of convolve flipud filter, so what we input is [1.  0.  -1.]
 
     '''
-    if shape is None:
-        shape = (3, 3)
-    N, M = shape
-    if N%2 == 0 or M%2 == 0:
-        raise ValueError("shape size {} should be odd!\n".format(repr(shape)))
-    cy, cx = (s//2 for s in shape)
+    N, M, cy, cx = fltGenPreProc(shape)
+    if axis == 'x':
+        axis = 0
+    elif axis == 'y':
+        axis = 1
     if axis == 0:
         sobel_flt = np.ones(M)
         sobel_flt[cx:] = -1
@@ -138,7 +141,7 @@ def SobelFilter(shape=None, axis=0, Prewitt=False, dtype=np.int32, normalize=Fal
 def PrewittFilter(shape=None, axis=0):
     return SobelFilter(shape=shape, axis=axis, Prewitt=True)
 
-def getDerivKernels(ktype, xorder, yorder, normalize=False):
+def getDerivXYKernel(ktype, xorder, yorder, normalize=False):
     '''
     Get col / row separated kernels
 
@@ -163,8 +166,9 @@ def getDerivKernels(ktype, xorder, yorder, normalize=False):
     ky : 1D array-like
         kernel y
     '''
-    if ktype.lower() not in ['sobel', 'prewitt', 'scharr'] :
-        raise ValueError("Input kernel type {} not in ['Sobel', 'Prewitt', 'Scharr']!\n".format(ktype))
+    DeriviateKernels = ['sobel', 'prewitt', 'scharr']
+    if ktype.lower() not in DeriviateKernels :
+        raise ValueError("Input kernel type {} not in {}!\n".format(ktype, str(DeriviateKernels)))
     if xorder == 1 and yorder == 0:
         kx = eval(ktype.upper() + '_EDGE')
         ky = eval(ktype.upper() + '_SMOOTH')
@@ -177,6 +181,22 @@ def getDerivKernels(ktype, xorder, yorder, normalize=False):
             kx = kx/np.sum(kx)
     else:
         raise ValueError("Input xorder {} yorder {} should one is 0, another is 1 !\n".format(xorder, yorder))
+    return kx, ky
+
+def getMeanXYKernel(ksize=None, ktype='box', normalize=True, **kwargs):
+    MeanFilter = ['box', 'gaussian']
+    if ktype.lower() not in MeanFilter :
+        raise ValueError("Input kernel type {} not in {}!\n".format(ktype, str(MeanFilter)))
+    N, M, _, _ = fltGenPreProc(ksize)
+    if ktype == 'box':
+        ky = np.ones(N)
+        kx = np.ones(M)
+    elif ktype == 'gaussian':
+        ky = cv_gaussian_kernel(N, **kwargs)
+        kx = cv_gaussian_kernel(M, **kwargs)
+    if normalize:
+        ky = ky/np.sum(ky)
+        kx = kx/np.sum(kx)
     return kx, ky
 
 def ContraHarmonicMean(src, ksize=None, Q=1.5):
@@ -226,44 +246,9 @@ def ContraHarmonicMean(src, ksize=None, Q=1.5):
         dst = np.subtract(dst, d_eps, out=dst, where=(dst>=d_eps))
     return dst
 
-def kernelPreProc(src, ksize=None):
-    '''
-    Parameters
-    ----------
-    src : 2D array-like
-        padded image array
-    ksize : int or tuple
-        kernel size
-
-    Returns
-    -------
-    dst : 2D array-like
-        dst, as zeros_like of the src
-    gp : 2D array-like
-        padded src image array
-    N, M : int
-        image #rows, #columns
-    n, m : int
-        kernel #rows, #columns, both should be odd
-    hlFltSzY, hlFltSzX :
-        half kernel size in rows(Y) and columns(X)
-    '''
-    if ksize is None:
-        ksize = (3, 3)
-    elif np.ndim(ksize) == 0:
-        ksize = (ksize, ksize)
-    N, M = src.shape
-    n, m = ksize
-    if n%2 == 0 or m%2 == 0:
-        raise ValueError("ksize shape {} should be odd!\n".format(repr(ksize)))
-    hlFltSzY, hlFltSzX = n//2, m//2
-    gp = padding(src, (hlFltSzY, hlFltSzX) )
-    dst = np.zeros_like(src)
-    return dst, gp, N, M, n, m
-
 def TrimedMean(src, ksize=None, d=0):
     '''alpha trimmed mean filter'''
-    dst, gp, N, M, n, m = kernelPreProc(src, ksize=ksize)
+    dst, gp, N, M, n, m, _, _ = kernelPreProc(src, ksize=ksize)
     log.debug("dst\n {}\n".format( str(dst)) )
     log.debug("gp\n {}\n".format( str(gp)) )
     log.debug("{} {} {} {}\n".format( N, M, n, m) )
@@ -279,8 +264,90 @@ def TrimedMean(src, ksize=None, d=0):
             dst[r, c] = np.mean(arr)
     return dst
 
-def adpM(src, ksize):
-    pass
+def applyMeanFilter(src, ksize=3, ktype='box', **kwargs):
+    kernelPreProc(src, ksize=ksize)
+    kx, ky = getMeanXYKernel(ksize=ksize, ktype=ktype, normalize=True, **kwargs) # always normalize in getMeanXYKernel
+    dst = applySepFilter(src, kx, ky)
+    return dst
+
+def adpMean(src, ksize, noise=None, noise_var=0, Imax=255, **kwargs):
+    '''
+    adaptive, local noise reduction filter
+
+    f' = g - VarN/VarL (g - mL)
+
+    Where,
+        g : degraded image
+        VarL :  Variance of `g` within local kernel
+        VarN :  Variance of `noise` within local kernel
+        mL :  smoothed image of `g` within local kernel
+        f' : restored image
+
+    1. VarN = 0, f' = g
+    2. VarL >> VarN,  f' = g, kept high contrast image areas
+    3. VarL ~= VarN,   = , reduce noise by smooth
+
+    Parameters
+    ----------
+    noise : 2D image like
+        should have the same size like the src image or padded image size
+    noise_var : double
+        constant Variance of the noise image, (std)^2
+    '''
+    dtype = np.float64
+    g = np.array(src, copy=True, dtype=dtype)
+    mL = applyMeanFilter(g, ksize, 'box', **kwargs)
+    VarL = applyKernelOperator(g, ksize, np.var)
+    if noise is not None:
+        if any(np.array(src.shape) - np.array(noise.shape) != 0):
+            raise ValueError("adpMean, src {} and noise {} image are not in the same shape!\n".format(str(src.shape), str(noise.shape)))
+        VarN = applyKernelOperator(noise, ksize, np.var)
+    else:
+        noise_var = dtype(noise_var)
+        VarN = np.full(g.shape, noise_var)
+    wt = np.divide(VarN, VarL, out=np.zeros_like(VarN), where=(VarL!=0))
+    wt = np.clip(wt, 0, 1)
+    log.debug('g: ' + getImageInfo(g) )
+    log.debug('mL: ' + getImageInfo(mL) )
+    log.debug('VarL: ' + getImageInfo(VarL) )
+    log.debug('VarN: ' + getImageInfo(VarN) )
+    log.debug('wt: ' + getImageInfo(wt) )
+    dst = imSub(g, wt*(g - mL), Imax=255)
+    return dst
+
+def adpMedian(src, ksize=3, max_ksize=7):
+    '''
+    adaptive median filter
+    '''
+    dst, _, N, M, n, m, _, _ = kernelPreProc(src, ksize)
+    gp_max = padding(src, max_ksize//2)
+
+    operators = [np.min, np.max, np.median]
+    Lmin, Lmax, Lmed = applyKernelOperator(src, ksize, operators)
+
+    for r in range(N):
+        for c in range(M):
+            dst[r, c] = adpMedianPixel(gp_max, (r, c), src[r,c], ksize, max_ksize, Lmin[r,c], Lmax[r,c], Lmed[r,c])
+    return dst
+
+def adpMedianPixel(gp_max, coord, intensity, ksize, max_ksize, lmin, lmax, lmed):
+    if lmed > lmin and  lmed < lmax:
+        if intensity > lmin and intensity < lmax:
+            return intensity
+        else:
+            return lmed
+    else:
+        ksize += 2
+        if ksize > max_ksize:
+            return lmed
+        r, c = coord
+        shift = max_ksize//2
+        cx = cy = ksize//2
+        slices = gp_max[(r+shift-cy):(r+shift+cy+1), (c+shift-cx):(c+shift+cx+1)]
+        lmin = np.min(slices)
+        lmax = np.max(slices)
+        lmed = np.median(slices)
+        return adpMedianPixel(gp_max, coord, intensity, ksize, max_ksize, lmin, lmax, lmed)
 
 if __name__ == '__main__':
     print(eval('SOBEL_SMOOTH'))

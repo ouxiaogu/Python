@@ -10,26 +10,32 @@ Last Modified by: ouxiaogu
 import numpy as np
 import cv2
 import pandas as pd
+from collections import OrderedDict
 
 import sys
 import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
-
 import logger
 log = logger.setup(level='info')
+from PlotConfig import getRGBColor
 
-__all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES', 'calcHistSeries',
+__all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
+            'calcHistSeries', 'calcHist', 'cdfHisto',
+            'addOrdereddDict', 'subOrdereddDict', 'Histogram',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
-            'printImageInfo'
+            'printImageInfo', 'getImageInfo'
         ]
 
 BINS = np.arange(256).reshape(256,1)
 RMS_BIN_RANGES = [0, 2, 4, 6, 8, 10, 15, 20, 30, 50, 100]
 ZNCC_BIN_RANGES = [0, 0.2, 0.5, 0.8]
 
+def getImageInfo(im):
+    shape = 'x'.join(map(str, im.shape))
+    return ', '.join(map(str, [shape, im.dtype, np.percentile(im, np.linspace(0, 100, 6),  interpolation='nearest')]))
+
 def printImageInfo(im):
-    shape = 'X'.join(map(str, im.shape))
-    print(shape, im.dtype, np.percentile(im, np.linspace(0, 100, 6),  interpolation='nearest'), sep=', ')
+    print(getImageInfo(im))
 
 def hist_curve(im):
     '''return histogram of an image drawn as curves'''
@@ -69,7 +75,7 @@ def hist_lines(im):
     h = np.flipud(h)
     return h
 
-def hist_rect(im=None, hbins=100, hist=None):
+def hist_rect(im=None, hbins=100, hist=None, color_hist=False):
     '''return histogram of any image as some rectangle bins
     In python, it seems cv2 don't support the float type image,
     But for c++, it's supported
@@ -94,12 +100,139 @@ def hist_rect(im=None, hbins=100, hist=None):
 
     assert(hbins <= 256)
     scale = 256//hbins
-    histImg = np.zeros((256, hbins*scale), np.uint8)
+    if not color_hist:
+        histImg = np.zeros((256, hbins*scale), np.uint8)
+        color = (255,255)
+    else:
+        histImg = np.zeros((256, hbins*scale, 3), np.uint8)
+        color = getRGBColor(ix=0) # ix=-3
     for ix in range(hbins):
         binVal = hist[ix]
-        cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), (255,255))
+        cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), color)
     histImg = np.flipud(histImg)
     return histImg
+
+class Histogram(object):
+    """docstring for Histogram"""
+    def __init__(self, hist, **kwargs):
+        super(Histogram, self).__init__()
+        self.hist = hist
+
+    def _validate_args(self, rhs):
+        if not isinstance(rhs, Histogram):
+            raise TypeError("rhs {} is not the Histogram object!\n".format(type(rhs) ))
+        if type(self.hist) != type(rhs.hist):
+            raise TypeError("Histogram self {} and rhs {} is not in the same type!\n".format(type(self.hist), type(rhs.hist) ))
+
+    def __add__(self, rhs):
+        self._validate_args(rhs)
+        if isinstance(self.hist, OrderedDict):
+            hist = addOrdereddDict(self.hist, rhs.hist)
+        elif isinstance(self.hist, list):
+            hist = (np.array(self.hist) + np.array(rhs.hist)).tolist()
+        return Histogram(hist)
+
+    def __sub__(self, rhs):
+        self._validate_args(rhs)
+        if isinstance(self.hist, OrderedDict):
+            hist = subOrdereddDict(self.hist, rhs.hist)
+        elif isinstance(self.hist, list):
+            hist = (np.array(self.hist) - np.array(rhs.hist)).tolist()
+        return Histogram(hist)
+
+    def cdf(self):
+        return cdfHisto(self.hist)
+
+def cdfHisto(hist, Lmax=255):
+    '''
+    hist: list with length = 256
+    cdf: cumulative distribution function
+    mapping: convert cdf into 0-255 grayscale levels
+    '''
+    cumsum = 0
+    if isinstance(hist, OrderedDict):
+        mapping = OrderedDict()
+        cumsum = np.cumsum(list(hist.values() ) )
+        hist = list(hist.items())
+        coeff = Lmax / cumsum[-1]
+        for i, kv in enumerate(hist):
+            mapping[kv[0]] = coeff*cumsum[i]
+    else:
+        cumsum = np.cumsum(hist)
+        tolsum = cumsum[-1]
+        coeff = Lmax / cumsum[-1]
+        mapping = coeff*cumsum
+    return mapping
+
+def addOrdereddDict(lhs, rhs):
+    lhs = list(lhs.items() )
+    rhs = list(rhs.items() )
+
+    dst = []
+    l = r = 0
+    while True:
+        if r == len(rhs):
+            if l < len(lhs) :
+                dst += lhs[l:]
+            break
+        elif l == len(lhs):
+            if r < len(rhs) :
+                dst += rhs[r:]
+            break
+        else:
+            if lhs[l][0] < rhs[r][0]:
+                dst.append((lhs[l][0], lhs[l][1]) )
+                l += 1
+            elif lhs[l][0] == rhs[r][0]:
+                dst.append((lhs[l][0], lhs[l][1] + rhs[r][1]) )
+                l += 1
+                r += 1
+            elif lhs[l][0] > rhs[r][0]:
+                dst.append((rhs[r][0], rhs[r][1]) )
+                r += 1
+    return  OrderedDict(dst)
+
+def subOrdereddDict(lhs, rhs):
+    dst = []
+    l = r = 0
+    for rk, rv in rhs.items():
+        if rk not in lhs.keys():
+            raise KeyError("subOrdereddDict, rhs key {} is not in lhs!\n".format(rk))
+        lhs[rk] -= rhs[rk]
+    return lhs
+
+def calcHist(src, hist_type='list'):
+    '''
+    histogram for grayscale image, intensity level is 256
+
+    Parameters
+    ----------
+    hist_type : string like
+        two types of hist_type to define histogram
+        - 'list': return hist as length=256 list, `hist[i]` to store the
+          times of intensity `i` occurs
+        - 'OrderedDict': return hist as length<=256 dict, `hist[k]` to store
+          the times of intensity `k` occurs, and will convert to OrderedDict
+          and sorted, for the sake of cdfHisto computation
+    '''
+    src = np.array(src)
+    if src.dtype != np.uint8:
+        raise ValueError("Histogram only supports single channel grayscale image, src's dtype is {}".format(repr(src.dtype)))
+
+    sz = src.size
+    arr = src.flatten()
+    if hist_type == 'list':
+        hist = np.zeros(256, dtype=np.int32)
+        for i in range(sz):
+            hist[ arr[i] ] += 1
+    elif hist_type == 'OrderedDict':
+        hist = {}
+        for i in range(sz):
+            if arr[i] not in hist.keys():
+                hist[arr[i] ] = 0
+            hist[arr[i] ] += 1
+        hist = OrderedDict(sorted(hist.items(), key=lambda kv: kv[0]))
+    return hist
 
 def calcHistSeries(series_, ranges=RMS_BIN_RANGES, column=None):
     """

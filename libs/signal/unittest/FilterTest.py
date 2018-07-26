@@ -45,7 +45,7 @@ class TestFilters(unittest.TestCase):
         np.testing.assert_equal(gaussian_filter(0.5, dtype=np.int32), [1, 4, 6, 4, 1])
 
     def test_cv_gaussian_kernel(self):
-        print(cv_gaussian_kernel(5, dtype=np.int32))
+        print(cv_gaussian_kernel(3, dtype=np.int32))
 
     def test_padding(self):
         padsize = 1

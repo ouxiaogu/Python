@@ -7,16 +7,28 @@ Last Modified by: ouxiaogu
 PlotConfig: Plot configuration utility module
 """
 
-import matplotlib.pyplot as plt
 from PlatformUtil import inWindows
 
 if inWindows():
     import seaborn as sns
 
-__all__ = ['choosePalette', 'setAxisLim', 'addLegend']
+__all__ = ['COLORS', 'hex2rgb', 'getRGBColor', 'choosePalette',
+        'setAxisLim', 'addLegend']
+
+COLORS = ['#0075DC', '#993F00', '#4C005C', '#191919', '#005C31', '#2BCE48', '#FFCC99', '#808080', '#94FFB5', '#8F7C00', '#9DCC00', '#C20088', '#003380', '#FFA405', '#FFA8BB', '#426600', '#FF0010', '#5EF1F2', '#00998F', '#E0FF66', '#740AFF', '#990000', '#FFFF00', '#FF5005', '#F0A3FF']
+
+def hex2rgb(src):
+    '''convert hexadecimal color into RGB tuple '''
+    src = src.lstrip('#')
+    return tuple(int(src[i:i+2], 16) for i in (0, 2 ,4))
+
+def getRGBColor(src=None, ix=0):
+    if src is None:
+        src = COLORS
+    return hex2rgb(src[ix])
 
 def choosePalette(style=''):
-    colors = ['#0075DC', '#993F00', '#4C005C', '#191919', '#005C31', '#2BCE48', '#FFCC99', '#808080', '#94FFB5', '#8F7C00', '#9DCC00', '#C20088', '#003380', '#FFA405', '#FFA8BB', '#426600', '#FF0010', '#5EF1F2', '#00998F', '#E0FF66', '#740AFF', '#990000', '#FFFF00', '#FF5005', '#F0A3FF']
+    colors = COLORS
     # https://en.wikipedia.org/wiki/Help:Distinguishable_colors#cite_note-2
 #    if sytle=='deep':
     if style == 'various':

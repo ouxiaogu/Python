@@ -31,23 +31,19 @@ DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
 class TestFilters(unittest.TestCase):
     def setUp(self):
         self.shape = (5, 5)
-        self.debug1 = False
-        self.debug2 = True
 
     def test_GaussianFilter(self):
-        if self.debug1:
-            print(GaussianFilter(self.shape) )
+        log.debug('GaussianFilter :\n'+ str(GaussianFilter(3)) )
+        kwargs = {'dtype': np.int32}
+        log.debug('GaussianFilter, w/o normalize, int:\n'+ str(GaussianFilter(3, False, **kwargs) ))
 
     def test_LaplaceFilter(self):
-        if self.debug1:
-            print(LaplaceFilter(self.shape) )
-            print(LaplaceFilter(self.shape, True) )
+        log.debug('LaplaceFilter :\n'+ str(LaplaceFilter(self.shape)))
+        log.debug('LaplaceFilter Gaussian :\n' + str(LaplaceFilter(self.shape, True)))
 
     def test_SobelFilter(self):
-        if self.debug1:
-            print(SobelFilter((5,3) ) )
-            print(SobelFilter((3,5), 1) )
-            print(PrewittFilter((3,5), 1))
+        log.debug('SobelFilter 5x3, X:\n' + str(SobelFilter((5,3), 'x')))
+        log.debug('PrewittFilter 3x5, Y:\n' + str(PrewittFilter((3,5), 'y')))
 
     def test_Sobel(self):
         '''
@@ -93,6 +89,17 @@ class TestFilters(unittest.TestCase):
         log.debug('im\n{}'.format(str(im)))
         log.debug('TrimedMean(im, 3, 8)\n{}\n'.format(str(TrimedMean(im, 3, 8))))
         np.testing.assert_almost_equal(TrimedMean(im, 3, 0)[1,1], np.mean(im))
+
+    def test_getMeanXYKernel(self):
+        kx, ky = getMeanXYKernel(3, 'box', False)
+        np.testing.assert_equal(kx, [1, 1, 1])
+        np.testing.assert_equal(ky, [1, 1, 1])
+
+        kx, ky = getMeanXYKernel(3, 'gaussian', True)
+        log.debug('Gaussian kx, ky:\n'+ str(kx)+ '\n'+ str(ky))
+        bas =  GaussianFilter(3, True)
+        ref = np.matmul(ky.reshape((3, 1)),  kx.reshape((1, 3)))
+        np.testing.assert_almost_equal(bas, ref)
 
 if __name__ == '__main__':
     unittest.main()

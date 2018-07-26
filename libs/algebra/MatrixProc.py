@@ -80,7 +80,7 @@ def test_gcd():
 def test_decompose2DIntegerFilter():
     # print(decompose2DIntegerFilter(GaussianFilter((3,3) ), sep='\n')
     print(decompose2DIntegerFilter(SobelFilter((3,3), 1, dtype=np.int32) ), sep='\n')
-    print(getDerivKernels('Sobel', 0, 1) )
+    print(getDerivXYKernel('Sobel', 0, 1) )
     print(decompose2DIntegerFilter(np.ones((3,3), dtype=np.int32) ) )
 
 def main():
