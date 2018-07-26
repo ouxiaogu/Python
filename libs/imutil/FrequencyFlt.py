@@ -9,6 +9,7 @@ Last Modified by: ouxiaogu
 
 import numpy as np
 import re
+import collections
 
 import sys
 import os
@@ -19,7 +20,7 @@ __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
             'BLPF', 'BHPF', 'BBRF', 'BBPF', 'BNRF', 'BNPF',
             'GLPF', 'GHPF', 'GBRF', 'GBPF',
             'HEF', 'LaplaceFilter',
-            'imApplyFilter', 'distance_map',
+            'applyFreqFilter', 'distance_map',
             'HomomorphicFilter', 'imApplyHomomorphicFilter'
             ]
 
@@ -88,7 +89,7 @@ def BBRF(shape, D0, n, W):
 def BBPF(shape, D0, n, W):
     return 1 - BBRF(shape, D0, n, W)
 
-def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left'):
+def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left', padded=False):
     '''
     Butterworth Notch Reject filter
     BNRF = ∏ H_i_{k} * H_i_{-k}
@@ -97,26 +98,49 @@ def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left'):
     ----------
     notches : array-like object
         each element is a pair of notch: (u, v), origin defined by
-        `notch_origin`
-    D0s : array-like object
+        `notch_origin`, note, `u` is column, `v` is row 
+    D0s : array-like object or single element
         each element is a cut-off frequency
     n : int
         Butterworth filer order, default n = 2
     notch_origin : string, 'top-left' or 'center'
         - 'top-left', means input notch's origin is at top left of the image,
           need switch to image center to get the real (u, v)
+    padded : bool
+        which fft is the notches drawn? 
+        - `True`, already based on the padded image's FFT, Because the frequency
+        domain filter multiply is spatial domain convolution, need padding into
+        2X size, so don't need to change the notches's coords
+        - `False`, 
+            - if notch_orgin=='center', no need to adjust
+            - if notch_orgin=='top-left', and w/o padding, then notches' coords
+            are all based no padded fft image's center, which is ((N-1)/4, (M-1)/4), 
+            need change the origin into ((N-1)/2, (M-1)/2)
+    Note
+    ----
+    1. (N-1)/2 as center, is because image index start from 0, end at N-1. eg, 
+    1024x1024 image, range [0, 1023], center at (1024-1)/2=511.5
     '''
     inline_origins = ['top-left', 'center']
+    if np.ndim(D0s) == 0:
+        D0s = np.full(len(notches), D0s) # scalar single element input
     if len(notches) != len(D0s):
         raise ValueError("'notches' and 'D0s' have different length: {} & {}!\n".format(len(notches), len(D0s)))
     if notch_origin not in inline_origins:
         raise ValueError("input 'notch_origin' {} is not in supported list {}!\n".format(notch_origin, str(notch_origin)))
     N, M = shape
+    if notch_origin == 'top-left':
+        if not padded:
+            notches = [(2*(u-(M-1)/4), 2*(v-(N-1)/4)) for u, v in notches]
+
+            notch_origin = 'center'
+        else:
+            inv_notches = [(M-1-u, N-1-v) for u, v in notches]
     if notch_origin == 'center':
+        inv_notches_rel = [(-u, -v) for u, v in notches] # relative
         notches = [(u + (M - 1)/2, v + (N - 1)/2) for u, v in notches]
-        inv_notches = [(-u, -v) for u, v in notches]
-    elif notch_origin == 'top-left':
-        inv_notches = [(M-1-u, N-1-v) for u, v in notches]
+        inv_notches = [(u + (M - 1)/2, v + (N - 1)/2) for u, v in inv_notches_rel]
+
     z = np.ones(shape)
     for ix, notch in enumerate(notches):
         u, v = notch
@@ -210,7 +234,7 @@ def HomomorphicFilter(shape, D0, gamma_L=0.25, gamma_H=2, c=1):
     z = gamma_L + (gamma_H - gamma_L) * (1 - np.exp(- c * D**2 / D0**2))
     return z
 
-def imApplyFilter(src, fltFunc, **kwargs):
+def applyFreqFilter(src, fltFunc, **kwargs):
     '''
     perform general process to apply filters in frequency domain
 
@@ -278,7 +302,7 @@ def imApplyHomomorphicFilter(src, D0, **kwargs):
 if __name__ == '__main__':
     im = np.random.rand(9, 9)
     kwargs = {'D0': 3, 'n':2}
-    a = imApplyFilter(im, BLPF, **kwargs)
+    a = applyFreqFilter(im, BLPF, **kwargs)
     kwargs = {'n':2, 'D0': 3}
-    b = imApplyFilter(im, BLPF, **kwargs)
+    b = applyFreqFilter(im, BLPF, **kwargs)
     np.testing.assert_equal(a, b)

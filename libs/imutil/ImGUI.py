@@ -350,6 +350,7 @@ class PolygonDrawer(object):
         elif event == cv2.EVENT_RBUTTONDOWN:
             # Right click means we're done
             print("Completing polygon with {} points.".format(len(self.points) ))
+            print(str(self.points))
             self.done = True
 
     def run(self):

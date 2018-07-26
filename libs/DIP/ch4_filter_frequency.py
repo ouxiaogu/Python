@@ -15,10 +15,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_TitleMatrix
-from FreqeuncyFlt import *
+from FrequencyFlt import *
 from ImDescriptors import im_fft_amplitude_phase
 
-DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04'
+# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04'
+DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH04'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 
 def try_paramid():
@@ -148,7 +149,7 @@ def try_power_ratio_loci():
     print(ratios)
 
 def try_filter(option=None):
-    from FreqeuncyFlt import imApplyFilter
+    from FrequencyFlt import applyFreqFilter
     if option is None:
         option = 'LPF'
     if option == 'LPF':
@@ -187,7 +188,7 @@ def try_filter(option=None):
             argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
             labels = [func.__name__] + argstrs
             label = ', '.join(labels)
-            flt_imgs.append(imApplyFilter(im, func, **kwargs) )
+            flt_imgs.append(applyFreqFilter(im, func, **kwargs) )
             flt_titles.append(label)
         imshowMultiple(imgs + flt_imgs, titles + flt_titles)
         flt_imgs.clear()
@@ -215,7 +216,7 @@ def try_HEF():
         argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
         labels = [func.__name__, subfunc.__name__] + argstrs[1:]
         label = ', '.join(labels)
-        flt_imgs.append(imApplyFilter(im, func, **kwargs) )
+        flt_imgs.append(applyFreqFilter(im, func, **kwargs) )
         flt_titles.append(label)
     imshowMultiple(imgs + flt_imgs, titles + flt_titles)
 
@@ -224,7 +225,7 @@ def try_homomorphic_filter():
     # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0462(a)(PET_image).tif', 0)
     im = cv2.imread(IMFILE, 0)
 
-    from FreqeuncyFlt import imApplyHomomorphicFilter
+    from FrequencyFlt import imApplyHomomorphicFilter
     kwargs = {'gamma_L': 0.5, 'gamma_H': 1.5, 'c': 1}
     flt_im = imApplyHomomorphicFilter(im, 80, **kwargs)
     imshowMultiple([im, flt_im], ['orig image', 'homomorphic filter'])
@@ -255,7 +256,8 @@ def try_display_filter():
 
 def try_notch_filter():
     # raw image
-    im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0464(a)(car_75DPI_Moire).tif', 0)
+    IMFILE = os.path.join(DIPPATH, r'Fig0464(a)(car_75DPI_Moire).tif')
+    im = cv2.imread(IMFILE, 0)
 
     # padding into 2X
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
@@ -264,16 +266,16 @@ def try_notch_filter():
     fp = padding_backward(im, rawShape)
     amplitude, _  = im_fft_amplitude_phase(fp)
 
-    notches = [(108.3, 169.6), (222.1, 161.4), (107.6, 86.6), (222.1, 79.1)]
+    notches = [(108.3, 169.6), (222.1, 161.4), (107.6, 86.6), (222.1, 79.1)] #(x,y)
     D0s = [10 for n in notches]
-    kwargs = {'notches': notches, 'D0s': D0s, 'n': 4}
+    kwargs = {'notches': notches, 'D0s': D0s, 'n': 4, 'padded':True}
     H = BNRF(fp.shape, **kwargs)
     Fp = np.fft.fft2(fp)
     Fp = np.fft.fftshift(Fp)
     Gp = Fp*H
     Gp_A = np.log(1 + np.absolute(Gp))
 
-    res = imApplyFilter(im, BNRF, **kwargs)
+    res = applyFreqFilter(im, BNRF, **kwargs)
 
     imshowMultiple([fp, amplitude, H, Gp_A], ['im', 'fft', 'BNRF', 'frequency result'])
     imshowMultiple([im, res], ['im', 'BNRF result'])
@@ -294,10 +296,10 @@ if __name__ == '__main__':
     # try_filter('HPF')
     # try_filter('BPF')
 
-    try_HEF()
+    # try_HEF()
 
     # try_homomorphic_filter()
 
     # try_display_filter()
 
-    # try_notch_filter()
+    try_notch_filter()

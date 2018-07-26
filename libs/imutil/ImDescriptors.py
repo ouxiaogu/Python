@@ -215,12 +215,16 @@ def calcHist(src, hist_type='list'):
           the times of intensity `k` occurs, and will convert to OrderedDict
           and sorted, for the sake of cdfHisto computation
     '''
+    htypes = ['list', 'OrderedDict']
+    if hist_type not in htypes:
+        raise ValueError("Input hist_type {} not in the supported list: {}!\n".format(hist_type, str(htypes)))
     src = np.array(src)
     if src.dtype != np.uint8:
         raise ValueError("Histogram only supports single channel grayscale image, src's dtype is {}".format(repr(src.dtype)))
 
     sz = src.size
     arr = src.flatten()
+    hist = None
     if hist_type == 'list':
         hist = np.zeros(256, dtype=np.int32)
         for i in range(sz):
@@ -346,7 +350,7 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
     else:
         power = amplitude**2
 
-    from FreqeuncyFlt import distance_map
+    from FrequencyFlt import distance_map
     D = distance_map(amplitude.shape)
     mask = ~(D <= D0)
     power_m = np.ma.array(power, mask=mask)

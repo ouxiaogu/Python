@@ -8,17 +8,20 @@ Last Modified by: ouxiaogu
 """
 
 import numpy as np
+import cv2
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
 from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve
-from ImTransform import normalize, intensityTransform, calcHist, imSub
+from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, powerFunc
 from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimedMean
+from FrequencyFlt import BNRF, BNPF, applyFreqFilter
 
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH05'
-PROJECTPATH = r'C:\Localdata\D\Book\DIP\DIPum\DIPUM2E_Projects\SAMPLE_DIPUM2E_PROJECT_IMAGES'
+# PROJECTPATH = r'C:\Localdata\D\Book\DIP\DIPum\DIPUM2E_Projects\SAMPLE_DIPUM2E_PROJECT_IMAGES'
+PROJECTPATH = r'D:\book\DIP\DIPum\DIPUM2E_Projects\SAMPLE_DIPUM2E_PROJECT_IMAGES'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 
 def try_noise_fft():
@@ -183,6 +186,43 @@ def try_NLM():
     imgs.append(imgs[-1] - imgs[0] )
     imshowMultiple(imgs, titles)
 
+def try_notch(interative=True):
+    KEY_ESC = 27
+
+    IMFILE = os.path.join(PROJECTPATH, r'FigP0405(HeadCT_corrupted).tif')
+    im = cv2.imread(IMFILE, 0)
+    amp, _ = im_fft_amplitude_phase(im)
+    amp = intensityTransform(normalize(amp, 255, np.uint8), powerFunc(gamma=2), dtype=np.uint8)
+    if interative:
+        window_name = r"draw notch points"
+        pd = PolygonDrawer(amp, window_name)
+        amproi = pd.run()
+        vertexes = pd.points
+    else:
+        #vertexes = [(216, 217), (246, 256), (256, 276)]
+        #vertexes = [(256, 266), (276, 256), (296, 296)] #DIPum
+        vertexes = [(296, 296), (256, 276), (265, 257)]
+        #[256 266; 276 256; 296 296]
+        amproi = cv2.polylines(amp, np.array([vertexes]), True, [0, 255, 255], 1)
+    kwargs = {'notches': vertexes,'D0s': 10, 'n':5, 'padded':False}
+
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+    from filters import padding_backward
+    rawShape = im.shape
+    fp = padding_backward(im, rawShape)
+    amplitude, _  = im_fft_amplitude_phase(fp)
+
+    H = BNRF(fp.shape, **kwargs)
+    Fp = np.fft.fft2(fp)
+    Fp = np.fft.fftshift(Fp)
+    Gp = Fp*H
+    Gp_A = np.log(1 + np.absolute(Gp))
+    imshowMultiple([fp, amplitude, H, Gp_A], ['im', 'fft', 'BNRF', 'frequency result'])
+    
+    imBNRF = applyFreqFilter(im, BNRF, **kwargs)
+    imBNPF = imSub(im, imBNRF, Imax=255) # applyFreqFilter(im, BNPF, **kwargs)
+    imshowMultiple([im, amproi, imBNRF, imBNPF], ['imroi', 'imhist', 'BNRF', 'BNPF'])
+
 def main():
     # try_noise_fft()
 
@@ -197,7 +237,9 @@ def main():
     # try_adpMedian()
 
     # try_median_ldose()
-    try_NLM()
+    # try_NLM()
+
+    try_notch(False)
 
 if __name__ == '__main__':
     main()
