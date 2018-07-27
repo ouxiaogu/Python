@@ -28,7 +28,7 @@ __all__ = ['GaussianFilter', 'LaplaceFilter', 'SobelFilter', 'PrewittFilter',
         'SCHARR_EDGE', 'SCHARR_SMOOTH', 'LaplaceFilter3', 'BoxFilter',
         'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivXYKernel',
         'getMeanXYKernel', 'ContraHarmonicMean', 'TrimedMean',
-        'adpMean', 'adpMedian']
+        'adpMean', 'adpMedian', 'setNLMParams']
 
 SOBEL_EDGE = np.array([1, 0, -1])
 SOBEL_SMOOTH = np.array([1, 2, 1])
@@ -188,10 +188,10 @@ def getMeanXYKernel(ksize=None, ktype='box', normalize=True, **kwargs):
     if ktype.lower() not in MeanFilter :
         raise ValueError("Input kernel type {} not in {}!\n".format(ktype, str(MeanFilter)))
     N, M, _, _ = fltGenPreProc(ksize)
-    if ktype == 'box':
+    if ktype.lower() == 'box':
         ky = np.ones(N)
         kx = np.ones(M)
-    elif ktype == 'gaussian':
+    else:
         ky = cv_gaussian_kernel(N, **kwargs)
         kx = cv_gaussian_kernel(M, **kwargs)
     if normalize:
@@ -254,13 +254,16 @@ def TrimedMean(src, ksize=None, d=0):
     log.debug("{} {} {} {}\n".format( N, M, n, m) )
     if d >= n*m:
         raise ValueError("TrimedMean filter, removed elements number d {} should be less than kernel elements {}={}x{}!\n".format(d, n*m, n, m))
-    hlTrim = d//2
+    hlTrim = int(d//2)
     for r in range(N):
         for c in range(M):
             slices = gp[r:(r+n), c:(c+m)]
             arr = np.sort(slices, axis=None)
             if hlTrim > 0:
-                arr = arr[hlTrim:-hlTrim]
+                try:
+                    arr = arr[hlTrim:-hlTrim]
+                except TypeError:
+                    raise TypeError("arr: {} d: {}!\n".format(str(arr), d))
             dst[r, c] = np.mean(arr)
     return dst
 
@@ -348,6 +351,35 @@ def adpMedianPixel(gp_max, coord, intensity, ksize, max_ksize, lmin, lmax, lmed)
         lmax = np.max(slices)
         lmed = np.median(slices)
         return adpMedianPixel(gp_max, coord, intensity, ksize, max_ksize, lmin, lmax, lmed)
+
+def setNLMParams(sigma):
+    '''
+    Non-Local Mean (NLM) filters, fastNlMeansDenoising
+    Auto set the NLM parameter based on the noise sigma
+    sigma = 0-15-30, patch 3~5, h=0.40*sigma, block = 21
+    sigma = 30-45-75, patch 7~9, h=0.35*sigma, block = 35
+    sigma = 75-100, patch 11, h=0.3*sigma, block = 35
+    '''
+    h = 3
+    psize = 7
+    bsize = 21
+    ratio = 1
+    if sigma >0 and sigma <= 30:
+        ratio = 0.4
+        psize = 3 if sigma <= 15 else 5
+        bsize = 21
+    elif sigma>30 and sigma <= 75:
+        ratio = 0.35
+        psize = 7 if sigma < 45 else 9
+        bsize = 35
+    elif sigma>75 and sigma<=100:
+        ratio = 0.3
+        psize = 11
+        bsize = 35
+    h = ratio*sigma
+    return (h, psize, bsize)
+
+
 
 if __name__ == '__main__':
     print(eval('SOBEL_SMOOTH'))

@@ -268,7 +268,7 @@ def try_notch_filter():
 
     notches = [(108.3, 169.6), (222.1, 161.4), (107.6, 86.6), (222.1, 79.1)] #(x,y)
     D0s = [10 for n in notches]
-    kwargs = {'notches': notches, 'D0s': D0s, 'n': 4, 'padded':True}
+    kwargs = {'notches': notches, 'D0s': D0s, 'n': 4, 'notch_after_padding':True}
     H = BNRF(fp.shape, **kwargs)
     Fp = np.fft.fft2(fp)
     Fp = np.fft.fftshift(Fp)

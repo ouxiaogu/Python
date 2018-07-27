@@ -15,6 +15,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import padding_backward
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+import logger
+log = logger.setup('FrequencyFlt', 'info')
 
 __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
             'BLPF', 'BHPF', 'BBRF', 'BBPF', 'BNRF', 'BNPF',
@@ -89,7 +92,7 @@ def BBRF(shape, D0, n, W):
 def BBPF(shape, D0, n, W):
     return 1 - BBRF(shape, D0, n, W)
 
-def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left', padded=False):
+def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left', notch_after_padding=False):
     '''
     Butterworth Notch Reject filter
     BNRF = ∏ H_i_{k} * H_i_{-k}
@@ -98,7 +101,7 @@ def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left', padded=Fal
     ----------
     notches : array-like object
         each element is a pair of notch: (u, v), origin defined by
-        `notch_origin`, note, `u` is column, `v` is row 
+        `notch_origin`, note, `u` is column, `v` is row
     D0s : array-like object or single element
         each element is a cut-off frequency
     n : int
@@ -106,20 +109,25 @@ def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left', padded=Fal
     notch_origin : string, 'top-left' or 'center'
         - 'top-left', means input notch's origin is at top left of the image,
           need switch to image center to get the real (u, v)
-    padded : bool
-        which fft is the notches drawn? 
+    notch_after_padding : bool
+        which fft is the notches drawn?
         - `True`, already based on the padded image's FFT, Because the frequency
         domain filter multiply is spatial domain convolution, need padding into
         2X size, so don't need to change the notches's coords
-        - `False`, 
+        - `False`,
             - if notch_orgin=='center', no need to adjust
             - if notch_orgin=='top-left', and w/o padding, then notches' coords
-            are all based no padded fft image's center, which is ((N-1)/4, (M-1)/4), 
+            are all based no padded fft image's center, which is ((N-1)/4, (M-1)/4),
             need change the origin into ((N-1)/2, (M-1)/2)
     Note
     ----
-    1. (N-1)/2 as center, is because image index start from 0, end at N-1. eg, 
-    1024x1024 image, range [0, 1023], center at (1024-1)/2=511.5
+    1. (N-1)/2 as center, is because image index start from 0, end at N-1. eg,
+    1024x1024 image, range [0, 1023], center at (0+N-1)/2=(0+1023)/2=511.5
+    2. spatial domain period (Px, Py) into frequency domain (u, v) bright
+    spot, the relation is u = M/Px, v = N/Py.
+    3. coord change rule is:
+        - 'top-left' coordinates, to generate image size notching filter
+        - 'center' coordinates, to inverse the notches center
     '''
     inline_origins = ['top-left', 'center']
     if np.ndim(D0s) == 0:
@@ -129,18 +137,21 @@ def BNRF(shape, notches=None, D0s=None, n=2, notch_origin='top-left', padded=Fal
     if notch_origin not in inline_origins:
         raise ValueError("input 'notch_origin' {} is not in supported list {}!\n".format(notch_origin, str(notch_origin)))
     N, M = shape
+    log.info('Notch filter, input notch_after_padding? {}; notches: {}'.format(notch_after_padding, str(notches)))
+    if not notch_after_padding:
+        # (u, v) into 2X, because image size will be padded into 2X to apply
+        # frequency filter.
+        # 2X rule works for notches from both 'top-left' and 'center' origin:
+        # 'top-left', 1x image (u, v), center (M/4, N/4); 2X image (2u, 2v),
+        # center: (M/2, N/2); M/2-2u = 2*(M/4 - u)
+        notches = [(2*u, 2*v) for u, v in notches]
     if notch_origin == 'top-left':
-        if not padded:
-            notches = [(2*(u-(M-1)/4), 2*(v-(N-1)/4)) for u, v in notches]
-
-            notch_origin = 'center'
-        else:
-            inv_notches = [(M-1-u, N-1-v) for u, v in notches]
-    if notch_origin == 'center':
+        inv_notches = [(M-1-u, N-1-v) for u, v in notches]
+    elif notch_origin == 'center':
         inv_notches_rel = [(-u, -v) for u, v in notches] # relative
         notches = [(u + (M - 1)/2, v + (N - 1)/2) for u, v in notches]
         inv_notches = [(u + (M - 1)/2, v + (N - 1)/2) for u, v in inv_notches_rel]
-
+    log.info('Notch filter, after processing notches: {}'.format(str(notches)))
     z = np.ones(shape)
     for ix, notch in enumerate(notches):
         u, v = notch
