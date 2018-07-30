@@ -83,12 +83,12 @@ class TestFilters(unittest.TestCase):
         im = im[(r-n):(r+n+1), (c-m):(c+m+1)]
         ContraHarmonicMean(im, 3, -1.5)
 
-    def test_TrimedMean(self):
+    def test_TrimmedMean(self):
         np.random.seed(0)
         im = np.random.randn(3, 3)
         log.debug('im\n{}'.format(str(im)))
-        log.debug('TrimedMean(im, 3, 8)\n{}\n'.format(str(TrimedMean(im, 3, 8))))
-        np.testing.assert_almost_equal(TrimedMean(im, 3, 0)[1,1], np.mean(im))
+        log.debug('TrimmedMean(im, 3, 8)\n{}\n'.format(str(TrimmedMean(im, 3, 8))))
+        np.testing.assert_almost_equal(TrimmedMean(im, 3, 0)[1,1], np.mean(im))
 
     def test_getMeanXYKernel(self):
         kx, ky = getMeanXYKernel(3, 'box', False)

@@ -27,7 +27,7 @@ __all__ = ['GaussianFilter', 'LaplaceFilter', 'SobelFilter', 'PrewittFilter',
         'SOBEL_EDGE', 'SOBEL_SMOOTH', 'PREWITT_EDGE', 'PREWITT_SMOOTH',
         'SCHARR_EDGE', 'SCHARR_SMOOTH', 'LaplaceFilter3', 'BoxFilter',
         'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivXYKernel',
-        'getMeanXYKernel', 'ContraHarmonicMean', 'TrimedMean',
+        'getMeanXYKernel', 'ContraHarmonicMean', 'TrimmedMean',
         'adpMean', 'adpMedian', 'setNLMParams']
 
 SOBEL_EDGE = np.array([1, 0, -1])
@@ -246,15 +246,17 @@ def ContraHarmonicMean(src, ksize=None, Q=1.5):
         dst = np.subtract(dst, d_eps, out=dst, where=(dst>=d_eps))
     return dst
 
-def TrimedMean(src, ksize=None, d=0):
+def TrimmedMean(src, ksize=None, d=0, ktype='box'):
     '''alpha trimmed mean filter'''
     dst, gp, N, M, n, m, _, _ = kernelPreProc(src, ksize=ksize)
     log.debug("dst\n {}\n".format( str(dst)) )
     log.debug("gp\n {}\n".format( str(gp)) )
     log.debug("{} {} {} {}\n".format( N, M, n, m) )
     if d >= n*m:
-        raise ValueError("TrimedMean filter, removed elements number d {} should be less than kernel elements {}={}x{}!\n".format(d, n*m, n, m))
+        raise ValueError("TrimmedMean filter, removed elements number d {} should be less than kernel elements {}={}x{}!\n".format(d, n*m, n, m))
     hlTrim = int(d//2)
+    fltSz = int(n*m-d)
+    smoother, _ = getMeanXYKernel(fltSz, ktype)
     for r in range(N):
         for c in range(M):
             slices = gp[r:(r+n), c:(c+m)]
@@ -264,7 +266,7 @@ def TrimedMean(src, ksize=None, d=0):
                     arr = arr[hlTrim:-hlTrim]
                 except TypeError:
                     raise TypeError("arr: {} d: {}!\n".format(str(arr), d))
-            dst[r, c] = np.mean(arr)
+            dst[r, c] = np.sum(np.dot(arr, smoother))
     return dst
 
 def applyMeanFilter(src, ksize=3, ktype='box', **kwargs):
@@ -298,8 +300,7 @@ def adpMean(src, ksize, noise=None, noise_var=0, Imax=255, **kwargs):
         constant Variance of the noise image, (std)^2
     '''
     dtype = np.float64
-    g = np.array(src, copy=True, dtype=dtype)
-    mL = applyMeanFilter(g, ksize, 'box', **kwargs)
+    g = np.array(src, copy=True, dtype=dtype)    mL = applyMeanFilter(g, ksize, 'box', **kwargs)
     VarL = applyKernelOperator(g, ksize, np.var)
     if noise is not None:
         if any(np.array(src.shape) - np.array(noise.shape) != 0):

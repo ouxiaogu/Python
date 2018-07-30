@@ -16,8 +16,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
 from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve
 from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, powerFunc
-from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimedMean, setNLMParams
+from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimmedMean, setNLMParams
 from FrequencyFlt import BNRF, BNPF, applyFreqFilter
+KWARGS = {'vmin': 0, 'vmax': 255}
 
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH05'
 PROJECTPATH = r'C:\Localdata\D\Book\DIP\DIPum\DIPUM2E_Projects\SAMPLE_DIPUM2E_PROJECT_IMAGES'
@@ -109,30 +110,35 @@ def try_pepper_salt2():
 def try_polyroi_noise_hist(interative=True):
     KEY_ESC = 27
 
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
+    # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
     # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_regular.bmp')
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
+    #IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_regular.bmp')
     im = cv2.imread(IMFILE, 0)
-    im = cv2.fastNlMeansDenoising(im, h=30,  templateWindowSize=11, searchWindowSize=35)
+    # im = cv2.fastNlMeansDenoising(im, h=30,  templateWindowSize=11, searchWindowSize=35)
 
     if interative:
-        window_name = r"draw poly roi"
-        pd = PolygonDrawer(im, window_name)
+        window_name = r"draw rect roi"
+        pd = RectangleDrawer(im, window_name)
         imroi = pd.run()
-        print(pd.points)
-        roi = getPolyROI(im, pd.points)
+        roi = pd.getROI()
     else:
         # vertexes = [(62,189), (31,203), (18,244), (68,283), (87,216)]
-        vertexes = [(140, 599), (878, 599), (878, 662), (140, 662)] # rect
-        imroi = cv2.polylines(im, np.array([vertexes]), True, [0, 255, 255], 1)
-        roi = getPolyROI(im, vertexes)
-        printImageInfo(roi)
+        # vertexes = [(140, 599), (878, 599), (878, 662), (140, 662)] # rect
+        # imroi = cv2.polylines(im, np.array([vertexes]), True, [0, 255, 255], 1)
+        # roi = getPolyROI(im, vertexes)
+        pair = [(171, 565), (467, 672)] # rect
+        tl, br = pair
+        imroi = cv2.rectangle(im, tl, br, (0, 255, 255))
+        roi = getROIByPointPairs(im, [pair], cv2.rectangle)
+    printImageInfo(roi)
     roi = roi.astype('uint8')
     roihist = calcHist(roi)
     printImageInfo(roihist)
     imhist = hist_rect(hist=roihist, color_hist=True)
     imshowMultiple([imroi, imhist], ['imroi', 'imhist'])
 
-def try_denoise_ldose():
+def try_denoise_ldose_various_methods():
     IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
     im = cv2.imread(IMFILE, 0)
     # im = cv2.pyrDown(im)
@@ -149,14 +155,14 @@ def try_denoise_ldose():
     im_mean = applyMeanFilter(im, 5)
     im_adpMean = adpMean(im, 5, noise_var=2500)
 
-    im_triMean = TrimedMean(im, 5, 4)
+    im_triMean = TrimmedMean(im, 5, 4)
 
     # imshowMultiple([im, im_med, im_adpMed, im_NonLMean, impepper_ch, im_mean, im_adpMean, im_triMean],
     #     ['raw', 'median 5x', 'adaptive median 3x, kSzMax=9', 'Non-local mean, h=30,psize=9,bsize=35', 'contra harmonic pepper, 5x, power=1.5',  'mean 5x', 'adpMean 5x, sigmaN=50', 'trimmed mean 5x, d=4'])
     imshowMultiple([im, im_med, im_adpMed, imsalt_ch, impepper_ch, im_mean, im_adpMean, im_triMean],
         ['raw', 'median 5x', 'adaptive median 3x, kSzMax=9', 'contra harmonic pepper, 5x, power=-1.5', 'contra harmonic pepper, 5x, power=1.5',  'mean 5x', 'adpMean 5x, sigmaN=50', 'trimmed mean 5x, d=4'])
 
-def try_denoise_ldose_more(mode='adpMean'):
+def try_denoise_ldose_deepen_one_method(mode='adpMean'):
     # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_regular.bmp')
     IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
     im = cv2.imread(IMFILE, 0)
@@ -167,7 +173,7 @@ def try_denoise_ldose_more(mode='adpMean'):
     if mode == 'adpMean':
         iteritems = np.linspace(50, 100, 6)
         iterkey = 'sigma'
-    elif mode == 'TrimedMean':
+    elif mode == 'TrimmedMean':
         iteritems = np.linspace(2, 22, 6)
         iterkey = 'd'
     elif mode.lower() == 'mean':
@@ -180,15 +186,15 @@ def try_denoise_ldose_more(mode='adpMean'):
         titles.append(mode+' '+ ', '.join(argstrs))
         if mode == 'adpMean':
             dst = adpMean(im, ksz, noise_var=item**2)
-        elif mode == 'TrimedMean':
-            dst = TrimedMean(im, ksz, d=item)
+        elif mode == 'TrimmedMean':
+            dst = TrimmedMean(im, ksz, d=item, ktype='box')
         elif mode == 'mean':
             dst = applyMeanFilter(im, ksz, ktype=item)
         imgs.append(dst)
 
     titles.append('diff last {} and raw image'.format(mode))
     imgs.append(imgs[-1] - imgs[0] )
-    imshowMultiple(imgs, titles)
+    imshowMultiple(imgs, titles, **KWARGS)
 
 def try_adpMean():
     IMFILE = os.path.join(DIPPATH, r'Fig0513(a)(ckt_gaussian_var_1000_mean_0).tif')
@@ -271,6 +277,13 @@ def try_notch(interative=True):
     # imBNPF = imSub(im, imBNRF, Imax=255) # applyFreqFilter(im, BNPF, **kwargs)
     imshowMultiple([im, amproi, imBNRF, imBNPF], ['imroi', 'imhist', 'BNRF', 'BNPF'])
 
+def try_estimate_degrationFunc():
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
+    g = cv2.imread(IMFILE, 0)
+
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_regular.bmp')
+    f = cv2.imread(IMFILE, 0)
+
 def main():
     # try_noise_fft()
 
@@ -284,10 +297,10 @@ def main():
     # try_adpMedian()
 
 
-    # try_polyroi_noise_hist(False)
-    # try_denoise_ldose()
+    # try_polyroi_noise_hist(True)
+    # try_denoise_ldose_various_methods()
     # try_NLM()
-    try_denoise_ldose_more('mean')
+    try_denoise_ldose_deepen_one_method('adpMean')
 
     # try_notch(False)
 
