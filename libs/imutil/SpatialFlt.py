@@ -300,7 +300,8 @@ def adpMean(src, ksize, noise=None, noise_var=0, Imax=255, **kwargs):
         constant Variance of the noise image, (std)^2
     '''
     dtype = np.float64
-    g = np.array(src, copy=True, dtype=dtype)    mL = applyMeanFilter(g, ksize, 'box', **kwargs)
+    g = np.array(src, copy=True, dtype=dtype)
+    mL = applyMeanFilter(g, ksize, 'box', **kwargs)
     VarL = applyKernelOperator(g, ksize, np.var)
     if noise is not None:
         if any(np.array(src.shape) - np.array(noise.shape) != 0):

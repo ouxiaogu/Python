@@ -2,7 +2,7 @@
 """
 Created: peyang, 2018-07-16 11:26:04
 
-DIP Image intensity transform and spatial filter pratice
+DIP Image intensity transform and spatial filter practice
 
 Last Modified by: ouxiaogu
 """
@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
 #DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
+WORKDIR = r"D:\code\Python\apps\MXP\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
 
 
@@ -250,8 +251,10 @@ def try_Combined_Enhance():
 def try_Combined_Enhance_Ops():
     # use the newly add image enhancement operators
 
-    IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
+    # IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
     im = cv2.imread(IMFILE, 0)
+    im=TrimmedMean(im, ksize=5, d=8)
 
     fltShape = (3, 3)
 
@@ -261,9 +264,9 @@ def try_Combined_Enhance_Ops():
     imLE = imAdd(im, imL, 255)
 
     # Sobel py
-    flt_sX = SobelFilter(fltShape)
+    flt_sX = SobelFilter(fltShape, 'x')
     imdX = fftconvolve(im, flt_sX)
-    flt_sY = SobelFilter(fltShape, 1)
+    flt_sY = SobelFilter(fltShape, 'y')
     imdY = fftconvolve(im, flt_sY)
     im_Sobel = np.sqrt(imdX**2, imdY**2)
     im_Sobel = normalize(im_Sobel, Imax=255)
@@ -289,7 +292,7 @@ def main():
 
     # try_specifyHisto()
 
-    try_localHistoEq()
+    # try_localHistoEq()
     # cProfile.run('try_localHistoEq()')
 
     # cProfile.run('try_Laplace_LoG()')
@@ -299,7 +302,7 @@ def main():
 
     # try_Combined_Enhance()
 
-    # try_Combined_Enhance_Ops()
+    try_Combined_Enhance_Ops()
 
 if __name__ == '__main__':
     main()
