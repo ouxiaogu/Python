@@ -14,7 +14,7 @@ import collections
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-from filters import padding_backward
+from filters import padding, padding_backward, nearest_power, centered
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('FrequencyFlt', 'info')
@@ -245,7 +245,7 @@ def HomomorphicFilter(shape, D0, gamma_L=0.25, gamma_H=2, c=1):
     z = gamma_L + (gamma_H - gamma_L) * (1 - np.exp(- c * D**2 / D0**2))
     return z
 
-def applyFreqFilter(src, fltFunc, **kwargs):
+def applyFreqFilter(src, fltFunc=None, freqFlt=None, **kwargs):
     '''
     perform general process to apply filters in frequency domain
 
@@ -255,18 +255,22 @@ def applyFreqFilter(src, fltFunc, **kwargs):
         input image
     fltFunc : function object
         specify the filter function
+    freqFlt : 2D array-like
+        directly input Frequency domain filter, not implemented
     kwargs : **dict
         key word argument to specify the shape of filter
     '''
-    # 1. padding into 2X
     rawShape = src.shape
-    fp = padding_backward(src, rawShape)
+    N, M = rawShape
+
+    # 1. padding into 2X
+    fp = padding_backward(src, rawShape) # backward padding in spatial
 
     # 2. matrix T=(-1)^(x+y) for fft shift in frequency domain
     N, M = fp.shape
     x, y = np.meshgrid(np.arange(M), np.arange(N))
     T = (-1)**(x + y)
-    fp = fp * T
+    fp = fp * T # fftshift in frequency
 
     # 3. fft & filtering
     Fp = np.fft.fft2(fp)
@@ -276,8 +280,8 @@ def applyFreqFilter(src, fltFunc, **kwargs):
     # 4. ifft, get real, revert translation T, and crop
     gp = np.fft.ifft2(Gp)
     gp = np.real(gp) * T
-    N, M = rawShape
-    g = gp[0:N, 0:M]
+    g = gp[0:N, 0:M] # backward cutting in spatial
+
     return g
 
 def imApplyHomomorphicFilter(src, D0, **kwargs):

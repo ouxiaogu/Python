@@ -14,7 +14,7 @@ from PlatformUtil import inLinux, inWindows
 import sys
 
 __all__ = [ 'gpfs2WinPath',
-            'splitFileName', 'getFileLabel', 'outfilePath'
+            'splitFileName', 'getFileLabels', 'outfilePath'
             'FileScanner']
 
 def gpfs2WinPath(src):
@@ -38,7 +38,7 @@ def splitFileName(src):
         filelabel, extension = string.rsplit(basename, sep='.', maxsplit=1)
     return dirname, filelabel, extension
 
-def getFileLabel(files):
+def getFileLabels(files):
     return [list(splitFileName(aa))[1] for aa in files]
 
 def outfilePath(src, postfix="_v", extn=None):
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     # '''test 2'''
     # fsn = FileScanner(INDIR)
     # files = fsn.scan_files(postfix=r'.pgm') ## , recursive=True)
-    # labels = getFileLabel(files)
+    # labels = getFileLabels(files)
     # print(files)
     # print(labels)
 
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # path = r"C:\Localdata\D\4Development\imageSynthesisTool\data\image"
     # fsn = FileScanner(path)
     # files = fsn.scan_files(regex_pattern=r'.tif') ## not use * in regex header
-    # labels = getFileLabel(files)
+    # labels = getFileLabels(files)
     # print(files)
     # print(labels)
 

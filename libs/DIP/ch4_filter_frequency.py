@@ -18,8 +18,8 @@ from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_Titl
 from FrequencyFlt import *
 from ImDescriptors import im_fft_amplitude_phase
 
-# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04'
-DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH04'
+DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04'
+# DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH04'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 
 def try_paramid():
@@ -106,7 +106,7 @@ def try_fft(fftshift=True, method=None):
     prefix = "{}(fftshift = {})".format(method, fftshift)
 
     # raw image
-    # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0424(a)(rectangle).tif', 0)
+    IMFILE = os.path.join(DIPPATH, r'Fig0424(a)(rectangle).tif')
     im = cv2.imread(IMFILE, 0)
     rows, cols = im.shape
     amplitude, phase = im_fft_amplitude_phase(im, fftshift, method)
@@ -163,10 +163,9 @@ def try_filter(option=None):
     elif option == 'BPF':
         funcs = [ GBPF]
         cutoffs = np.linspace(30, 60, 7)
-    funcname = [f.__name__ for f in funcs]
 
     # raw image
-    # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0442(a)(characters_test_pattern).tif', 0)
+    IMFILE = os.path.join(DIPPATH, r'Fig0442(a)(characters_test_pattern).tif')
     im = cv2.imread(IMFILE, 0)
     im = cv2.medianBlur(im, 3)
     imgs = [im]
@@ -292,7 +291,7 @@ if __name__ == '__main__':
 
     # try_power_ratio_loci()
 
-    # try_filter('LPF')
+    try_filter('LPF')
     # try_filter('HPF')
     # try_filter('BPF')
 
@@ -302,4 +301,4 @@ if __name__ == '__main__':
 
     # try_display_filter()
 
-    try_notch_filter()
+    # try_notch_filter()

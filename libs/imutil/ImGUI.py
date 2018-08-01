@@ -85,11 +85,11 @@ def gen_multi_image_overview(src_dir, reg_pattern=None, title=None, im_name=None
     import os
     from subprocess import call
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
-    from FileUtil import FileScanner, getFileLabel
+    from FileUtil import FileScanner, getFileLabels
     fsc = FileScanner(src_dir)
     files = fsc.scan_files(regex_pattern=reg_pattern)
     files.sort()
-    labels = getFileLabel(files)
+    labels = getFileLabels(files)
     strLabels = ''
     for ix, label in enumerate(labels):
         strLabels += "-label {} {} ".format(label, files[ix])
@@ -125,10 +125,10 @@ def imreadFolder(src_dir, reg_pattern=None):
         just need the labels as subplot titles
     '''
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
-    from FileUtil import FileScanner, getFileLabel
+    from FileUtil import FileScanner, getFileLabels
     fsc = FileScanner(src_dir)
     files = fsc.scan_files(regex_pattern=reg_pattern)
-    filelabels = getFileLabel(files)
+    filelabels = getFileLabels(files)
 
     images = []
     for imgfile in files:

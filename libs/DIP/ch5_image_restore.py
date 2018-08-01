@@ -14,10 +14,16 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
-from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve
+from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve, calculate_cutoff
 from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, powerFunc
 from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimmedMean, setNLMParams
 from FrequencyFlt import BNRF, BNPF, applyFreqFilter
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+from FileUtil import splitFileName
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+from filters import padding_backward
+
 KWARGS = {'vmin': 0, 'vmax': 255}
 
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH05'
@@ -112,9 +118,14 @@ def try_polyroi_noise_hist(interative=True):
 
     # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
     # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_regular.bmp')
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
+    # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose_shappen.bmp')
+    # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
+    IMFILE = os.path.join(WORKDIR, r'1521_image.pgm')
     #IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_regular.bmp')
     im = cv2.imread(IMFILE, 0)
+    if IMFILE[-3:] == 'pgm':
+        im = im/((np.iinfo(im.dtype).max+1)/(np.iinfo('>u1').max+1))
+        im = im.astype('>u1')
     # im = cv2.fastNlMeansDenoising(im, h=30,  templateWindowSize=11, searchWindowSize=35)
 
     if interative:
@@ -127,7 +138,7 @@ def try_polyroi_noise_hist(interative=True):
         # vertexes = [(140, 599), (878, 599), (878, 662), (140, 662)] # rect
         # imroi = cv2.polylines(im, np.array([vertexes]), True, [0, 255, 255], 1)
         # roi = getPolyROI(im, vertexes)
-        pair = [(171, 565), (467, 672)] # rect
+        pair = [(143, 140), (436, 548)] # rect
         tl, br = pair
         imroi = cv2.rectangle(im, tl, br, (0, 255, 255))
         roi = getROIByPointPairs(im, [pair], cv2.rectangle)
@@ -162,13 +173,29 @@ def try_denoise_ldose_various_methods():
     imshowMultiple([im, im_med, im_adpMed, imsalt_ch, impepper_ch, im_mean, im_adpMean, im_triMean],
         ['raw', 'median 5x', 'adaptive median 3x, kSzMax=9', 'contra harmonic pepper, 5x, power=-1.5', 'contra harmonic pepper, 5x, power=1.5',  'mean 5x', 'adpMean 5x, sigmaN=50', 'trimmed mean 5x, d=4'])
 
-def try_denoise_ldose_deepen_one_method(mode='adpMean'):
+def try_denoise_ldose_deepen_one_method(mode='adpMean', save=False):
     # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_regular.bmp')
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose_shappen.bmp')
     im = cv2.imread(IMFILE, 0)
     imgs = [im]
     titles = ['raw image']
     ksz = 5
+
+    if save:
+        dirname, filename, filextn = splitFileName(IMFILE)
+        outfile = os.path.join(dirname, filename+'_'+mode+'.'+filextn)
+        if mode == 'adpMean':
+            dst = adpMean(im, ksz, noise_var=100**2)
+        elif mode == 'TrimmedMean':
+            dst = TrimmedMean(im, ksz, d=14)
+        elif mode.lower() == 'mean':
+            dst = applyMeanFilter(im, ksz)
+        elif mode == 'NLM':
+            sigma = 100
+            h, psize, bsize = setNLMParams(sigma)
+            dst = cv2.fastNlMeansDenoising(im, None, h, psize, bsize)
+        cv2.imwrite(outfile, dst)
+        return 0
 
     if mode == 'adpMean':
         iteritems = np.linspace(50, 100, 6)
@@ -179,6 +206,11 @@ def try_denoise_ldose_deepen_one_method(mode='adpMean'):
     elif mode.lower() == 'mean':
         iteritems = ['box', 'Gaussian']
         iterkey = 'ktype'
+    elif mode == 'NLM':
+        iteritems = np.linspace(60, 110, 6)
+        iterkey = 'sigma'
+    else:
+        raise NotImplementedError("mode {} is not implemented!\n".format(model))
 
     for item in iteritems:
         kwargs = {'ksz':ksz, iterkey: item}
@@ -190,6 +222,9 @@ def try_denoise_ldose_deepen_one_method(mode='adpMean'):
             dst = TrimmedMean(im, ksz, d=item, ktype='box')
         elif mode == 'mean':
             dst = applyMeanFilter(im, ksz, ktype=item)
+        elif mode == 'NLM':
+            h, psize, bsize = setNLMParams(sigma)
+            dst = cv2.fastNlMeansDenoising(im, None, h, psize, bsize)
         imgs.append(dst)
 
     titles.append('diff last {} and raw image'.format(mode))
@@ -218,7 +253,7 @@ def try_adpMedian():
 
 def try_NLM():
     # IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_regular.bmp')
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose_shappen.bmp')
     im = cv2.imread(IMFILE, 0)
     imgs = [im]
     titles = ['raw image']
@@ -259,8 +294,6 @@ def try_notch(interative=True):
         amproi = cv2.polylines(amp, np.array([vertexes]), True, [0, 255, 255], 1)
     kwargs = {'notches': vertexes,'D0s': 10, 'n':5, 'notch_after_padding':False}
 
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-    from filters import padding_backward
     rawShape = im.shape
     fp = padding_backward(im, rawShape)
     amplitude, _  = im_fft_amplitude_phase(fp)
@@ -278,11 +311,91 @@ def try_notch(interative=True):
     imshowMultiple([im, amproi, imBNRF, imBNPF], ['imroi', 'imhist', 'BNRF', 'BNPF'])
 
 def try_estimate_degrationFunc():
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose_P7.bmp')
     g = cv2.imread(IMFILE, 0)
 
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_regular.bmp')
-    f = cv2.imread(IMFILE, 0)
+    IMFILE = os.path.join(WORKDIR, r'1521_image.pgm')
+    f = read_pgm(IMFILE)
+    f = f/((np.iinfo(f.dtype).max+1)/(np.iinfo('>u1').max+1))
+    f = f.astype('>u1')
+    printImageInfo(f)
+
+    roi = [(143, 140), (436, 548)]
+    rc = [(y, x) for x, y in roi]
+    myslice = tuple(slice(start, end) for start, end in zip(*rc))
+
+    gs = g[myslice]
+    fs = f[myslice]
+    padShape = tuple(g.shape[i] - gs.shape[i] for i in range(len(g.shape)) )
+    print(gs.shape, g.shape, padShape)
+    gs = padding_backward(gs, padShape)
+    fs = padding_backward(fs, padShape)
+    print(gs.shape, fs.shape)
+    GsA, _ = im_fft_amplitude_phase(gs)
+    FsA, _ = im_fft_amplitude_phase(fs)
+
+    Gs = np.fft.fft2(gs)
+    Fs = np.fft.fft2(fs)
+    # import scipy
+    # G = scipy.misc.imresize(Gs, g.shape)
+    # F = scipy.misc.imresize(Fs, g.shape)
+    H = Gs/Fs
+    G1 = np.fft.fft2(g)
+    F1 = G1/H
+    f1 = np.real(np.fft.ifft2(F1))
+
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
+    g2 = cv2.imread(IMFILE, 0)
+    G2 = np.fft.fft2(g2)
+    F2 = G2/H
+    f2 = np.real(np.fft.ifft2(F2))
+
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
+    g3 = cv2.imread(IMFILE, 0)
+    G3 = np.fft.fft2(g3)
+    F3 = G3/H
+    f3 = np.real(np.fft.ifft2(F3))
+
+    # imshowMultiple([g, f], ['degraded low dose: g', 'averaged: f'])
+    # imshowMultiple([gs, fs, GsA, FsA], ['gs', 'fs', 'Gs', 'Fs'])
+    imshowMultiple_TitleMatrix([g, g2, g3, f1, f2, f3], 2, 3, ['degraded', 'restored'], ['p1521 p7 complete', 'p1521 p7', 'p3613'])
+
+def try_LPF():
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose_P7.bmp')
+    g = cv2.imread(IMFILE, 0)
+    rawShape = g.shape
+    gp = padding_backward(g, rawShape)
+    Gp = np.fft.fft2(gp)
+    Gp = np.fft.fftshift(Gp)
+
+    funcs = [GLPF]
+    cutoffs = calculate_cutoff(Gp, thres=np.linspace(0.8, 0.95, 5))
+
+    # raw image
+    imgs = [im]
+    # titles = ['raw image']
+    titles = ['image w/i medianBlur']
+    flt_imgs = []
+    flt_titles = []
+    n = 2
+
+    for func in funcs:
+        for D0 in cutoffs:
+            kwargs = {'D0': D0}
+            if re.match('^B\w{1}PF', func.__name__):
+                kwargs['n'] = n
+            if re.match('^\w{1}B\w{1}F', func.__name__):
+                W = D0*0.4
+                kwargs['W'] = W
+
+            argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
+            labels = [func.__name__] + argstrs
+            label = ', '.join(labels)
+            flt_imgs.append(applyFreqFilter(im, func, **kwargs) )
+            flt_titles.append(label)
+        imshowMultiple(imgs + flt_imgs, titles + flt_titles)
+        flt_imgs.clear()
+        flt_titles.clear()
 
 def main():
     # try_noise_fft()
@@ -296,11 +409,11 @@ def main():
     # try_adpMean()
     # try_adpMedian()
 
-
-    # try_polyroi_noise_hist(True)
+    # try_polyroi_noise_hist(False)
     # try_denoise_ldose_various_methods()
     # try_NLM()
-    try_denoise_ldose_deepen_one_method('adpMean')
+    # try_denoise_ldose_deepen_one_method('NLM', True)
+    try_estimate_degrationFunc()
 
     # try_notch(False)
 

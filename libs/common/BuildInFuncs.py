@@ -131,6 +131,11 @@ def enumerate(sequence, start=0):
         yield n, elem
         n += 1
 
+def slice(start, stop, step=None):
+    # a[slice] == a[start:stop:step]
+    pass
+
+
 if __name__ == '__main__':
 
     '''test 1, zip'''

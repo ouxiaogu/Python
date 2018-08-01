@@ -17,7 +17,7 @@ import collections
 __all__ = ['gaussian_filter', 'padding', 'padding_backward', 'convolve',
         'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel',
         'correlate', 'applySepFilter', 'kernelPreProc',
-        'applyKernelOperator',
+        'applyKernelOperator', 'centered',
         ]
 
 SMALL_GAUSSIAN_TAB = [
@@ -166,10 +166,14 @@ def padding_backward(src, padshape, padval=0):
         try:
             if(len(padshape) != 2):
                 raise ValueError("padshape {} should be the same with src {}!\n".format(padshape, srcShape))
-        except:
+        except TypeError:
             padshape = (padshape, padshape)
         nrows, ncols = srcShape
-        newshape = tuple(np.sum(a) for a in zip(srcShape, padshape) )
+        try:
+            newshape = tuple(np.sum(a) for a in zip(srcShape, padshape) )
+        except TypeError:
+            print(srcShape, padshape, sep='\n')
+            raise TypeError
         dst = padval * np.ones(newshape, arr.dtype)
         dst[0:nrows, 0:ncols] = arr
     else:
@@ -258,7 +262,7 @@ def array_long_axis_size(src):
     """get array's size at longest axis"""
     return max(src.shape)
 
-def _centered(arr, newshape):
+def centered(arr, newshape):
     # Return the center newshape portion of the array.
     newshape = np.asarray(newshape)
     curshape = np.asarray(arr.shape)
@@ -304,15 +308,15 @@ def fftconvolve(src, flt, mode='same'):
         raise NotImplementedError("arr size should be larger than filter size in 'valid' mode")
     shape = s1 + s2 - 1
     fshape = [nearest_power(d) for d in shape]
-    fslice = tuple([slice(0, int(sz)) for sz in shape])
+    fslice = tuple([slice(0, int(sz)) for sz in shape]) # backward padding
     sp1 = np.fft.rfftn(arr, fshape)
     sp2 = np.fft.rfftn(fltRes, fshape)
-    ret = np.fft.irfftn(sp1 * sp2, fshape)[fslice].copy()
+    ret = np.fft.irfftn(sp1 * sp2, fshape)[fslice].copy() # backward padding
 
     if mode == "same":
-        return _centered(ret, s1)
+        return centered(ret, s1)
     elif mode == "valid":
-        return _centered(ret, s1 - s2 + 1)
+        return centered(ret, s1 - s2 + 1)
     else:
         raise ValueError("Acceptable mode flags are 'valid' or 'same'.")
     return ret

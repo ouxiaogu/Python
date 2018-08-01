@@ -23,7 +23,7 @@ __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
             'calcHistSeries', 'calcHist', 'cdfHisto',
             'addOrdereddDict', 'subOrdereddDict', 'Histogram',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
-            'printImageInfo', 'getImageInfo'
+            'printImageInfo', 'getImageInfo', 'calculate_cutoff'
         ]
 
 BINS = np.arange(256).reshape(256,1)
@@ -337,7 +337,7 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
     amplitude : 2D array
         image frequency amplitude or
         fourier transform result as complex data type
-    D0 : float
+    D0 : float or list
         cutoff frequency
 
     Returns:
@@ -351,9 +351,58 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
         power = amplitude**2
 
     from FrequencyFlt import distance_map
+    if np.ndim(D0) = 0:
+        D0s = [D0]
+    else:
+        D0s = D0
     D = distance_map(amplitude.shape)
-    mask = ~(D <= D0)
-    power_m = np.ma.array(power, mask=mask)
+    ratios = []
+    for D0 in D0s:
+        mask = ~(D <= D0)
+        power_m = np.ma.array(power, mask=mask)
+        ratio = 100 * np.sum(power_m) / np.sum(power)
+        ratios.append(ratio)
+    if np.ndim(D0) = 0:
+        return ratios[0]
+    else:
+        return ratio
 
-    ratio = 100 * np.sum(power_m) / np.sum(power)
-    return ratio
+def calculate_cutoff(amplitude, samples=None, thres=0.95):
+    """
+    calculate cutoff frequency at specific power ratio thres
+
+    Parameters
+    ----------
+    samples : 1D array-like
+        The cut-off frequencies(radius), elements should <= 1/2 amplitude size
+    thres : float or array
+        thres ratio value in range of [0, 1]
+
+    Returns
+    -------
+    ret : float
+        the cutoff frequency at specific power ratio
+    """
+    shape = amplitude.shape
+    maxSz = max(shape)/2 # radius
+    if samples is None:
+        samples = np.linspace(maxSz/10, maxSz, 10)
+    ratios = power_ratio_in_cutoff_frequency(amplitude, samples)
+    ridx = 0
+
+    thresholds = [thres] if np.ndim(thres) == 0 else thres
+    rets = []
+    for thres in thresholds:
+        for i in range(len(ratios) - 1):
+            if (ratios[i] - thres) * (ratios[i+1] - thres) <= 0:
+                ridx = i
+                break
+        ret = samples[-1]
+        if ratio[ridx] == ratio[ridx+1]:
+            ret = samples[ridx]
+        else: # bilinear interpolation
+            alpha = (thres - ratios[ridx])/(ratios[ridx+1] - ratios[ridx])
+            ret = (1-alpha)*ratios[ridx] + alpha*ratios[ridx+1]
+        rets.appen(ret)
+    ret = rets[0] if np.ndim(thres) == 0 else rets
+    return ret

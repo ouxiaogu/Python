@@ -16,6 +16,8 @@ from ImGUI import imshowMultiple_TitleMatrix, imshowMultiple
 from ImDescriptors import hist_lines
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import fftconvolve
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+from FileUtil import splitFileName
 
 import cv2
 import matplotlib.pyplot as plt
@@ -24,7 +26,7 @@ import matplotlib.pyplot as plt
 DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
 #DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
-WORKDIR = r"D:\code\Python\apps\MXP\samples"
+# WORKDIR = r"D:\code\Python\apps\MXP\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
 
 
@@ -254,7 +256,7 @@ def try_Combined_Enhance_Ops():
     # IMFILE = os.path.join(DIPPATH, r'Fig0343(a)(skeleton_orig).tif')
     IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose.bmp')
     im = cv2.imread(IMFILE, 0)
-    im=TrimmedMean(im, ksize=5, d=8)
+    #im=TrimmedMean(im, ksize=5, d=8)
 
     fltShape = (3, 3)
 
@@ -277,11 +279,16 @@ def try_Combined_Enhance_Ops():
     im_Sobel_G = normalize(im_Sobel_G, 255)
     sharp = imMul(imLE, im_Sobel_G, 255)
     imShapened = imAdd(im, sharp, 255)
-    imShapenedPower = intensityTransform(imShapened, powerFunc(1, 0.5))
+    dirname, filename, filextn = splitFileName(IMFILE)
+    imShapenedMed = cv2.medianBlur(imShapened, 5)
+    outfile = os.path.join(dirname, filename+'_shappen_med5x.'+filextn)
+    cv2.imwrite(outfile, normalize(imShapenedMed, dtype=np.uint8))
 
-    imshowMultiple([im, normalize(imL), normalize(imLE), normalize(im_Sobel)] + [normalize(im_Sobel_G), sharp, imShapened, imShapenedPower],
-        ['raw', 'Laplace 3x3', '(1+L)I', 'Sobel'] + [ 'Sobel*G',  '(1+L)I*Sobel_G sharp mask', 'I + (1+L)I*Sobel_G', 'Fig 7 gamma=0.5'], **KWARGS
-        )
+    # imShapenedPower = intensityTransform(imShapened, powerFunc(1, 0.5))
+
+    imshowMultiple([im, normalize(imL), normalize(imLE), normalize(im_Sobel)] + [normalize(im_Sobel_G), sharp, imShapened, imShapenedMed],
+        ['raw', 'Laplace 3x3', '(1+L)I', 'Sobel'] + [ 'Sobel*G',  '(1+L)I*Sobel_G sharp mask', 'I + (1+L)I*Sobel_G', 'Fig 7 median 5x'], **KWARGS
+        ) # 'Fig 7 gamma=0.5'
 
 def main():
     import cProfile
