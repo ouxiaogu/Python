@@ -117,15 +117,16 @@ def hist_rect(im=None, hbins=100, hist=None, color_hist=False, fit_hist=False):
         cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), color)
 
     if fit_hist:
-        mu, std = statHist(hist)
-        normfunc = lambda x: 255/(np.sqrt(2*np.pi)*std) * np.exp( - (x-mu)**2/(2*(std)**2 ))
+        mu, std = statHist(hist, trimmedNum=2)
+        scale = 255/(np.max(hist)/np.sum(hist))
+        normfunc = lambda x: scale/(np.sqrt(2*np.pi)*std) * np.exp( - (x-mu)**2/(2*(std)**2 ))
         pts = np.int32(np.column_stack((BINS, normfunc(BINS))))
-        cv2.polylines(histImg, [pts], False, color)
-    histImg = np.flipud(histImg)
+        cv2.polylines(histImg, [pts], False, (0, 0, 0), 1)
+    histImg = np.flipud(histImg).copy()
     if fit_hist:
-        text = 'norm pdf, mu={:.3f}, sigma={:.3f}'.format(mu, std)
+        text = 'u={:.2f}, sigma={:.2f}'.format(mu, std)
         printImageInfo(histImg)
-        cv2.putText(histImg, 'test', (127, 4), cv2.FONT_HERSHEY_SCRIPT_COMPLEX, 1, (0, 0, 0))
+        cv2.putText(histImg, text, (100, 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0))
     return histImg
 
 class Histogram(object):

@@ -8,7 +8,7 @@ iCal
 .vscode
 ~*
 samples
-
+test.py
 # C extensions
 *.so
 
