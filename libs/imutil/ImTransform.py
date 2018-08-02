@@ -19,7 +19,7 @@ from ImDescriptors import Histogram, calcHist, cdfHisto
 __all__ = ['equalizeHisto', 'specifyHisto',
         'localHistoEqualize1', 'localHistoEqualize2', 'localHistoEqualize3',
         'localHistoEqualize', 'normalize', 'intensityTransform', 'powerFunc',
-        'imAdd', 'imSub', 'imMul']
+        'imAdd', 'imSub', 'imMul', 'convertTo']
 
 def powerFunc(c=1, gamma=0):
     '''
@@ -237,6 +237,11 @@ def normalize(src, Imax=255, dtype=None):
 
     mfunc = lambda v: Imax * (v - vmin)/(vmax - vmin)
     dst = intensityTransform(src, mfunc, Imax=Imax, dtype=dtype)
+    return dst
+
+def convertTo(src, dtype=None, alpha=1, beta=0):
+    '''s = dtype(alpha*r + beta)'''
+    dst = dtype(src*alpha + beta)
     return dst
 
 def imAdd(src, mask, Imax=None, sub=False):

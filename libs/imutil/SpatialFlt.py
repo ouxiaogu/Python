@@ -17,7 +17,7 @@ from ImTransform import imSub
 from ImDescriptors import getImageInfo
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding
+from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding, sync_dtype
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
@@ -84,7 +84,7 @@ def LaplaceFilter3():
     L_y = np.matmul(LAPLACE_DIRECTIONAL.reshape(N, 1), LAPLACE_POSITION.reshape(1, M)  )
     return L_x + L_y
 
-def SobelFilter(shape=None, axis=0, Prewitt=False, dtype=np.int32, normalize=False):
+def SobelFilter(shape=None, axis=0, Prewitt=False, dtype=np.float64, normalize=False):
     '''
     generate Sobel Filter, firstly generate the 1D differential array, then
     multiply the Gaussian function
@@ -225,25 +225,26 @@ def ContraHarmonicMean(src, ksize=None, Q=1.5):
     fltX = np.full(m, 1.0)
     fltY = np.full(n, 1.0)
 
-    src = src.astype(np.float64)
+    srcd = np.array(src, copy=True, dtype=np.float64)
     d_eps = 1e-9
     addEps = False
-    if np.min(src) == 0:
-        log.debug("apply src add Eps\n")
-        src += d_eps
+    if np.min(srcd) == 0:
+        log.debug("apply srcd add Eps\n")
+        srcd += d_eps
         addEps = True
-    denumerator = np.power(src, Q+1.)
+    denumerator = np.power(srcd, Q+1.)
     log.debug("denumerator:\n {}\n".format( str(denumerator)) )
-    numerator = np.power(src, Q)
+    numerator = np.power(srcd, Q)
     log.debug("numerator:\n {}\n".format( str(numerator)) )
     densum = correlate(denumerator, fltX, fltY)
     log.debug("densum:\n {}\n".format( str(densum)) )
     numsum = correlate(numerator, fltX, fltY)
     log.debug("numsum:\n {}\n".format( str(numsum)) )
-    dst = np.divide(densum, numsum, out=np.zeros_like(src), where=(numsum!=0))
+    dst = np.divide(densum, numsum, out=np.zeros_like(srcd), where=(numsum!=0))
     if addEps:
-        log.debug("clear apply src add Eps\n")
+        log.debug("clear apply srcd add Eps\n")
         dst = np.subtract(dst, d_eps, out=dst, where=(dst>=d_eps))
+    dst = sync_dtype(src, dst)
     return dst
 
 def TrimmedMean(src, ksize=None, d=0, ktype='box'):
@@ -273,6 +274,7 @@ def applyMeanFilter(src, ksize=3, ktype='box', **kwargs):
     kernelPreProc(src, ksize=ksize)
     kx, ky = getMeanXYKernel(ksize=ksize, ktype=ktype, normalize=True, **kwargs) # always normalize in getMeanXYKernel
     dst = applySepFilter(src, kx, ky)
+    dst = sync_dtype(src, dst)
     return dst
 
 def adpMean(src, ksize, noise=None, noise_var=0, Imax=255, **kwargs):
@@ -280,6 +282,7 @@ def adpMean(src, ksize, noise=None, noise_var=0, Imax=255, **kwargs):
     adaptive, local noise reduction filter
 
     f' = g - VarN/VarL (g - mL)
+    f' = (1-alpha)*g + alpha*mL, 0<=alpha<=1, so 0<=f'<=255
 
     Where,
         g : degraded image
@@ -318,6 +321,7 @@ def adpMean(src, ksize, noise=None, noise_var=0, Imax=255, **kwargs):
     log.debug('VarN: ' + getImageInfo(VarN) )
     log.debug('wt: ' + getImageInfo(wt) )
     dst = imSub(g, wt*(g - mL), Imax=255)
+    dst = sync_dtype(src, dst)
     return dst
 
 def adpMedian(src, ksize=3, max_ksize=7):
@@ -380,8 +384,6 @@ def setNLMParams(sigma):
         bsize = 35
     h = ratio*sigma
     return (h, psize, bsize)
-
-
 
 if __name__ == '__main__':
     print(eval('SOBEL_SMOOTH'))

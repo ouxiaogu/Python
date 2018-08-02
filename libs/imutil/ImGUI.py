@@ -544,6 +544,8 @@ def getROIByPointPairs(im, pairs, drawfunc, masked_mat=False):
         # roi = matrix[~matrix.mask]
     return roi
 
+
+
 class LineDrawer(PointPairDrawer):
     """LineDrawer: line by a pair of points, head&tail,
     support H,V,45,any line"""

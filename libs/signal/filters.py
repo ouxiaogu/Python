@@ -17,7 +17,7 @@ import collections
 __all__ = ['gaussian_filter', 'padding', 'padding_backward', 'convolve',
         'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel',
         'correlate', 'applySepFilter', 'kernelPreProc',
-        'applyKernelOperator', 'centered',
+        'applyKernelOperator', 'centered', 'sync_dtype'
         ]
 
 SMALL_GAUSSIAN_TAB = [
@@ -175,7 +175,7 @@ def padding_backward(src, padshape, padval=0):
             print(srcShape, padshape, sep='\n')
             raise TypeError
         dst = padval * np.ones(newshape, arr.dtype)
-        dst[0:nrows, 0:ncols] = arr
+        dst[0:nrows, 0:ncols] = arr.copy()
     else:
         raise NotImplementedError("padding_backward only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
     return dst
@@ -552,6 +552,25 @@ def applyKernelOperator(src, ksize, operator=None):
                     dst[i][r, c] = opt(slices)
             else:
                 dst[r, c] = operator(slices)
+    return dst
+
+def sync_dtype(src, dst):
+    '''sync the dtype of src into dst
+    '''
+    intdtype = False
+    try:
+        dtypeinfo = np.iinfo(src.dtype)
+        intdtype = True
+    except ValueError:
+        dtypeinfo = np.finfo(src.dtype)
+
+    if np.min(dst) < dtypeinfo.min or np.max(dst) > dtypeinfo.max:
+        raise ValueError('dst value range [{}, {}] exceed the max value range  of src type: {}\n'.format(np.min(dst), np.max(dst), repr(dtypeinfo)))
+    else:
+        if intdtype:
+            dst = np.round(dst).astype(src.dtype)
+        else:
+            dst = dst.astype(src.dtype)
     return dst
 
 if __name__ == '__main__':

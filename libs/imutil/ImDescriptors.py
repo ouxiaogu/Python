@@ -23,7 +23,8 @@ __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
             'calcHistSeries', 'calcHist', 'cdfHisto',
             'addOrdereddDict', 'subOrdereddDict', 'Histogram',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
-            'printImageInfo', 'getImageInfo', 'calculate_cutoff'
+            'printImageInfo', 'getImageInfo', 'calculate_cutoff',
+            'statHist'
         ]
 
 BINS = np.arange(256).reshape(256,1)
@@ -75,7 +76,7 @@ def hist_lines(im):
     h = np.flipud(h)
     return h
 
-def hist_rect(im=None, hbins=100, hist=None, color_hist=False):
+def hist_rect(im=None, hbins=100, hist=None, color_hist=False, fit_hist=False):
     '''return histogram of any image as some rectangle bins
     In python, it seems cv2 don't support the float type image,
     But for c++, it's supported
@@ -92,24 +93,39 @@ def hist_rect(im=None, hbins=100, hist=None, color_hist=False):
             #print("so converting image to grayscale for representation"
             im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
         hist_item = cv2.calcHist([im], [0], None, [hbins], [0, 256])
-        cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
     else:
         hist_item = hist
-        hbins = len(hist_item)
+    hbins = len(hist_item)
+    maxhist = np.max(hist_item)
+    hist_item = hist_item/maxhist*255
+    # cv2.normalize(hist_item, hist_item, 0, 255, cv2.NORM_MINMAX)
     hist = np.uint8(np.around(hist_item)) # normalized hist as CV_U8
 
     assert(hbins <= 256)
-    scale = 256//hbins
+    height = 260
+    scale = height//hbins #hist image size 260 x 256
     if not color_hist:
-        histImg = np.zeros((256, hbins*scale), np.uint8)
+        histImg = np.zeros((height, 256), np.uint8)
         color = (255,255)
     else:
-        histImg = np.zeros((256, hbins*scale, 3), np.uint8)
+        histImg = np.zeros((height, 256, 3), np.uint8)
         color = getRGBColor(ix=0) # ix=-3
+        bkcolor = getRGBColor(ix=0, background=True)
+        histImg[:] = bkcolor
     for ix in range(hbins):
         binVal = hist[ix]
         cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), color)
+
+    if fit_hist:
+        mu, std = statHist(hist)
+        normfunc = lambda x: 255/(np.sqrt(2*np.pi)*std) * np.exp( - (x-mu)**2/(2*(std)**2 ))
+        pts = np.int32(np.column_stack((BINS, normfunc(BINS))))
+        cv2.polylines(histImg, [pts], False, color)
     histImg = np.flipud(histImg)
+    if fit_hist:
+        text = 'norm pdf, mu={:.3f}, sigma={:.3f}'.format(mu, std)
+        printImageInfo(histImg)
+        cv2.putText(histImg, 'test', (127, 4), cv2.FONT_HERSHEY_SCRIPT_COMPLEX, 1, (0, 0, 0))
     return histImg
 
 class Histogram(object):
@@ -128,7 +144,7 @@ class Histogram(object):
         self._validate_args(rhs)
         if isinstance(self.hist, OrderedDict):
             hist = addOrdereddDict(self.hist, rhs.hist)
-        elif isinstance(self.hist, list):
+        elif isinstance(self.hist, list) or isinstance(self.hist, np.ndarray):
             hist = (np.array(self.hist) + np.array(rhs.hist)).tolist()
         return Histogram(hist)
 
@@ -136,12 +152,35 @@ class Histogram(object):
         self._validate_args(rhs)
         if isinstance(self.hist, OrderedDict):
             hist = subOrdereddDict(self.hist, rhs.hist)
-        elif isinstance(self.hist, list):
+        elif isinstance(self.hist, list) or isinstance(self.hist, np.ndarray):
             hist = (np.array(self.hist) - np.array(rhs.hist)).tolist()
         return Histogram(hist)
 
     def cdf(self):
         return cdfHisto(self.hist)
+
+
+def fillHist(hist):
+    dst = np.zeros(256, dtype=np.uint32)
+    if isinstance(hist, OrderedDict):
+        for i in range(256):
+            if i in hist.keys():
+                dst[i] = hist[i]
+    elif isinstance(hist, list) or isinstance(hist, np.ndarray):
+        dst = hist
+    return dst
+
+def statHist(hist=None, trimmedNum=None):
+    hist = fillHist(hist)
+    if trimmedNum is not None and trimmedNum > 0 and trimmedNum < 255//2:
+        hist[:trimmedNum] = 0
+        hist[-trimmedNum:] = 0
+
+    hist = hist/np.sum(hist)
+    levels = np.arange(256)
+    mu = np.dot(levels, hist)
+    std = np.sqrt(np.abs(np.dot(levels**2, hist) - mu**2))
+    return mu, std
 
 def cdfHisto(hist, Lmax=255):
     '''
@@ -324,7 +363,7 @@ def im_fft_amplitude_phase(im, freqshift=True, method=None, raw_amplitude=False)
         amplitude = rawamplitude
     return (amplitude, phase)
 
-def power_ratio_in_cutoff_frequency(amplitude, D0):
+def power_ratio_in_cutoff_frequency(amplitude, cutoff):
     '''
     A way to compute the cutoff frequency loci for LPF
 
@@ -337,24 +376,21 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
     amplitude : 2D array
         image frequency amplitude or
         fourier transform result as complex data type
-    D0 : float or list
+    cutoff : float or list
         cutoff frequency
 
     Returns:
     --------
-    ratio : float
+    ratio : float or list
         image power ratio inside cutoff frequency
     '''
     if 'complex' in str(amplitude.dtype):
-        power = ff * np.conjugate(ff)
+        power = np.abs(amplitude * np.conjugate(amplitude))
     else:
         power = amplitude**2
 
     from FrequencyFlt import distance_map
-    if np.ndim(D0) = 0:
-        D0s = [D0]
-    else:
-        D0s = D0
+    D0s = [cutoff] if np.ndim(cutoff) == 0 else cutoff
     D = distance_map(amplitude.shape)
     ratios = []
     for D0 in D0s:
@@ -362,12 +398,10 @@ def power_ratio_in_cutoff_frequency(amplitude, D0):
         power_m = np.ma.array(power, mask=mask)
         ratio = 100 * np.sum(power_m) / np.sum(power)
         ratios.append(ratio)
-    if np.ndim(D0) = 0:
-        return ratios[0]
-    else:
-        return ratio
+    ratio = ratios[0] if np.ndim(cutoff) == 0 else ratios
+    return ratio
 
-def calculate_cutoff(amplitude, samples=None, thres=0.95):
+def calculate_cutoff(amplitude, samples=None, thres=95):
     """
     calculate cutoff frequency at specific power ratio thres
 
@@ -376,7 +410,7 @@ def calculate_cutoff(amplitude, samples=None, thres=0.95):
     samples : 1D array-like
         The cut-off frequencies(radius), elements should <= 1/2 amplitude size
     thres : float or array
-        thres ratio value in range of [0, 1]
+        thres ratio value in range of [0, 100]
 
     Returns
     -------
@@ -388,21 +422,31 @@ def calculate_cutoff(amplitude, samples=None, thres=0.95):
     if samples is None:
         samples = np.linspace(maxSz/10, maxSz, 10)
     ratios = power_ratio_in_cutoff_frequency(amplitude, samples)
-    ridx = 0
 
     thresholds = [thres] if np.ndim(thres) == 0 else thres
     rets = []
-    for thres in thresholds:
+    ridx = 0
+    foundidx = False
+    for th in thresholds:
         for i in range(len(ratios) - 1):
-            if (ratios[i] - thres) * (ratios[i+1] - thres) <= 0:
+            if (ratios[i] - th) * (ratios[i+1] - th) <= 0:
                 ridx = i
+                foundidx = True
                 break
         ret = samples[-1]
-        if ratio[ridx] == ratio[ridx+1]:
-            ret = samples[ridx]
-        else: # bilinear interpolation
-            alpha = (thres - ratios[ridx])/(ratios[ridx+1] - ratios[ridx])
-            ret = (1-alpha)*ratios[ridx] + alpha*ratios[ridx+1]
-        rets.appen(ret)
+        if foundidx:
+            if ratios[ridx] == ratios[ridx+1]:
+                ret = samples[ridx]
+            else: # bilinear interpolation
+                alpha = (th - ratios[ridx])/(ratios[ridx+1] - ratios[ridx])
+                assert(alpha>=0 and alpha<=1)
+                ret = (1-alpha)*samples[ridx] + alpha*samples[ridx+1]
+        else:
+            if th < ratios[0]:
+                ret = th/ratios[0]*samples[0]
+            elif th > ratios[-1]:
+                ret = th/ratios[-1]*samples[-1]
+        rets.append(ret)
     ret = rets[0] if np.ndim(thres) == 0 else rets
     return ret
+

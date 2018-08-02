@@ -12,19 +12,24 @@ from PlatformUtil import inWindows
 if inWindows():
     import seaborn as sns
 
-__all__ = ['COLORS', 'hex2rgb', 'getRGBColor', 'choosePalette',
-        'setAxisLim', 'addLegend']
+__all__ = ['COLORS', 'BACKGROUND_COLORS', 'hex2rgb', 'getRGBColor',
+        'choosePalette', 'setAxisLim', 'addLegend']
 
 COLORS = ['#0075DC', '#993F00', '#4C005C', '#191919', '#005C31', '#2BCE48', '#FFCC99', '#808080', '#94FFB5', '#8F7C00', '#9DCC00', '#C20088', '#003380', '#FFA405', '#FFA8BB', '#426600', '#FF0010', '#5EF1F2', '#00998F', '#E0FF66', '#740AFF', '#990000', '#FFFF00', '#FF5005', '#F0A3FF']
+
+BACKGROUND_COLORS = ['#EAEAF2', '#BFBFBF', '#404040', '#E5E5E5']
 
 def hex2rgb(src):
     '''convert hexadecimal color into RGB tuple '''
     src = src.lstrip('#')
     return tuple(int(src[i:i+2], 16) for i in (0, 2 ,4))
 
-def getRGBColor(src=None, ix=0):
+def getRGBColor(src=None, background=False, ix=0):
     if src is None:
-        src = COLORS
+        if background:
+            src = BACKGROUND_COLORS
+        else:
+            src = COLORS
     return hex2rgb(src[ix])
 
 def choosePalette(style=''):

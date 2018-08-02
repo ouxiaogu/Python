@@ -132,6 +132,7 @@ def try_power_ratio_loci():
 
     # raw image
     # im = cv2.imread(r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH04\Fig0441(a)(characters_test_pattern).tif', 0)
+    IMFILE = os.path.join(DIPPATH, r'Fig0441(a)(characters_test_pattern).tif')
     im = cv2.imread(IMFILE, 0)
 
     # padding into 2X
@@ -289,9 +290,9 @@ if __name__ == '__main__':
     # for fftshift in [True]: #False
     #    try_fft(fftshift)
 
-    # try_power_ratio_loci()
+    try_power_ratio_loci()
 
-    try_filter('LPF')
+    # try_filter('LPF')
     # try_filter('HPF')
     # try_filter('BPF')
 

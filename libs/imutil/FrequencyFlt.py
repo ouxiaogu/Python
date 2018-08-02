@@ -261,7 +261,6 @@ def applyFreqFilter(src, fltFunc=None, freqFlt=None, **kwargs):
         key word argument to specify the shape of filter
     '''
     rawShape = src.shape
-    N, M = rawShape
 
     # 1. padding into 2X
     fp = padding_backward(src, rawShape) # backward padding in spatial
@@ -280,6 +279,7 @@ def applyFreqFilter(src, fltFunc=None, freqFlt=None, **kwargs):
     # 4. ifft, get real, revert translation T, and crop
     gp = np.fft.ifft2(Gp)
     gp = np.real(gp) * T
+    N, M = rawShape
     g = gp[0:N, 0:M] # backward cutting in spatial
 
     return g
