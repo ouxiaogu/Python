@@ -132,7 +132,7 @@ def specifyHisto(src, ref, **kwargs):
     dst = intensityTransform(src, mapping, **kwargs)
     return dst
 
-def localHistoEqualize(src, ksize, **kwargs): # choose method 2
+def localHistoEqualize(src, ksize=None, **kwargs): # choose method 2
     return localHistoEqualize2(src, ksize, **kwargs)
 
 def localHistoEqualize1(src, ksize=None): # 15.96s

@@ -27,3 +27,12 @@ def Lagrange(f, X):
     http://mathworld.wolfram.com/LagrangeInterpolatingPolynomial.html
     https://en.wikipedia.org/wiki/Lagrange_polynomial
     """
+    pass
+
+def interp1d(x, y, newx):
+
+    pass
+
+
+def lerp(v0, v1, alpha):
+  return (1-alpha)*v0 + alpha * v1

@@ -10,18 +10,19 @@ Last Modified by: ouxiaogu
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import scipy
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
 from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve, calculate_cutoff, getImageInfo, statHist
-from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, powerFunc, convertTo
+from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, localHistoEqualize, powerFunc, convertTo
 from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimmedMean, setNLMParams
 from FrequencyFlt import BNRF, BNPF, applyFreqFilter, GLPF
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 from FileUtil import splitFileName
-from PlotConfig import addLegend
+from PlotConfig import addLegend, getHexColor
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import padding_backward
@@ -118,7 +119,7 @@ def try_pepper_salt2():
 def try_polyroi_noise_hist(interative=True):
     KEY_ESC = 27
 
-    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p1521_LDose_P7.bmp')
+    IMFILE = os.path.join(WORKDIR, r'vs_calaveras_v3_LDose_p3544.bmp')
     # IMFILE = os.path.join(WORKDIR, r'1521_image.pgm')
     im = cv2.imread(IMFILE, 0)
 
@@ -133,9 +134,9 @@ def try_polyroi_noise_hist(interative=True):
         imroi = pd.run()
         roi = pd.getROI()
     else:
-        pair = [(471, 207), (555, 809)] # 1521 bk rect
+        # pair = [(471, 207), (555, 809)] # 1521 bk rect
         # pair = [(143, 140), (436, 548)] # common feature rect
-        # pair = [(140, 599), (878, 662)] # 3613 bk rect
+        pair = [(140, 599), (878, 662)] # 3613 bk rect
         tl, br = pair
         roi = getROIByPointPairs(im, [pair], cv2.rectangle)
         tmp = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR) if np.ndim(im) == 2 else im
@@ -149,7 +150,7 @@ def try_polyroi_noise_hist(interative=True):
     # print(roihist[80:120:10])
     # np.testing.assert_equal(roihist1, roihist)
     # mu, std = norm.fit(roi)
-    mu, std = statHist(roihist)
+    mu, std, _ = statHist(roihist, trimmedNum=2)
     fig = plt.figure()
     ax = fig.add_subplot(111)
     xends = np.linspace(1, 256, 256)
@@ -166,7 +167,7 @@ def try_polyroi_noise_hist(interative=True):
     # plt.plot(x, p, 'k', linewidth=2, label='pdf, $\mu={:.3f}, \sigma={:.3f}$'.format(mu, std))
     addLegend([ax])
 
-    imhist = hist_rect(hist=roihist, color_hist=True, fit_hist=True)
+    imhist = hist_rect(hist_in=roihist, color_hist=True, fit_hist=True)
     #allhist = hist_rect(im, hbins=256, color_hist=True)
     imshowMultiple([imroi, imhist], ['imroi', 'imhist'])
 
@@ -185,12 +186,12 @@ def try_denoise_ldose_various_methods(wihist=False):
     impepper_ch = ContraHarmonicMean(im, 5, 1.5) # yes
 
     im_mean = applyMeanFilter(im, 5)
-    im_adpMean = adpMean(im, 5, noise_var=2500)
+    im_adpMean = adpMean(im, 5, noise_var=44**2)
 
     im_triMean = TrimmedMean(im, 5, 4)
 
     imgs=[im, im_med, im_adpMed, im_NonLMean, impepper_ch, im_mean, im_adpMean, im_triMean]
-    titles = ['raw', 'median 5x', 'adaptive median 3x, kSzMax=9', 'Non-local mean, h=30,psize=9,bsize=35', 'contra harmonic pepper, 5x, power=1.5',  'mean 5x', 'adpMean 5x, sigmaN=50', 'trimmed mean 5x, d=4']
+    titles = ['raw', 'median 5x', 'adaptive median 3x, kSzMax=9', 'Non-local mean, h=30,psize=9,bsize=35', 'contra harmonic pepper, 5x, power=1.5',  'mean 5x', 'adpMean 5x, sigmaN=44', 'trimmed mean 5x, d=4']
     # imgs = [im, im_med, im_adpMed, imsalt_ch, impepper_ch, im_mean, im_adpMean, im_triMean]
     # titles = ['raw', 'median 5x', 'adaptive median 3x, kSzMax=9', 'contra harmonic pepper, 5x, power=-1.5', 'contra harmonic pepper, 5x, power=1.5',  'mean 5x', 'adpMean 5x, sigmaN=50', 'trimmed mean 5x, d=4']
 
@@ -205,7 +206,7 @@ def try_denoise_ldose_various_methods(wihist=False):
         for im in imgs:
             roi = getROIByPointPairs(im, [pair], cv2.rectangle)
             roihist = calcHist(roi)
-            imhist = hist_rect(hist=roihist, color_hist=True)
+            imhist = hist_rect(hist_in=roihist, color_hist=True)
             histimgs.append(imhist)
         imshowMultiple(histimgs, titles)
 
@@ -215,13 +216,13 @@ def try_denoise_ldose_deepen_one_method(mode='adpMean', save=False):
     im = cv2.imread(IMFILE, 0)
     imgs = [im]
     titles = ['raw image']
-    ksz = 5
+    ksz = 9
 
     if save:
         dirname, filename, filextn = splitFileName(IMFILE)
         outfile = os.path.join(dirname, filename+'_'+mode+'.'+filextn)
         if mode == 'adpMean':
-            dst = adpMean(im, ksz, noise_var=100**2)
+            dst = adpMean(im, ksz, noise_var=44**2)
         elif mode == 'TrimmedMean':
             dst = TrimmedMean(im, ksz, d=14)
         elif mode.lower() == 'mean':
@@ -240,27 +241,32 @@ def try_denoise_ldose_deepen_one_method(mode='adpMean', save=False):
         iteritems = np.linspace(2, 22, 6)
         iterkey = 'd'
     elif mode.lower() == 'mean':
-        iteritems = ['box', 'Gaussian']
-        iterkey = 'ktype'
+        # iteritems = ['box', 'Gaussian']
+        # iterkey = 'ktype'
+        iteritems = np.linspace(3, 13, 6)
+        iterkey = 'ksize'
     elif mode == 'NLM':
-        iteritems = np.linspace(60, 110, 6)
+        iteritems = np.linspace(60, 160, 6)
         iterkey = 'sigma'
     else:
-        raise NotImplementedError("mode {} is not implemented!\n".format(model))
+        raise NotImplementedError("mode {} is not implemented!\n".format(mode))
 
     for item in iteritems:
-        kwargs = {'ksz':ksz, iterkey: item}
-        argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
-        titles.append(mode+' '+ ', '.join(argstrs))
         if mode == 'adpMean':
             dst = adpMean(im, ksz, noise_var=item**2)
         elif mode == 'TrimmedMean':
-            dst = TrimmedMean(im, ksz, d=item, ktype='box')
+            dst = TrimmedMean(im, ksz, d=item, ktype='Gaussian')
         elif mode == 'mean':
-            dst = applyMeanFilter(im, ksz, ktype=item)
+            dst = applyMeanFilter(im, ksz, ktype=item) if iterkey == 'ktype' else applyMeanFilter(im, item, 'box')
         elif mode == 'NLM':
-            h, psize, bsize = setNLMParams(sigma)
+            h, psize, bsize = setNLMParams(item)
             dst = cv2.fastNlMeansDenoising(im, None, h, psize, bsize)
+        if mode != 'NLM':
+            kwargs = {'ksz':ksz, iterkey: item} if iterkey != 'ksize' else {iterkey: item}
+        else:
+            kwargs = {iterkey: item, 'h':h, 'psize':psize, 'bsize':bsize}
+        argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
+        titles.append(mode+' '+ ', '.join(argstrs))
         imgs.append(dst)
 
     titles.append('diff last {} and raw image'.format(mode))
@@ -271,14 +277,21 @@ def try_denoise_combined():
     IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_LDose.bmp')
     im = cv2.imread(IMFILE, 0)
     im_adpMed = adpMedian(im, 3, 7)
-    im_adpMean = adpMean(im_adpMed, 5, noise_var=100**2)
+    im_adpMedMean = adpMean(im_adpMed, 5, noise_var=44**2)
 
-    dirname, filename, filextn = splitFileName(IMFILE)
-    outfile = os.path.join(dirname, filename+'_adpMedMean.'+filextn)
-    cv2.imwrite(outfile, im_adpMean)
+    # from scipy import signal
+    # im_wiener = signal.wiener(im, 5, noise=44**2)
+    # dirname, filename, filextn = splitFileName(IMFILE)
+    # outfile = os.path.join(dirname, filename+'_weiner.'+filextn)
+    # cv2.imwrite(outfile, im_adpMean)
 
-    imgs = [im, im_adpMed, im_adpMean]
-    titles = ['raw', 'adaptive median 3x, kSzMax=7', 'adpMean 5x, sigmaN=100']
+    imgs = [im, im_adpMed, im_adpMedMean] # im_wiener
+    titles = ['raw', 'adaptive median 3x, kSzMax=7', 'adpMean on adpMedian 5x, sigmaN=44'] # , 'wiener 5x, sigmaN=44'
+
+    im_Med = cv2.medianBlur(im, 3)
+    im_MedMean = applyMeanFilter(im_Med, 5)
+    imgs += [im, im_Med, im_MedMean]
+    titles += ['raw', 'median 3x', 'mean on median 5x'] # , 'wiener 5x, sigmaN=44'
 
     infos = [getImageInfo(im) for im in imgs]
     print('\n'.join(map(', '.join, zip(titles, infos))))
@@ -414,7 +427,8 @@ def try_estimate_degrationFunc():
     imshowMultiple_TitleMatrix([g, g2, g3, f1, f2, f3], 2, 3, ['degraded', 'restored'], ['p1521 p7 complete', 'p1521 p7', 'p3613'])
 
 def try_LPF(save=False):
-    imfiles = [r'Calaveras_v3_p1521_LDose_P7.bmp', r'vs_calaveras_v3_LDose_p3544.bmp', r'Calaveras_v3_p3613_LDose.bmp']
+    # imfiles = [r'Calaveras_v3_p1521_LDose_P7.bmp'] , r'vs_calaveras_v3_LDose_p3544.bmp', r'Calaveras_v3_p3613_LDose.bmp']
+    imfiles = [ r'Calaveras_v3_p3613_LDose.bmp']
     for imfile in imfiles:
         IMFILE = os.path.join(WORKDIR, imfile)
         g = cv2.imread(IMFILE, 0)
@@ -426,11 +440,14 @@ def try_LPF(save=False):
         Gp_a = np.log(1+np.abs(Gp))
 
         funcs = [GLPF]
-        thres = [85.5]
-        cutoffs = calculate_cutoff(Gp, thres=thres)
+        # thres = np.linspace(80, 95, 6)
+        # cutoffs = calculate_cutoff(Gp, thres=thres)
+        cutoffs = [96, 100, 268, 585, 780, 935]
+        thres = power_ratio_in_cutoff_frequency(Gp, cutoffs)
 
-        thres_cutoffs = zip(thres, cutoffs)
-        print(list(thres_cutoffs))
+        thres_cutoffs = list(zip(thres, cutoffs))
+        print(imfile)
+        print('\n'.join(['{:.2f}%: {:.2f}'.format(th, d) for th, d in thres_cutoffs]))
 
         # raw image
         imgs = [im]
@@ -450,7 +467,7 @@ def try_LPF(save=False):
                     kwargs['W'] = W
                 fltIm = applyFreqFilter(im, func, **kwargs)
 
-                kwargs['thres'] = round(th, 3)
+                kwargs['percentage'] = round(th, 3)
                 argstrs = ['='.join(map(str, kw) ) for kw in zip(kwargs.keys(), kwargs.values()) ]
                 labels = [func.__name__] + argstrs
                 label = ', '.join(labels)
@@ -462,9 +479,80 @@ def try_LPF(save=False):
                         cv2.imwrite(outfile, fltIm)
                 flt_imgs.append(fltIm )
                 flt_titles.append(label)
-        imshowMultiple(imgs + [Gp_a] + flt_imgs, titles + ['fft 2x'] + flt_titles)
-        flt_imgs.clear()
-        flt_titles.clear()
+            flt_titles.append('diff last {} and raw image'.format(func.__name__))
+            flt_imgs.append(flt_imgs[-1] - imgs[0] )
+
+            imshowMultiple(imgs + flt_imgs, titles + flt_titles,**KWARGS)
+            flt_imgs.clear()
+            flt_titles.clear()
+
+def try_LPF_fit_bk_noise():
+    imfiles = [r'Calaveras_v3_p1521_LDose_P7.bmp', r'vs_calaveras_v3_LDose_p3544.bmp', r'Calaveras_v3_p3613_LDose.bmp']
+    sigmas = np.array([43.86, 44.0, 43.91])
+
+    rawimgs, flt_imgs = [], []
+    rawtitles, flt_titles = [], []
+    for i, imfile in enumerate(imfiles):
+        IMFILE = os.path.join(WORKDIR, imfile)
+        im = cv2.imread(IMFILE, 0)
+        rawimgs.append(im)
+        rawtitles.append(imfile)
+
+        D0 = np.max(im.shape)/sigmas[i]*2
+        # D0 = 100
+        kwargs = {'D0': round(D0, 3)}
+        fltIm = applyFreqFilter(im, GLPF, **kwargs)
+        flt_imgs.append(fltIm)
+        flt_titles.append(imfile+', LPF D0={:.3f}'.format(D0))
+    diffs = [rawimgs[i] - flt_imgs[i] for i in range(3)]
+    difftitles = ['diff '+str(i) for i in range(3)]
+    imshowMultiple(rawimgs+flt_imgs+diffs, rawtitles+flt_titles+difftitles, **KWARGS)
+
+def try_LPF_dramatic_cutoff():
+    imfiles = [r'Calaveras_v3_p1521_LDose_P7.bmp', r'vs_calaveras_v3_LDose_p3544.bmp', r'Calaveras_v3_p3613_LDose.bmp']
+    cutoffs = np.linspace(1, 512, 100)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    for i, imfile in enumerate(imfiles):
+        IMFILE = os.path.join(WORKDIR, imfile)
+        g = cv2.imread(IMFILE, 0)
+        im = g
+        rawShape = g.shape
+        # gp = padding_backward(g, rawShape)
+        Gp = np.fft.fft2(g)
+        Gp = np.fft.fftshift(Gp)
+
+        funcs = [GLPF]
+        thres = power_ratio_in_cutoff_frequency(Gp, cutoffs)
+
+        thres_cutoffs = list(zip(thres, cutoffs))
+        ax.plot(cutoffs, thres, color=getHexColor(ix=i), label='{}'.format(imfile))
+    # ax.set_xlim([0, 512])
+    # ax.set_ylim([0, 100])
+    ax.set_ylabel("power spectrum percentage")
+    ax.set_xlabel("cutoff frequency")
+    addLegend([ax])
+
+
+def try_histeq_localhisteq():
+    imfiles = [r'Calaveras_v3_p3613_LDose.bmp', r'Calaveras_v3_p3613_LDose_mean.bmp']
+    imgs = []
+    titles = []
+    for i, imfile in enumerate(imfiles):
+        IMFILE = os.path.join(WORKDIR, imfile)
+        im = cv2.imread(IMFILE, 0)
+        imgs.append(im)
+        titles.append(imfile)
+
+        im_histEq = equalizeHisto(im)
+        im_histLocalEq = localHistoEqualize(im, ksize=3)
+        imgs += [im_histEq, im_histLocalEq]
+
+    imshowMultiple_TitleMatrix(imgs, 2, 3,
+        titles, ['raw image', 'histeq', 'localhisteq'])
+
 
 def main():
     # try_noise_fft()
@@ -478,14 +566,18 @@ def main():
     # try_adpMean()
     # try_adpMedian()
 
-    try_polyroi_noise_hist(interative=False)
+    # try_polyroi_noise_hist(interative=True)
     # try_denoise_ldose_various_methods(wihist=True)
-    #try_denoise_combined()
+    # try_denoise_ldose_deepen_one_method(mode='NLM', save=False)
+
+    # try_denoise_combined()
     # try_NLM()
-    # try_denoise_ldose_deepen_one_method('NLM', True)
 
     # try_notch(False)
-    #try_LPF(save=True)
+    # try_LPF(save=False)
+    # try_LPF_fit_bk_noise()
+    try_LPF_dramatic_cutoff()
+    # try_histeq_localhisteq()
 
 if __name__ == '__main__':
     main()

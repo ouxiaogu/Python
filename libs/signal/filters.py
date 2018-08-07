@@ -9,13 +9,14 @@ Underlying core functions to
 Last Modified by: ouxiaogu
 """
 import math
-import matplotlib.pyplot as plt
+
 import numpy as np
 import sys
 import collections
 
 __all__ = ['gaussian_filter', 'padding', 'padding_backward', 'convolve',
-        'fftconvolve', 'nearest_power', 'dft', 'cv_gaussian_kernel',
+        'fftconvolve', 'nearest_power', 'dft', 'idft',
+        'cv_gaussian_kernel',
         'correlate', 'applySepFilter', 'kernelPreProc',
         'applyKernelOperator', 'centered', 'sync_dtype'
         ]
@@ -31,6 +32,9 @@ SMALL_GAUSSIAN_SIZE = 7
 def gaussian_filter(sigma=2, derivative_order=0, mode='CV', dtype=None):
     """
     Generate Gaussian filter or its derivative with the input sigma
+
+    normfunc = lambda x: 1/(np.sqrt(2*np.pi)*sigma) * np.exp( - (x-mu)**2/(2*(sigma)**2 ))
+
     g(x) = 1/ (sqrt(2*pi)*sigma) * e^(-1/2*x^2/sigma^2)
     g_n_(x) = -1/sigma^2 *( g_(n-1)_(x)*x + g_(n-2)*(x)*(n-1) )
     """
@@ -74,7 +78,7 @@ def cv_gaussian_kernel(ksize, sigma=0, dtype=None):
         ksize = int(ksize)
     except:
         raise TypeError("cv_gaussian_kernel is to generate linear Gaussian filter, ksize should be int, but input is: {}!\n".format(str(ksize)))
-    if(ksize <= SMALL_GAUSSIAN_SIZE):
+    if ksize <= SMALL_GAUSSIAN_SIZE and sigma <= 0:
         dst = np.array(SMALL_GAUSSIAN_TAB[ksize>>1])
     else:
         if ksize % 2 == 0:
@@ -327,67 +331,18 @@ def nearest_power(num, powbase=2):
         return powbase
     return powbase*nearest_power(num/powbase)
 
-def plot_flt_dG(sigma=2):
-    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
-    from PlotConfig import choosePalette, addLegend
-    pal = choosePalette()
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
-
-    fltG = gaussian_filter(sigma)
-    hlFltSz = (len(fltG) - 1)//2
-    x0 = list(map(lambda i: i-hlFltSz, range(0, 2*hlFltSz + 1)))
-    for ix in range(0, 3):
-        fltGG = gaussian_filter(sigma, ix)
-        fltGG = np.asarray(fltGG)
-        axes[0].plot(x0, fltGG, '-s', color=pal[ix], label="sigma=%d, order=%d" % (sigma, ix))
-        sp = np.fft.rfftn(fltGG, fltGG.shape)
-        sp = np.fft.fftshift(sp)
-        x1 = range(len(sp))
-        mag = np.absolute(sp)
-        axes[1].plot(x1, mag, '-*', color=pal[ix], label="sigma=%d, order=%d, spectrum mag" % (sigma, ix))
-    addLegend([axes[0]])
-    addLegend([axes[1]])
-
-def plot_flt_sz(sigma=2):
-    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
-    from PlotConfig import choosePalette, addLegend
-    pal = choosePalette()
-    fig, ax = plt.subplots()
-    for ix, mode in enumerate(['CV', 'RD', 'OCE']):
-        flt_G = gaussian_filter(sigma, mode=mode)
-        hlFltSz = (len(flt_G) - 1)//2
-        x = list(map(lambda i: i-hlFltSz, range(0, 2*hlFltSz + 1)))
-        ax.plot(x, flt_G, '-s', color=pal[ix], label="mode={}, sigma={}, hlFltSz={}".format(mode, sigma, hlFltSz) )
-    addLegend([ax ])
-
-def plot_rect_func_fft():
-    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
-    from MathUtil import rectFunc
-    fig, axes = plt.subplots(nrows=3, ncols=1)
-
-    x, y = zip(*rectFunc(2, slices=20, extend=1) )
-    axes[0].plot(x, y, 'b-s', label='rectangle function')
-
-    sp1 = np.fft.fft(y)
-    sp1 = np.fft.fftshift(sp1)
-    axes[1].plot(x, sp1, 'g-*', label='rectangle function, fft')
-
-    sp2 = np.fft.rfft(y)
-    # sp2 = np.fft.fftshift(sp2)
-    print('length of sp1: {}, sp2: {}'.format(len(sp1), len(sp2)) )
-    axes[2].plot(np.arange(len(sp2)), sp2, 'k-.', label='rectangle function, fft for real input')
-    from PlotConfig import addLegend
-    addLegend(axes)
-    plt.show()
-
-def dft_1d_matrix(N):
+def dft_1d_matrix(N, inverse=False):
     '''build 1D dft matrix with W_i = u^i'''
+    coeff, sgn = 1, -1
+    if inverse:
+        coeff = 1/N
+        sgn = 1
     x, y = np.meshgrid(np.arange(N), np.arange(N))
-    v = np.exp( - 2 * np.pi * 1J / N )
-    W = np.power(v, x*y) #/ np.sqrt(N)
+    v = np.exp( sgn* 2 * np.pi * 1J / N )
+    W = coeff*np.power(v, x*y)
     return W
 
-def dft_2d_matrix(N, M):
+def dft_2d_matrix(N, M, inverse=False):
     '''build 2D dft matrix with W_ij = u^i*v^j
     N: #rows, M: #columns,
 
@@ -400,17 +355,22 @@ def dft_2d_matrix(N, M):
     # => x = { [0, 1, 2], [0, 1, 2] }
     # => y = { [0, 0, 0], [1, 1, 1] }
     '''
-    u = np.exp( - 2. * np.pi * 1J / M )
-    v = np.exp( - 2. * np.pi * 1J / N )
+    coeffx, coeffy, sgn = 1, 1, -1
+    if inverse:
+        coeffx = 1/M
+        coeffy = 1/N
+        sgn = 1
+    u = np.exp( sgn* 2. * np.pi * 1J / M )
+    v = np.exp( sgn* 2. * np.pi * 1J / N )
 
     x, y = np.meshgrid(np.arange(M), np.arange(M))
-    U = np.power(u, x*y) #/ np.sqrt(M)
+    U = coeffx*np.power(u, x*y) #/ np.sqrt(M)
 
     x, y = np.meshgrid(np.arange(N), np.arange(N))
-    V = np.power(v, x*y) #/ np.sqrt(N)
+    V = coeffy*np.power(v, x*y) #/ np.sqrt(N)
     return U, V
 
-def dft(src):
+def dft(src, inverse=False):
     '''
     DFT computation by directly matrix computation, complementary to fft
     Note, unlike DIP book DFT convention, DFT has coefficients 1/sqrt(MN),
@@ -463,23 +423,20 @@ def dft(src):
     dst = None
     if(is_1D_array(arr) ):
         N = array_long_axis_size(arr)
-        arr = arr.reshape((1,N) )
-        W = dft_1d_matrix(N)
+        arr = arr.reshape((N,1) )
+        W = dft_1d_matrix(N, inverse)
         dst = W.dot(arr)
         dst = dst.reshape(srcShape)
     elif(len(srcShape) == 2):
         N, M = srcShape
-        U, V = dft_2d_matrix(N, M)
+        U, V = dft_2d_matrix(N, M, inverse)
         dst = V.dot(arr).dot(U)
     else:
         raise NotImplementedError("DFT only support 1D/2D array, input array shape is: {}!\n".format(str(srcShape)))
     return dst
 
-def dft_matrix(N):
-    i, j = np.meshgrid(np.arange(N), np.arange(N))
-    omega = np.exp( - 2 * np.pi * 1J / N )
-    W = np.power( omega, i * j ) #/ np.sqrt(N)
-    return W
+def idft(src):
+    return dft(src, True)
 
 def kernelPreProc(src, ksize=None):
     '''
@@ -508,6 +465,7 @@ def kernelPreProc(src, ksize=None):
         ksize = (3, 3)
     elif np.ndim(ksize) == 0:
         ksize = (ksize, ksize)
+    ksize = tuple(map(int, ksize))
     N, M = src.shape
     n, m = ksize
     if n%2 == 0 or m%2 == 0:
@@ -528,6 +486,7 @@ def fltGenPreProc(shape=None):
         shape = (3, 3)
     elif np.ndim(shape) == 0:
         shape = (shape, shape)
+    shape = tuple(map(int, shape))
     N, M = shape
     if N%2 == 0 or M%2 == 0:
         raise ValueError("filter shape size {} should be odd!\n".format(repr(shape)))
@@ -572,6 +531,35 @@ def sync_dtype(src, dst):
         else:
             dst = dst.astype(src.dtype)
     return dst
+
+def isEven(a):
+    '''whether the 1D array is discrete even function rule:
+    - continuous:   even = (w(x) + w(-x))/2
+    - discrete:     f(x) = f(N-x)
+    '''
+    if np.ndim(a) != 0:
+        raise TypeError("isEven, can only support 1D array, input a's shape is: {}!\n".format(str(a.shape)))
+    N = len(a)
+    n = len(a)//2
+    for i in range(1, n):
+        if a[i] != a[N-i]:
+            return False
+    return True
+
+def isOdd(a):
+    '''whether the 1D array is discrete odd function rule:
+    - continuous:   odd = (w(x) - w(-x))/2
+    - discrete:     f(x) = -f(N-x)'''
+    if np.ndim(a) != 0:
+        raise TypeError("isOdd, can only support 1D array, input a's shape is: {}!\n".format(str(a.shape)))
+    N = len(a)
+    n = len(a)//2
+    if N == 0 or a[0] != 0:
+        return False
+    for i in range(1, n):
+        if a[i] != -a[N-i]:
+            return False
+    return True
 
 if __name__ == '__main__':
     # arr = np.random.randn(3, 4)

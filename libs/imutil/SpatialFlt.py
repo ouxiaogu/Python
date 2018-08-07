@@ -382,6 +382,10 @@ def setNLMParams(sigma):
         ratio = 0.3
         psize = 11
         bsize = 35
+    elif sigma >= 100:
+        ratio = 0.3
+        psize = int(11 + (sigma-100)//30*2)
+        bsize = 35
     h = ratio*sigma
     return (h, psize, bsize)
 
@@ -392,3 +396,6 @@ if __name__ == '__main__':
 
     print(LaplaceFilter3() )
     print(LaplaceFilter((3, 3) ) )
+
+    for sigma in np.linspace(60, 160, 6):
+        print(setNLMParams(sigma))

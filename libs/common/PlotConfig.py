@@ -24,13 +24,16 @@ def hex2rgb(src):
     src = src.lstrip('#')
     return tuple(int(src[i:i+2], 16) for i in (0, 2 ,4))
 
-def getRGBColor(src=None, background=False, ix=0):
+def getHexColor(src=None, background=False, ix=0):
     if src is None:
         if background:
             src = BACKGROUND_COLORS
         else:
             src = COLORS
-    return hex2rgb(src[ix])
+    return src[ix]
+
+def getRGBColor(src=None, background=False, ix=0):
+    return hex2rgb(getHexColor(src, background, ix))
 
 def choosePalette(style=''):
     colors = COLORS

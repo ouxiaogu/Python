@@ -16,6 +16,7 @@ import sys
 import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
+from filters import cv_gaussian_kernel, applySepFilter
 log = logger.setup(level='info')
 from PlotConfig import getRGBColor
 
@@ -76,25 +77,25 @@ def hist_lines(im):
     h = np.flipud(h)
     return h
 
-def hist_rect(im=None, hbins=100, hist=None, color_hist=False, fit_hist=False):
+def hist_rect(im=None, hbins=100, hist_in=None, color_hist=False, fit_hist=False):
     '''return histogram of any image as some rectangle bins
     In python, it seems cv2 don't support the float type image,
     But for c++, it's supported
 
     Parameters
     ----------
-    hist : None or 1D list-like
+    hist_in : None or 1D list-like
         if hist is None, use OpenCV to calcHist
         if hist is 1D list, it should be grayscale histogram, list or dict
     '''
-    if hist is None:
+    if hist_in is None:
         if len(im.shape)!=2:
-            sys.stderr.write("hist_lines applicable only for grayscale images!\n")
+            sys.stderr.write("hist_rect applicable only for grayscale images!\n")
             #print("so converting image to grayscale for representation"
             im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
         hist_item = cv2.calcHist([im], [0], None, [hbins], [0, 256])
     else:
-        hist_item = hist
+        hist_item = hist_in.copy()
     hbins = len(hist_item)
     maxhist = np.max(hist_item)
     hist_item = hist_item/maxhist*255
@@ -116,14 +117,15 @@ def hist_rect(im=None, hbins=100, hist=None, color_hist=False, fit_hist=False):
         binVal = hist[ix]
         cv2.rectangle(histImg, (ix*scale, 0), ((ix+1)*scale, binVal), color)
 
-    if fit_hist:
-        mu, std = statHist(hist, trimmedNum=2)
-        scale = 255/(np.max(hist)/np.sum(hist))
-        normfunc = lambda x: scale/(np.sqrt(2*np.pi)*std) * np.exp( - (x-mu)**2/(2*(std)**2 ))
+    if fit_hist: # add fitting curve
+        # raw & normalized hist, mu & std will have some numerical difference
+        # mu, std, _ = statHist(hist_in, trimmedNum=2) # raw hist
+        mu, std, yscale = statHist(hist, trimmedNum=2, compute_scale=True) # normalized hist
+        normfunc = lambda x: yscale/(np.sqrt(2*np.pi)*std) * np.exp( - (x-mu)**2/(2*(std)**2 ))
         pts = np.int32(np.column_stack((BINS, normfunc(BINS))))
         cv2.polylines(histImg, [pts], False, (0, 0, 0), 1)
     histImg = np.flipud(histImg).copy()
-    if fit_hist:
+    if fit_hist: # add fitting curve text info
         text = 'u={:.2f}, sigma={:.2f}'.format(mu, std)
         printImageInfo(histImg)
         cv2.putText(histImg, text, (100, 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0))
@@ -161,27 +163,69 @@ class Histogram(object):
         return cdfHisto(self.hist)
 
 
-def fillHist(hist):
+def fullBinHist(hist):
+    '''if hist is OrderedDict type, fill histogram into a full bin histogram version'''
     dst = np.zeros(256, dtype=np.uint32)
     if isinstance(hist, OrderedDict):
         for i in range(256):
             if i in hist.keys():
                 dst[i] = hist[i]
     elif isinstance(hist, list) or isinstance(hist, np.ndarray):
-        dst = hist
+        dst = hist.copy()
+    else:
+        raise TypeError("fullBinHist, hist type {} is not supported".format(type(type(hist))))
     return dst
 
-def statHist(hist=None, trimmedNum=None):
-    hist = fillHist(hist)
+def statHist(hist=None, trimmedNum=None, compute_scale=False):
+    """
+    statistics based on the histogram
+
+    Parameters
+    ----------
+    hist : list like or OrderedDict
+        histogram itself
+    trimmedNum : int
+        trim hist number at the two end by trimmedNum
+
+    Returns
+    -------
+    mu : float
+        mean of the data, computed by sum(bins*pdf)
+    std : float
+        standard deviation of the data, computed by sqrt(sum((bins^2)*pdf) - mean^2)
+    scale : float
+        how much the data is scaled, hist point (u, hist_norm[u])
+        becomes (u, hist[u]), refer to hist_rect, max(hist)=255,
+        but hist[u] not always 255, because trimmed some number
+        at head/tail
+    """
+    hist = fullBinHist(hist)
+    #assert(len(hist) == 256)
     if trimmedNum is not None and trimmedNum > 0 and trimmedNum < 255//2:
         hist[:trimmedNum] = 0
         hist[-trimmedNum:] = 0
 
-    hist = hist/np.sum(hist)
-    levels = np.arange(256)
-    mu = np.dot(levels, hist)
-    std = np.sqrt(np.abs(np.dot(levels**2, hist) - mu**2))
-    return mu, std
+    hist_norm = hist/np.sum(hist)
+    bins = np.arange(len(hist))
+    mu = np.dot(bins, hist_norm)
+    std = np.sqrt(np.abs(np.dot(bins**2, hist_norm) - mu**2))
+
+    # for compute scale
+    scale = None
+    if compute_scale:
+        flt_G = cv_gaussian_kernel(7)
+        hist_smooth = applySepFilter(hist, flt_G)
+        hist_norm_smooth = applySepFilter(hist_norm, flt_G)
+        idx = int(mu)
+        if idx > 255-3 or idx < 0+3: # 3 because erosion of applySepFilter
+            hist_mu = 255
+            scale = hist_mu*np.sqrt(2*np.pi)*std
+        else:
+            alpha = mu - idx
+            hist_mu = hist_smooth[idx]*(1 - alpha) + hist_smooth[idx+1]*alpha
+            hist_norm_mu = hist_norm_smooth[idx]*(1 - alpha) + hist_norm_smooth[idx+1]*alpha
+            scale = hist_mu/hist_norm_mu
+    return mu, std, scale
 
 def cdfHisto(hist, Lmax=255):
     '''
@@ -421,14 +465,14 @@ def calculate_cutoff(amplitude, samples=None, thres=95):
     shape = amplitude.shape
     maxSz = max(shape)/2 # radius
     if samples is None:
-        samples = np.linspace(maxSz/10, maxSz, 10)
+        samples = np.linspace(maxSz/10, maxSz, 50)
     ratios = power_ratio_in_cutoff_frequency(amplitude, samples)
 
     thresholds = [thres] if np.ndim(thres) == 0 else thres
     rets = []
     ridx = 0
-    foundidx = False
     for th in thresholds:
+        foundidx = False
         for i in range(len(ratios) - 1):
             if (ratios[i] - th) * (ratios[i+1] - th) <= 0:
                 ridx = i
@@ -440,14 +484,37 @@ def calculate_cutoff(amplitude, samples=None, thres=95):
                 ret = samples[ridx]
             else: # bilinear interpolation
                 alpha = (th - ratios[ridx])/(ratios[ridx+1] - ratios[ridx])
-                assert(alpha>=0 and alpha<=1)
+                if alpha<0 or alpha>1:
+                    raise ValueError("ridx: {}, alpha {}, thresh {}, ratios {} {}\n".format(ridx, alpha, th, ratios[ridx], ratios[ridx+1]))
                 ret = (1-alpha)*samples[ridx] + alpha*samples[ridx+1]
+
         else:
             if th < ratios[0]:
                 ret = th/ratios[0]*samples[0]
             elif th > ratios[-1]:
                 ret = th/ratios[-1]*samples[-1]
         rets.append(ret)
+    rets = np.array(rets)
+    rets = np.clip(rets, 0, maxSz)
     ret = rets[0] if np.ndim(thres) == 0 else rets
     return ret
 
+def computeSNR(src, restored):
+    """
+    compute the SNR of the restored image[s]
+        SNR = mean(f^2) / mean((f - fr)^2) # higher SNR, the better, fr -> f
+        SNR = mean(fr^2) / mean((g - fr)^2) # less filters the better, not correct, so not use this function now
+    """
+    im_restore = [restored] if np.ndim(restored) == 0 else restored
+    SNRs = []
+    for f_r in im_restore:
+        imdiff = f_r - src
+        SNRs.append(np.mean(f_r**2)/np.mean(imdiff**2))
+    ret = SNRs[0] if np.ndim(restored) == 0 else SNRs
+    return ret
+
+if __name__ == '__main__':
+    print(statHist(cv_gaussian_kernel(3)))
+    print(statHist(cv_gaussian_kernel(5)))
+    print(statHist(cv_gaussian_kernel(5, 0.7)))
+    print(statHist(cv_gaussian_kernel(7)))
