@@ -23,8 +23,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 # INPATH = r'C:\Localdata\D\Note\Python\misc\iCal\SEM\samples'
-DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
-#DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
+# DIPPATH = r'C:\Localdata\D\Book\DIP\DIP\imagesets\DIP3E_Original_Images_CH03'
+DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'
 WORKDIR = r"C:\Localdata\D\Note\Python\misc\iCal\SEM\samples"
 # WORKDIR = r"D:\code\Python\apps\MXP\samples"
 KWARGS = {'vmin': 0, 'vmax': 255}
@@ -134,7 +134,7 @@ def try_Laplace_LoG():
     imL = fftconvolve(im, flt_L)
     imL_norm = normalize(imL)
 
-    flt_LoG = LaplaceFilter(fltShape, True)
+    flt_LoG = LoG(fltShape)
     imLoG = fftconvolve(im, flt_LoG)
     imLoG_norm = normalize(imLoG)
 
@@ -303,13 +303,13 @@ def main():
     # cProfile.run('try_localHistoEq()')
 
     # cProfile.run('try_Laplace_LoG()')
-    # try_Laplace_LoG()
+    try_Laplace_LoG()
 
     # try_1st_2nd_deriative()
 
     # try_Combined_Enhance()
 
-    try_Combined_Enhance_Ops()
+    # try_Combined_Enhance_Ops()
 
 if __name__ == '__main__':
     main()

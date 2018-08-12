@@ -220,7 +220,7 @@ def applySepFilter(src, fltx, flty=None):
     fltx = np.asarray(fltx)
     flty = np.asarray(flty)
     if(np.ndim(fltx) != 1 or np.ndim(flty) != 1):
-        raise NotImplementedError("applySepFilter only support 1D filter, input  fltx shape: %s, fltx shape: %s!\n".format(str(fltx.shape), str(flty.shape) ) )
+        raise NotImplementedError("applySepFilter only support 1D filter, input  fltx shape: {}, fltx shape: {}!\n".format(str(fltx.shape), str(flty.shape) ) )
     n, m = array_long_axis_size(flty), array_long_axis_size(fltx)
     if n%2 == 0 or m%2 == 0:
         raise ValueError("applySepFilter only support odd filter size, fltx: {}, flty: {}".format(str(fltx.shape), str(flty.shape)))
@@ -475,7 +475,7 @@ def kernelPreProc(src, ksize=None):
     dst = np.zeros_like(src)
     return dst, gp, N, M, n, m, hlFltSzY, hlFltSzX
 
-def fltGenPreProc(shape=None):
+def fltGenPreProc(shape=None, force_odd=True):
     '''
     N, M : int
         kernel #rows, #columns, both should be odd
@@ -488,7 +488,7 @@ def fltGenPreProc(shape=None):
         shape = (shape, shape)
     shape = tuple(map(int, shape))
     N, M = shape
-    if N%2 == 0 or M%2 == 0:
+    if force_odd and (N%2 == 0 or M%2 == 0):
         raise ValueError("filter shape size {} should be odd!\n".format(repr(shape)))
     cy, cx = (s//2 for s in shape)
     return N, M, cy, cx

@@ -14,7 +14,7 @@ import collections
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-from filters import padding, padding_backward, nearest_power, centered
+from filters import padding, padding_backward, nearest_power, centered, fltGenPreProc
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('FrequencyFlt', 'info')
@@ -29,10 +29,8 @@ __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
 
 def distance_map(shape, notch=None):
     """distance = sqrt((x-cx)^2 + (y-cy)^2)"""
-    N, M = shape
+    N, M, cx, cy = fltGenPreProc(shape, force_odd=False)
     x, y = np.meshgrid(np.arange(M), np.arange(N))
-    cx = (M - 1)/2
-    cy = (N - 1)/2
     if notch is not None:
         cx, cy = notch
     z = np.sqrt((x - cx)**2 + (y - cy)**2)

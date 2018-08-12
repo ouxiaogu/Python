@@ -15,6 +15,7 @@ import os
 
 from ImTransform import imSub
 from ImDescriptors import getImageInfo
+from FrequencyFlt import distance_map
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding, sync_dtype
@@ -23,10 +24,14 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('SpatialFlt', level='info')
 
-__all__ = ['GaussianFilter', 'LaplaceFilter', 'SobelFilter', 'PrewittFilter',
-        'SOBEL_EDGE', 'SOBEL_SMOOTH', 'PREWITT_EDGE', 'PREWITT_SMOOTH',
-        'SCHARR_EDGE', 'SCHARR_SMOOTH', 'LaplaceFilter3', 'BoxFilter',
-        'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 'getDerivXYKernel',
+__all__ = ['GaussianFilter', 'BoxFilter',
+        'SobelFilter', 'PrewittFilter',
+        'SOBEL_EDGE', 'SOBEL_SMOOTH', 
+        'PREWITT_EDGE', 'PREWITT_SMOOTH',
+        'SCHARR_EDGE', 'SCHARR_SMOOTH',
+        'LaplaceFilter', 'LaplaceFilter3', 'LoG', 'DoG',
+        'LAPLACE_DIRECTIONAL', 'LAPLACE_POSITION', 
+        'getDerivXYKernel',
         'getMeanXYKernel', 'ContraHarmonicMean', 'TrimmedMean',
         'adpMean', 'adpMedian', 'setNLMParams']
 
@@ -46,12 +51,12 @@ def BoxFilter(shape, normalize=True):
         dst = dst / np.sum(dst)
     return dst
 
-def GaussianFilter(shape, normalize=True, **kwargs):
+def GaussianFilter(shape, sigma=0, normalize=True, **kwargs):
     N, M, _, _ = fltGenPreProc(shape)
 
     dst = []
-    colG = cv_gaussian_kernel(M, **kwargs).reshape((1, M) )
-    rowG = cv_gaussian_kernel(N, **kwargs).reshape((N, 1) )
+    colG = cv_gaussian_kernel(M, sigma, **kwargs).reshape((1, M) )
+    rowG = cv_gaussian_kernel(N, sigma, **kwargs).reshape((N, 1) )
     # colT = np.tile(colG, (N, 1))
     # rowT = np.tile(rowG, (1, M))
     # dst = colT*rowT
@@ -60,7 +65,7 @@ def GaussianFilter(shape, normalize=True, **kwargs):
         dst = dst / np.sum(dst)
     return dst
 
-def LaplaceFilter(shape, gaussian=False):
+def LaplaceFilter(shape):
     '''
     Δf = ∇^2f = f''x + f''y
     f''x = [f(x+1) - f(x)] - [f(x) - f(x-1)]
@@ -70,19 +75,68 @@ def LaplaceFilter(shape, gaussian=False):
     '''
     N, M, cx, cy = fltGenPreProc(shape)
 
-    dst = np.ones(shape)
-    if gaussian:
-        dst = GaussianFilter(shape, normalize=False)
+    dst = np.ones((N, M))
 
     tolsum = np.sum(dst)
     dst[cy, cx] = dst[cy, cx] - tolsum
     return dst
+
 
 def LaplaceFilter3():
     N = M = 3
     L_x = np.matmul(LAPLACE_POSITION.reshape(N, 1), LAPLACE_DIRECTIONAL.reshape(1, M) )
     L_y = np.matmul(LAPLACE_DIRECTIONAL.reshape(N, 1), LAPLACE_POSITION.reshape(1, M)  )
     return L_x + L_y
+
+def LaplaceFilter5():
+    N = M = 5
+    LAPLACE_POSITION = np.array([0, 0, 1, 0, 0])
+    LAPLACE_DIRECTIONAL = np.array([1, 1, -4, 1, 1])
+    L_x = np.matmul(LAPLACE_POSITION.reshape(N, 1), LAPLACE_DIRECTIONAL.reshape(1, M) )
+    L_y = np.matmul(LAPLACE_DIRECTIONAL.reshape(N, 1), LAPLACE_POSITION.reshape(1, M)  )
+    return L_x + L_y
+
+def LoG(shape, sigma=None, force_center=16):
+    '''
+    G = e^(-(x^2+y^2)/(2*σ^2))
+    Δf = ∇^2(f) = f''x + f''y = (x^2 + y^2 - 2σ^2)/σ^4 * e^(-(x^2+y^2)/(2*σ^2))
+    '''
+    N, M, cx, cy = fltGenPreProc(shape)
+    if sigma is None:
+        sigma = min(N, M)/6
+    assert(sigma > 0)
+    dist = distance_map(shape)
+    res = (dist**2 - 2*sigma**2)/sigma**4 * np.exp(- dist**2/(2*sigma**2) )
+    res[cy, cx] = res[cy, cx] - np.sum(res)
+    assert(res[cy, cx] < 0)
+    if force_center is not None:
+        scale = -np.abs(force_center)/(res[cy, cx]) # assume center is negative
+        res = np.round(res*scale).astype(np.int32)
+        res[cy, cx] = res[cy, cx] - np.sum(res)
+    return res
+
+def DoG(shape, sigma=None, force_1st_cx=2):
+    '''
+    DoG = G1 - G2
+    '''
+    N, M, cx, cy = fltGenPreProc(shape)
+    dstShape = (N, M)
+    sigma1 = sigma
+    if sigma1 is None:
+        sigma1 = min(N, M)/6
+    ratio = 1.6
+    sigma2 = sigma1/ratio
+    print(sigmaLoG(sigma1, sigma2))
+    res = GaussianFilter(dstShape, sigma1) - GaussianFilter(dstShape, sigma2)
+    res[cy, cx] = res[cy, cx] - np.sum(res)
+    if force_1st_cx is not None:
+        scale = np.abs(force_1st_cx/res[0, cx])
+        res = np.round(res*scale).astype(np.int32)
+        res[cy, cx] = res[cy, cx] - np.sum(res)
+    return res
+
+def sigmaLoG(sigma1, sigma2):
+    return (sigma1**2 * sigma2**2)/(sigma1**2 - sigma2**2)*2*np.log(sigma1/sigma2)
 
 def SobelFilter(shape=None, axis=0, Prewitt=False, dtype=np.float64, normalize=False):
     '''
@@ -393,9 +447,21 @@ if __name__ == '__main__':
     print(eval('SOBEL_SMOOTH'))
 
     print(GaussianFilter((3, 3) ) )
+    print(GaussianFilter(5, 0.7) )
+    print(GaussianFilter(5, 0.4375) )
 
     print(LaplaceFilter3() )
     print(LaplaceFilter((3, 3) ) )
+    print(distance_map(5))
+    print(-LoG(5, sigma=0.65, force_center=16) )
+    print(-DoG(5, sigma=0.7, force_1st_cx=1) )
+    print(LoG(7, sigma=1) )
+    print(LoG(9, sigma=1.35, force_center=40) )
+    print(DoG(9, sigma=1.49, force_1st_cx=1.8) )
+    LoG = convolve(LaplaceFilter5(), cv_gaussian_kernel(5, 0.8, dtype=np.int32), cv_gaussian_kernel(5, 0.8,dtype=np.int32))
+    scale = 0.49/LoG[0, 1]
+    LoG = np.int32(np.round(scale*LoG))
+    print(LoG)
 
     for sigma in np.linspace(60, 160, 6):
         print(setNLMParams(sigma))

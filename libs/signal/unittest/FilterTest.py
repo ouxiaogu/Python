@@ -152,12 +152,12 @@ def plot_flt_dG(sigma=2):
     for ix in range(0, 3):
         fltGG = gaussian_filter(sigma, ix)
         fltGG = np.asarray(fltGG)
-        axes[0].plot(x0, fltGG, '-s', color=pal[ix], label="sigma=%d, order=%d" % (sigma, ix))
+        axes[0].plot(x0, fltGG, '-s', color=pal[ix], label="sigma=%f, order=%d" % (sigma, ix))
         sp = np.fft.rfftn(fltGG, fltGG.shape)
         sp = np.fft.fftshift(sp)
         x1 = range(len(sp))
         mag = np.absolute(sp)
-        axes[1].plot(x1, mag, '-*', color=pal[ix], label="sigma=%d, order=%d, spectrum mag" % (sigma, ix))
+        axes[1].plot(x1, mag, '-*', color=pal[ix], label="sigma=%f, order=%d, spectrum mag" % (sigma, ix))
     addLegend([axes[0]])
     addLegend([axes[1]])
 
@@ -288,13 +288,13 @@ def plot_fft_G():
     plt.show()
 
 def main():
-    # plot_flt_dG()
+    plot_flt_dG(sigma=5.3)
 
     # plot_flt_sz()
 
     # plot_rect_func_fft()
 
-    plot_DoG()
+    #plot_DoG()
     # plot_fft_G()
 
 
