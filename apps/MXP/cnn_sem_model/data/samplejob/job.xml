@@ -1,0 +1,25 @@
+<root>
+  <MXP>
+    <global>
+      <options>
+        <enable>1-2000</enable>
+      </options>
+  </global>
+    <init>
+      <dataset></dataset>
+      <cal_ver_ratio>3</cal_ver_ratio>
+      <filter>
+        <folder></folder>
+        <file>*.bmp</file>
+      </filter>
+      <outxml>mxp_input.xml</outxml>
+      <enable>1800</enable>
+    </init>
+    <DLSEMCalibration>
+      <learning_rate>0.001</learning_rate>
+      <inxml>mxp_input.xml</inxml>
+      <outxml>dlsemcal2000out.xml</outxml>
+      <enable>2000</enable>
+    </DLSEMCalibration>
+  </MXP>
+</root>

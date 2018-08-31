@@ -1,0 +1,17 @@
+<root>
+  <result>
+    <model>model.xml</model>
+    <pattern>
+      <image_path></image_path>
+      <usage>CAL</usage>
+      <costwt>1</costwt>
+      <error>0</error>
+    </pattern>
+    <pattern>
+      <image_path></image_path>
+      <usage>VER</usage>
+      <costwt>1</costwt>
+      <error>0</error>
+    </pattern>
+  </result>
+</root>
