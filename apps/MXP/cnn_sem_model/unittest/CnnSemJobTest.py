@@ -4,6 +4,7 @@ import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../")
 from CnnSemJob import *
 import numpy as np
+import pandas as pd
 
 class TestCNNJob(unittest.TestCase):
     def setUp(self):
@@ -30,6 +31,13 @@ class TestCNNJob(unittest.TestCase):
 
     def test_mxpjob_stageIOfile(self):
         self.assertEqual('dlsemcal2000out.xml', self.myjob.getStageIOFile(enable=2000))
+
+    def test_dfToXmlStream(self):
+        mylist = [{'name': 1, 'usage': 'CAL', 'cost_wt': 1, 'imgpath': '1_se.bmp'},
+                {'name': 2, 'usage': 'VER', 'cost_wt': 1, 'imgpath': '1_se.bmp'}]
+        df = pd.DataFrame(mylist)
+        print(dfToXmlStream(df))
+
 
 if __name__ == "__main__":
     unittest.main()

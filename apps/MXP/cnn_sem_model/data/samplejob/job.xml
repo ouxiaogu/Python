@@ -6,11 +6,12 @@
       </options>
   </global>
     <init>
-      <dataset></dataset>
+      <data_dir></data_dir>
       <cal_ver_ratio>3</cal_ver_ratio>
       <filter>
         <folder></folder>
-        <file>*.bmp</file>
+        <srcfile>*.bmp</file>
+        <tgtfile>*.bmp</file>
       </filter>
       <outxml>mxp_input.xml</outxml>
       <enable>1800</enable>
