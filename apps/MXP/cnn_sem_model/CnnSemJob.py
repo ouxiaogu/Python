@@ -551,7 +551,6 @@ class InitStage(MxpStage):
 class CSemCalStage(MxpStage):
     def loadDataSet(self):
         from dataset import DataSet, load_image
-
         nsamples = len(self.d_df)
         imgsize = getConfigData(self.d_cf, ".imgsize", 256)
         normalize_X = getConfigData(self.d_cf, ".normalize_X", 1)
@@ -565,14 +564,14 @@ class CSemCalStage(MxpStage):
             input_images = np.array([(input_images[i] - means[i])/stds[i] if stds[i]!=0 else np.zeros_like(input_images[i])  for i in range(nsamples)])
 
         train_indice = (self.d_df.usage=='training').nonzero()[0]
-        train_input_images = input_images[train_indice)
+        train_input_images = input_images[train_indice]
         train_target_images = target_images[train_indice]
         train_input_images_file_name = input_images_file_name[train_indice]
         train_target_images_file_name = target_images_file_name[train_indice]
 
         validation_indice = (self.d_df.usage=='validation').nonzero()[0]
-        validation_input_images = input_images[validation_indice)
-        validation_target_images = target_images[validation_indice)
+        validation_input_images = input_images[validation_indice]
+        validation_target_images = target_images[validation_indice]
         validation_input_images_file_name = input_images_file_name[validation_indice]
         validation_target_images_file_name = target_images_file_name[validation_indice]
 
@@ -581,11 +580,12 @@ class CSemCalStage(MxpStage):
 
         log.info("Complete reading input data")
         log.info("Number of files in Training-set:\t\t{}".format(len(train_indice)))
-        log.info("Number of files in Validation-set:\t{}".format(len(validation_indice))
+        log.info("Number of files in Validation-set:\t{}".format(len(validation_indice)))
 
     def run(self):
         from convNN import ConvNN
         self.loadDataSet()
+        learning_rate = getConfigData(self.d_cf, ".learning_rate", 1e-4)
         X_train, y_train = self.train.input_images, self.train.target_images
         X_valid, y_valid = self.valid.input_images, self.valid.target_images
         log.info('Training:\t{}\t{}'.format(str(X_train.shape), str(y_train.shape)))
@@ -593,7 +593,26 @@ class CSemCalStage(MxpStage):
         cnn = ConvNN(batchsize=8, random_seed=123, imgsize=_imgsize)
         cnn.train(training_set=(X_train, y_train),
                   validation_set=(X_valid, y_valid))
-        cnn.save(epoch=20)
+        self.modelpath=self.stagepath+'/tflayers-model/'
+        cnn.save(epoch=20, path=self.modelpath)
+
+    def save(self, path):
+        xml = ['<root>']
+        xml.append('\t<result>')
+        xml.append('\t\t<model>{}</model>'.format(self.modelpath))
+        xml.extend(df.apply(dfRowToXmlStream, axis=1))
+        xml.append('\t</result>')
+        xml.append('</root>')
+        ss = '\n'.join(xml)
+        log.debug("Result save path: %s\n" % (path))
+        with open(path, 'w') as fout:
+            fout.write(ss)
+        log.info("Result saved at %s\n" % (path))
+
+class CSemChkStage(MxpStage):
+    def loadDataSet(self):
+        from dataset import DataSet, load_image
+        
 
 if __name__ == '__main__':
     nodestr = """<pattern>
