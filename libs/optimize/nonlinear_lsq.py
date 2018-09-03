@@ -1,11 +1,12 @@
 # coding: utf-8
 import numpy as np
 from sympy import Matrix, symbols, pprint
+
 import sys
-sys.path.append(r'C:\Users\peyang\Perforce\peyang_LT324319_3720\app\mxp\scripts\util')
+import os.path
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
-logger.initlogging(debug=True)
-log = logger.getLogger("UNS")
+log = logger.setup('NL_LSQ', level='debug')
 
 """
 Consider a set of m data points, and a curve (model function) y=f(x),

@@ -16,6 +16,7 @@ import sys
 import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, applySepFilter
 log = logger.setup(level='info')
 from PlotConfig import getRGBColor

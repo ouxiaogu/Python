@@ -14,10 +14,9 @@ import xml.etree.ElementTree as ET
 from XmlUtil import getRecurConfigMap, getElemText, dfFromConfigMapList
 import re
 
-logger.initlogging(debug=False)
-log = logger.getLogger("MXPJob")
+log = log.setup("MXPJob")
 
-MXP_XML_FILE_TAGS = ["inxml", "outxml"]
+MXP_XML_TAGS = ["inxml", "outxml"]
 MXP_RESULT_OPTIONS = ["occfs", "osumccfs", "osumkpis"]
 
 class MXPJob(Job):
@@ -50,7 +49,8 @@ class MXPJob(Job):
         """
         Enable range in MXP job option
 
-        Return:
+        Returns
+        -------
             range_:
                 [-1, -1]: means all the stages are enabled
                 [min, max]:stage between [min max] are enabled
@@ -86,10 +86,13 @@ class MXPJob(Job):
 
     def getAllMxpStages(self, enabled_only=True):
         """
-        Return:
-            Stages as sorted [(stagename, enable)] by enable
+        Returns
+        -------
+        stages : sorted list by enable number
+            items like [(stagename, enable), ...], ascending order
 
-        Example:
+        Example
+        -------
             [('D2DBAlignment', 500), ('ResistModelCheck', 510),
              ('ImageD2DBAlignment', 600), ('ResistModelCheck', 610)]
         """
@@ -100,13 +103,11 @@ class MXPJob(Job):
         stages = []
         for key, stagectx in self.mxpCfgMap.items():
             stagename, enable_ = key
-            if enable_ == "":
+            if type(enable_) == str:
                 continue
-            if enabled_only:
-                if inRange(enable_):
-                    stages.append((stagename, enable_))
-            else:
-                stages[enable_] = stagename
+            if enabled_only and not inRange(enable_):
+                continue
+            stages.append((stagename, enable_))
 
         # bubble sort
         stagenum = len(stages)
@@ -131,7 +132,7 @@ class MXPJob(Job):
         for key in stages:
             if not stagecfs.has_key(key):
                 stagecfs[key] = OrderedDict()
-            for tag in MXP_XML_FILE_TAGS:
+            for tag in MXP_XML_TAGS:
                 try:
                     stagecfs[key][tag] = self.mxpCfgMap[key][tag]
                 except KeyError:
@@ -165,8 +166,8 @@ class MXPJob(Job):
         stagecfs = self.getAllStageXmlFiles()
         if not stagecfs.has_key(stage_):
             raise KeyError("Input stage %s not in: %s" % (stage_, str(stagecfs.keys())))
-        if option not in MXP_XML_FILE_TAGS:
-            raise KeyError("Input option %s not in: %s" % (option, str(MXP_XML_FILE_TAGS)))
+        if option not in MXP_XML_TAGS:
+            raise KeyError("Input option %s not in: %s" % (option, str(MXP_XML_TAGS)))
         return stagecfs[stage_][option]
 
     def getStageOut(self, stage):
@@ -227,22 +228,28 @@ class MXPOutXml(object):
 
     def getoccfs(self):
         """
-        Return:
-            DataFrame object, all the pattern's results in xmlfile
+        Returns
+        -------
+            ret : DataFrame object
+                all the pattern's results in xmlfile
         Example:
         """
         return dfFromConfigMapList(self.ocf, ".pattern")
 
     def getosumccfs(self):
         """
-        Return:
-            DataFrame object, all the pattern's summary in xmlfile"""
+        Returns
+        -------
+            ret : DataFrame object
+                all the pattern's summary in xmlfile"""
         return dfFromConfigMapList(self.osumcf, ".pattern")
 
     def getosumkpis(self):
         """
-        Return:
-            DataFrame object, all the pattern's KPIsummary in xmlfile"""
+        Returns
+        -------
+            ret : DataFrame object\
+                all the pattern's KPIsummary in xmlfile"""
         return dfFromConfigMapList(self.osumcf, ".pattern/KPI")
 
 if __name__ == '__main__':

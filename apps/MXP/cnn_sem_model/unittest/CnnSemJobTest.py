@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# tested on python 3
 import unittest
 import sys
 import os.path
@@ -8,21 +10,22 @@ import pandas as pd
 
 class TestCNNJob(unittest.TestCase):
     def setUp(self):
-        self.myjob = MXPJob(r'../data/samplejob')
+        self.myjob = MXPJob(r'../samplejob')
 
     def test_construct_job(self):
-        myjob = Job(r'../data/samplejob')
+        myjob = Job(r'../samplejob')
         self.assertTrue(myjob.checkJobXml())
 
     def test_mxpjob_build(self):
         self.assertTrue(self.myjob.mxproot is not None)
         print(self.myjob.mxpCfgMap)
 
-    def test_mxpjob_enable_range(self):
+    @unittest.skip("only enable init")
+    def test_mxpjob_enable_range_Disabled(self):
         np.testing.assert_equal(np.array([1, 2000]), np.array(self.myjob.getEnableRange()))
 
     def test_mxpjob_all_stages(self):
-        stagenames, enables = zip(*self.myjob.getAllMxpStages())
+        stagenames, enables = zip(*self.myjob.getAllMxpStages(enabled=False))
         np.testing.assert_equal(np.array(["init", 'DLSEMCalibration']),  np.array(list(stagenames)))
         np.testing.assert_equal(np.array([1800, 2000]),  np.array(list(enables)))
 
@@ -30,13 +33,17 @@ class TestCNNJob(unittest.TestCase):
         print(self.myjob.getAllStageIOFiles())
 
     def test_mxpjob_stageIOfile(self):
-        self.assertEqual('dlsemcal2000out.xml', self.myjob.getStageIOFile(enable=2000))
+        outxml = 'mxp_input.xml'
+        self.assertEqual(outxml, self.myjob.getStageIOFile(enable=1800)[-len(outxml):])
 
     def test_dfToXmlStream(self):
         mylist = [{'name': 1, 'usage': 'CAL', 'cost_wt': 1, 'imgpath': '1_se.bmp'},
                 {'name': 2, 'usage': 'VER', 'cost_wt': 1, 'imgpath': '1_se.bmp'}]
         df = pd.DataFrame(mylist)
         print(dfToXmlStream(df))
+
+    def test_run(self):
+        self.myjob.run()
 
 
 if __name__ == "__main__":

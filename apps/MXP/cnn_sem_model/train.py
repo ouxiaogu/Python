@@ -30,7 +30,7 @@ if __name__ == "__main__":
     # 20% of the data will automatically be used for validation
     _validation_size = 0.2
     _batchsize = 4 
-    _imgsize = 256 
+    _imgsize = 64 
     _load_imgsize = _imgsize 
     if(args['type'] == "model_apply"):
         _load_imgsize = _imgsize 

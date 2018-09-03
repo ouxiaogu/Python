@@ -9,6 +9,7 @@ import os
 import cv2
 from tensorflow.python.tools import optimize_for_inference_lib
 from tensorflow.tools.graph_transforms import TransformGraph
+import argparse
 
 #Adding Seed so that random initialization is consistent
 from numpy.random import seed
@@ -18,7 +19,7 @@ set_random_seed(2)
 debug = 0
 
 
-class ConvNN(object):
+class SimpleNN(object):
     def __init__(self, batchsize=8,
                  epochs=20, learning_rate=1e-4, 
                  dropout_rate=0.5,
@@ -62,66 +63,14 @@ class ConvNN(object):
                               shape=[None, 1, self.imgsize, self.imgsize],
                               name='tf_y')
         
-        ## for CPU, need convert to nhwc order
-        if(self.data_format == "channels_last"):
-            tf_x = tf.transpose(tf_x, [0, 2, 3, 1])
-        ## 1st layer: Conv_1
-        h1_filters_size = 128
-        h1 = tf.layers.conv2d(tf_x, 
-                              kernel_size=(5, 5), 
-                              filters=h1_filters_size, 
-                              activation=tf.nn.relu, 
-                              padding = 'same',
-                              data_format = self.data_format) 
-        ## MaxPooling
-        h1_pool = tf.layers.max_pooling2d(h1, 
-                              pool_size=(2, 2), 
-                              strides=(2, 2),
-                              padding = 'same',
-                              data_format = self.data_format)
-        ## 2n layer: Conv_2
-        h2_filter_size = 128
-        h2 = tf.layers.conv2d(h1_pool, kernel_size=(5,5), 
-                              filters=64, 
-                              activation=tf.nn.relu,
-                              padding = 'same',
-                              data_format = self.data_format)
-        ## MaxPooling 
-        h2_poo_size = 2
-        h2_pool = tf.layers.max_pooling2d(h2, 
-                              pool_size=(h2_poo_size, h2_poo_size), 
-                              strides=(2, 2),
-                              padding = 'same',
-                              data_format = self.data_format)
-
-        ## 3rd layer: Fully Connected
-        input_shape = h2_pool.get_shape().as_list()
+        input_shape = tf_x.get_shape().as_list()
         n_input_units = np.prod(input_shape[1:])
-        h2_pool_flat = tf.reshape(h2_pool, 
-                              shape=[-1, n_input_units])
-        h3 = tf.layers.dense(h2_pool_flat, n_input_units, 
-                              activation=tf.nn.relu)
-
-        ## Dropout (comments it till opencv 3.4.3)
-        '''
-        h3_drop = tf.layers.dropout(h3, 
-                              rate=self.dropout_rate,
-                              training=self.is_train)
-        '''
-        
-        ## 4th layer: Fully Connected (linear activation)
-        h4 = tf.layers.dense(h3, self.imgsize * self.imgsize, 
-                              activation=None)  
+        h1 = tf.reshape(tf_x, shape=[-1, n_input_units])
+        h2 = tf.layers.dense(h1, n_input_units, activation=tf.nn.relu)
+        h3 = tf.layers.dense(h2, self.imgsize * self.imgsize, activation=None)  
         
         s = tf_y.get_shape().as_list()
-        y_pred = tf.reshape(h4, [-1,s[1], s[2], s[3]], name= "y_pred")  
-        
-        '''            
-        h4 = tf.layers.dense(tf_x, self.imgsize * self.imgsize, 
-                              activation=None)  
-        s = tf_y.get_shape().as_list()
-        y_pred = tf.reshape(h4, [-1, s[1], s[2], s[3]], name = "y_pred") 
-        '''
+        y_pred = tf.reshape(h3, [-1,s[1], s[2], s[3]], name= "y_pred")  
  
         ## Predictition
         predictions = {
@@ -260,23 +209,27 @@ class ConvNN(object):
        
             
 if __name__ == "__main__":
-    
-    
-    batch_size = 8 
-    DIR = ".\\"
-
-    import argparse
-    parser = argparse.ArgumentParser(description='demo CNN SEM model')
-    parser.add_argument('-t','--type', help='train, or model_apply', required=True)
+    parser = argparse.ArgumentParser(description='train CNN SEM model')
+    parser.add_argument('-t','--type', help='train, or model_apply', default = "train")
+    parser.add_argument('-d','--dir', help='train image folder', default = "./training_data_3") 
+    parser.add_argument('--input_tag', help='input image, default is se term image', default = "_seTermComponent.pgm") 
+    parser.add_argument('--target_tag', help='target image, default is sem image', default = "_image.pgm") 
+    parser.add_argument('--epochs', help='epochs iteration number,default is 20', default = 20) 
+    parser.add_argument('--imgsize', help='image size after scale,default is 128', default = 128) 
     args = vars(parser.parse_args())    
+    
+    # set debug option
+    dataset.debug = debug
     
     # 20% of the data will automatically be used for validation
     _validation_size = 0.2
-    _imgsize = 128 
+    _batchsize = 6 
+    _imgsize = int(args["imgsize"]) 
     _number = -1
-    _input_tag = "_optical_image.pgm"
-    _target_tag = "_sem_image.pgm"
-    train_path='training_data'
+    _input_tag = args["input_tag"]
+    _target_tag = args["target_tag"] 
+    train_path= args["dir"]
+    _epochs = int(args["epochs"])
     # We shall load all the training and validation input_images and target_images into memory using openCV and use that during training
     data = dataset.read_train_sets(train_path, imgsize=_imgsize, 
                   validation_size=_validation_size, number=_number,
@@ -291,20 +244,38 @@ if __name__ == "__main__":
     X_valid_file_name, y_valid_file_name = data.valid.input_images_file_name, data.valid.target_images_file_name
     print('Training:   ', X_train.shape, y_train.shape)
     print('Validation: ', X_valid.shape, y_valid.shape)    
+    if(debug == 1):
+        print("Main: min and max of X_train_centered: %f, %f \n" %(X_train.min(), X_train.max()))
+        print("Main: min and max of y_train: %f, %f \n" %(y_train.min(), y_train.max()))
     mean_vals = np.mean(X_train, axis=0) 
     std_val = np.std(X_train)
+    if(debug == 1):
+        print("std val is: ", std_val)
     X_train_centered = (X_train - mean_vals)/std_val
-    X_valid_centered = X_valid - mean_vals
+    X_valid_centered = (X_valid - mean_vals)/std_val
     del X_train, X_valid
+    mean_vals = np.mean(y_train, axis=0) 
+    std_val = np.std(y_train)
+    y_train_centered = (y_train - mean_vals)/std_val
+    y_valid_centered = (y_valid - mean_vals)/std_val
+    del y_train, y_valid
     
     if(args['type'] == "train"):    
-        cnn = ConvNN(batchsize=8, random_seed=123, imgsize=_imgsize)
-        cnn.train(training_set=(X_train_centered, y_train), 
-                  validation_set=(X_valid_centered, y_valid))
-        cnn.save(epoch=20)
+        snn = SimpleNN(batchsize=_batchsize, epochs=_epochs, random_seed=123, imgsize=_imgsize)
+        if(debug == 1):
+            print("Main: min and max of X_train_centered: %f, %f \n" %(X_train_centered.min(), X_train_centered.max()))
+            print("Main: min and max of y_train: %f, %f \n" %(y_train.min(), y_train.max()))
+        snn.train(training_set=(X_train_centered, y_train_centered), 
+                  validation_set=(X_valid_centered, y_valid_centered))
+        snn.save(epoch=_epochs)
     elif(args['type'] == "model_apply"):
-        cnn = ConvNN(random_seed=123,imgsize=_imgsize)
-        cnn.load(epoch=20)
-        X_data_file_name = [i.replace(_input_tag, "_dl_simu.pgm") for i in X_train_file_name]
-        cnn.model_apply(X_train_centered, X_data_file_name)
-
+        snn = SimpleNN(batchsize=_batchsize, epochs=_epochs, random_seed=123, imgsize=_imgsize)
+        snn.load(epoch=_epochs)
+        X_train_file_name = [i.replace(_input_tag, "_dl_simu.pgm") for i in X_train_file_name]
+        X_valid_file_name = [i.replace(_input_tag, "_dl_simu.pgm") for i in X_valid_file_name]
+        snn.model_apply(X_train_centered, X_train_file_name)
+        snn.model_apply(X_valid_centered, X_valid_file_name)
+    elif(args['type'] == "freeze"):
+        snn = SimpleNN(random_seed=123,imgsize=_imgsize)
+        snn.freeze(epoch=_epochs, model_name="dlsem")
+        

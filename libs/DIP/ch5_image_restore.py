@@ -56,12 +56,20 @@ def try_noise():
 
     shape = (300, 300)
     GaussianNoise = np.random.normal(0.5, 0.2, shape ) # u, sigma
+
+    #  NLM Gaussian noise
+    std = 43.13
+    a = np.random.random(shape)
+    b = np.random.random(shape)
+    z = std * np.sqrt(-2.0*np.log(a)) * np.cos(2.0*np.pi*b)
+    z = normalize(z, 255, np.uint8)
+
     RayleighNoise = np.random.rayleigh(0.2, shape ) # sigma, a=0 here
     GammaNoise = np.random.gamma(5, 0.2, shape ) # b, sigma = 1/a
-    noise1 = [GaussianNoise, RayleighNoise, GammaNoise]
+    noise1 = [GaussianNoise, z, RayleighNoise, GammaNoise]
     hist1 = list(map(histfunc, noise1))
-    imshowMultiple_TitleMatrix(noise1+hist1, 2, 3,
-        ['noise', 'histogram'], ['Gaussian', 'Rayleigh', 'Gamma'],
+    imshowMultiple_TitleMatrix(noise1+hist1, 2, 4,
+        ['noise', 'histogram'], ['Gaussian', 'NLM noise', 'Rayleigh', 'Gamma'],
         cbar=False)
 
     ExpNoise = np.random.exponential(0.2, shape ) # sigma = 1/a
@@ -73,6 +81,7 @@ def try_noise():
     pdf[127] = 0.8
     random_variable = rv_discrete(values=(np.arange(256), pdf))
     ImpulseNoise = random_variable.rvs(size=shape)
+
     noise2 = [ExpNoise, UniformNoise, ImpulseNoise]
     hist2 = list(map(histfunc, noise2))
     imshowMultiple_TitleMatrix(noise2+hist2, 2, 3,
@@ -119,8 +128,8 @@ def try_pepper_salt2():
 def try_polyroi_noise_hist(interative=True):
     KEY_ESC = 27
 
-    IMFILE = os.path.join(WORKDIR, r'vs_calaveras_v3_LDose_p3544.bmp')
-    # IMFILE = os.path.join(WORKDIR, r'1521_image.pgm')
+    # IMFILE = os.path.join(WORKDIR, r'vs_calaveras_v3_LDose_p3544.bmp')
+    IMFILE = os.path.join(WORKDIR, r'Calaveras_v3_p3613_regular.bmp')
     im = cv2.imread(IMFILE, 0)
 
     if IMFILE[-3:] == 'pgm':
@@ -135,8 +144,9 @@ def try_polyroi_noise_hist(interative=True):
         roi = pd.getROI()
     else:
         # pair = [(471, 207), (555, 809)] # 1521 bk rect
+        pair = [(498, 168), (600, 971)] # 1521 reguar bk rect
         # pair = [(143, 140), (436, 548)] # common feature rect
-        pair = [(140, 599), (878, 662)] # 3613 bk rect
+        # pair = [(140, 599), (878, 662)] # 3613 bk rect
         tl, br = pair
         roi = getROIByPointPairs(im, [pair], cv2.rectangle)
         tmp = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR) if np.ndim(im) == 2 else im
@@ -149,8 +159,8 @@ def try_polyroi_noise_hist(interative=True):
     # print(roihist1[80:120:10])
     # print(roihist[80:120:10])
     # np.testing.assert_equal(roihist1, roihist)
-    # mu, std = norm.fit(roi)
-    mu, std, _ = statHist(roihist, trimmedNum=2)
+    mu, std = norm.fit(roi)
+    # mu, std, _ = statHist(roihist, trimmedNum=2)
     fig = plt.figure()
     ax = fig.add_subplot(111)
     xends = np.linspace(1, 256, 256)
@@ -559,14 +569,13 @@ def main():
 
     # try_noise()
 
-
     # try_pepper_salt()
     # try_pepper_salt2()
 
     # try_adpMean()
     # try_adpMedian()
 
-    # try_polyroi_noise_hist(interative=True)
+    try_polyroi_noise_hist(interative=True)
     # try_denoise_ldose_various_methods(wihist=True)
     # try_denoise_ldose_deepen_one_method(mode='NLM', save=False)
 
@@ -576,7 +585,7 @@ def main():
     # try_notch(False)
     # try_LPF(save=False)
     # try_LPF_fit_bk_noise()
-    try_LPF_dramatic_cutoff()
+    # try_LPF_dramatic_cutoff()
     # try_histeq_localhisteq()
 
 if __name__ == '__main__':

@@ -14,14 +14,24 @@ import re
 from collections import OrderedDict
 import numpy as np
 import glob
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+import pandas as pd
 import logger
 log = logger.setup("MXPJob", "debug")
 
 MXP_XML_TAGS = ["inxml", "outxml"]
 MXP_RESULT_OPTIONS = ["occfs", "osumccfs", "osumkpis"]
 PATTERN_DEFAULT_ATTR =\
-'''name cost_wt    usage   srcfile    tgtfile  pixel   offset_x    offset_y
-1   1 CAL   1_se.bmp    1_image.bmp    1   0   0'''
+'''name costwt    usage   srcfile    tgtfile  imgpixel   offset_x    offset_y
+1   1 training   1_se.bmp    1_image.bmp    1   0   0'''
+STAGE_REGISTER_TABLE = {
+    'init': 'InitStage',
+    'DLSEMCalibration': 'CSemCalStage',
+    'DLSEMCheck': 'CSemChkStage'
+}
 
 def parseText(text_):
     """
@@ -221,7 +231,7 @@ class MXPJob(Job):
         except:
             pass
         return range_
-    
+
     def getStageConfig(self, stage):
         if not isinstance(stage, tuple) and len(stage) !=2:
             raise ValueError("Wrong input: %s, please input MXP stage name together with enable number, e.g., (Average, 300)\n" % str(stage_))
@@ -234,7 +244,7 @@ class MXPJob(Job):
                 enable = getElemText(item.find(".enable"))
             except:
                 pass
-            if stagename == stagename_ and enable==enable_
+            if stagename == stagename_ and enable==enable_:
                 found = True
                 return item
         if not found:
@@ -256,12 +266,14 @@ class MXPJob(Job):
         self.mxpCfgMap = mxpCfgMap
         return mxpCfgMap
 
-    def getAllMxpStages(self, enabled_only=True):
+    def getAllMxpStages(self, enabled=True):
         """
         Returns
         -------
         stages : sorted list by enable number
             items like [(stagename, enable), ...], ascending order
+        enabled : bool
+            if True, just get the enabled stages; if False, get all
 
         Example
         -------
@@ -270,14 +282,14 @@ class MXPJob(Job):
         """
         range_ = self.getEnableRange()
         if set(range_) == set([-1, -1]):
-            enabled_only = False
+            enabled = False
         inRange = lambda x: True if x >= range_[0] and x <= range_[1] else False
         stages = []
         for key, stagectx in self.mxpCfgMap.items():
             stagename, enable_ = key
             if type(enable_) == str:
                 continue
-            if enabled_only and not inRange(enable_):
+            if enabled and not inRange(enable_):
                 continue
             stages.append((stagename, enable_))
 
@@ -342,7 +354,7 @@ class MXPJob(Job):
                     log.debug("stagename: %s" % stagename)
                     log.debug("enable: %d" % enable)
                     stage_ = (stagename, enable)
-            elif isinstance(stage_, tuple): 
+            elif isinstance(stage_, tuple):
                 pass
             else:
                 raise ValueError("Wrong input: %s, please input MXP stage name together with enable number, e.g., Average300\n" % str(stage_))
@@ -351,7 +363,10 @@ class MXPJob(Job):
             raise KeyError("Input stage %s not in: %s" % (stage_, str(stageIOFiles.keys())))
         if option not in MXP_XML_TAGS:
             raise KeyError("Input option %s not in: %s" % (option, str(MXP_XML_TAGS)))
-        return stageIOFiles[stage_][option]
+        xmlfile = stageIOFiles[stage_][option]
+        # xmlfile = self.dataAbsPath(xmlfile) if option == MXP_XML_TAGS[0] else self.resultAbsPath(xmlfile)
+        xmlfile = self.resultAbsPath(xmlfile) # init stage without inxml, other stages inxml and outxml are all in result folder
+        return xmlfile
 
     def getStageOut(self, stage):
         """Refer to MXPStageXml.getoccfs"""
@@ -391,12 +406,19 @@ class MXPJob(Job):
         allstages = self.getAllMxpStages()
         for stage in allstages:
             stagename, enablenum = stage
-            inxmlfile = self.getStageIOFile(stage, option="inxml")
+            log.info("Stage %s%d starts\n" % (stagename, enablenum))
+            df = None
+            if stagename != "init":
+                inxmlfile = self.getStageIOFile(stage, option="inxml")
+                stagexml = MXPStageXml(inxmlfile)
+                df = stagexml.geticcfs()
             cfg = self.getStageConfig(stage)
-            MXPStageXml stagexml(inxmlfile)
-            df = stagexml.geticcfs()
-            curstage = eval(stagename)(cfg, df)
+            stagepath = self.resultAbsPath(''.join(stage)+'result')
+            curstage = eval(STAGE_REGISTER_TABLE[stagename])(cfg, df, stagepath)
             curstage.run()
+            outxmlfile = self.getStageIOFile(stage, option="outxml")
+            curstage.save(outxmlfile)
+            log.info("Stage %s%d successfully finished\n" % (stagename, enablenum))
 
 class MXPStageXml(object):
     """docstring for MXPStageXml"""
@@ -463,9 +485,19 @@ class MXPStageXml(object):
 
 class MxpStage(object):
     """docstring for MxpStage"""
-    def __init__(self, cf, df):
+    def __init__(self, cf, df, stagepath):
         self.d_cf = cf
         self.d_df = df
+        if not os.path.exists(stagepath):
+            os.mkdir(stagepath)
+        self.d_path = stagepath
+
+    def save(self, path):
+        ss = dfToXmlStream(self.d_df)
+        log.debug("Result save path: %s\n" % (path))
+        with open(path, 'w') as fout:
+            fout.write(ss)
+        log.info("Result saved at %s\n" % (path))
 
 class InitStage(MxpStage):
     def run(self):
@@ -473,31 +505,95 @@ class InitStage(MxpStage):
         folderflt = getConfigData(self.d_cf, ".filter/folder", "*")
         srcfileflt = getConfigData(self.d_cf, ".filter/srcfile", "*")
         tgtfileflt = getConfigData(self.d_cf, ".filter/tgtfile", "*")
-        cal_ver_ratio = getConfigData(self.d_cf, ".cal_ver_ratio", 3)
-        cal_ver_ratio = cal_ver_ratio/(cal_ver_ratio+1)
+        doshuffle = getConfigData(self.d_cf, ".shuffle", 0)
+        divide_rule = getConfigData(self.d_cf, ".divide_rule", "70:20:10")
+        divide_rule = list(map(int, divide_rule.split(":")))
+        if sum(divide_rule) != 100:
+            log.warn("Warning, sum of training set, validation set and test set should be 100, input is %s, use [70, 20, 10] instead." % ':'.join(divide_rule))
+
         if not os.path.exists(dataDir):
-            raise IOError("%s data_dir not exists at: {}\n".format(__function__, dataDir))
+            raise IOError("data_dir not exists at: {}\n".format(dataDir))
         log.info('Going to glob dataset\n')
         log.info('Now going to read path for both input and target images\n')
         srcpathex = os.path.join(dataDir, folderflt, srcfileflt)
-        dstpathex = os.path.join(dataDir, folderflt, tgtfileflt)
+        tgtpathex = os.path.join(dataDir, folderflt, tgtfileflt)
         srcfiles = glob.glob(srcpathex)
-        dstfiles = glob.glob(dstpathex)
-        basename = list(map(os.path.dirname, srcfiles))
-        if len(srcfiles) != len(dstfiles):
-            raise ValueError("%s, number of source files is not equal with target files', %d != %d\n", len(srcfiles), len(dstfiles))
-
+        tgtfiles = glob.glob(tgtpathex)
+        if len(srcfiles) != len(tgtfiles):
+            raise ValueError("%s, number of source files is not equal with target files', %d != %d\n", len(srcfiles), len(tgtfiles))
+        nsamples = len(srcfiles)
+        basename = list(map(os.path.basename, (map(os.path.dirname, srcfiles))))
         DATA = StringIO(PATTERN_DEFAULT_ATTR)
         defaultdf = pd.read_csv(DATA, sep="\s+")
         colnames = defaultdf.columns
         defaultrow = defaultdf.as_matrix()
-        dataset = np.tile(defaultrow, (len(srcfiles), 1))
-        df = pd.Dataframe(dataset, columns=colnames)
-        df.ix[:, ['name', 'srcfile', 'dstfile']] = [basename, srcfiles, dstfiles]
-        tmp = np.random.random(len(srcfiles))
-        tmp = ['CAL' if x < cal_ver_ratio else 'VER' for x in tmp]
-        df.ix[:, 'usage'] = tmp
+        dataset = np.tile(defaultrow, (nsamples, 1))
+        df = pd.DataFrame(dataset, columns=colnames)
+        df = df.assign(name=basename, srcfile=srcfiles, tgtfile=tgtfiles)
+        self.d_df = df
 
+        if doshuffle > 0:
+            self.d_df = self.d_df.sample(frac=1).reset_index(drop=True) # shuffle
+
+        divides = [min(1, int(d/100.*nsamples)) for d in divide_rule]
+        divides[-1] = nsamples - sum(divides[:-1])
+        assert(all(divides>=0))
+        divides = np.cumsum(divides)
+        def usagefunc(x):
+            usage = 'training'
+            if x.index > divides[0] and x.index < divides[1]:
+                usage = 'validation'
+            elif x.index > divides[1] and x.index < divides[2]:
+                usage = 'test'
+            return usage
+        self.d_df[:, 'usage'] = self.d_df['usage'].apply(usagefunc(x), axis=1)
+
+class CSemCalStage(MxpStage):
+    def loadDataSet(self):
+        from dataset import DataSet, load_image
+
+        nsamples = len(self.d_df)
+        imgsize = getConfigData(self.d_cf, ".imgsize", 256)
+        normalize_X = getConfigData(self.d_cf, ".normalize_X", 1)
+        input_images_file_name = self.d_df.ix[:, 'srcfile'].tolist()
+        target_images_file_name = self.d_df.ix[:, 'tgtfile'].tolist()
+        input_images = np.array([load_image(path, imgsize) for path in input_images_file_name])
+        target_images = np.array([load_image(path, imgsize) for path in target_images_file_name])
+        if normalize_X > 0:
+            means = [np.mean(input_images[i], dtype=np.float64) for i in range(nsamples)]
+            stds = [np.std(input_images[i], dtype=np.float64) for i in range(nsamples)]
+            input_images = np.array([(input_images[i] - means[i])/stds[i] if stds[i]!=0 else np.zeros_like(input_images[i])  for i in range(nsamples)])
+
+        train_indice = (self.d_df.usage=='training').nonzero()[0]
+        train_input_images = input_images[train_indice)
+        train_target_images = target_images[train_indice]
+        train_input_images_file_name = input_images_file_name[train_indice]
+        train_target_images_file_name = target_images_file_name[train_indice]
+
+        validation_indice = (self.d_df.usage=='validation').nonzero()[0]
+        validation_input_images = input_images[validation_indice)
+        validation_target_images = target_images[validation_indice)
+        validation_input_images_file_name = input_images_file_name[validation_indice]
+        validation_target_images_file_name = target_images_file_name[validation_indice]
+
+        self.train = DataSet(train_input_images, train_target_images, train_input_images_file_name, train_target_images_file_name)
+        self.valid = DataSet(validation_input_images, validation_target_images, validation_input_images_file_name, validation_target_images_file_name)
+
+        log.info("Complete reading input data")
+        log.info("Number of files in Training-set:\t\t{}".format(len(train_indice)))
+        log.info("Number of files in Validation-set:\t{}".format(len(validation_indice))
+
+    def run(self):
+        from convNN import ConvNN
+        self.loadDataSet()
+        X_train, y_train = self.train.input_images, self.train.target_images
+        X_valid, y_valid = self.valid.input_images, self.valid.target_images
+        log.info('Training:\t{}\t{}'.format(str(X_train.shape), str(y_train.shape)))
+        log.info('Validation:\t{}\t{}'.format(str(X_valid.shape), str(y_valid.shape)))
+        cnn = ConvNN(batchsize=8, random_seed=123, imgsize=_imgsize)
+        cnn.train(training_set=(X_train, y_train),
+                  validation_set=(X_valid, y_valid))
+        cnn.save(epoch=20)
 
 if __name__ == '__main__':
     nodestr = """<pattern>

@@ -13,21 +13,23 @@ import pandas as pd
 import logger
 from StrUtil import parseText
 
-logger.initlogging(debug=False)
-log = logger.getLogger("XmlUtil")
+log = logger.setup("XmlUtil")
 
 def addChildNode(node, key='', val=''):
     """
     Add key-value type child node in Brion job xml way
 
-    Args:
+    Parameters
+    ----------
         node: parent xml node to put the child
 
-    kwargs:
+    Returns
+    -------
         key: key    -> 'name' tag
         val: value  -> 'value' tag
 
-    Example:
+    Example
+    -------
         >>> addChildNode(node, "jobtype", "mxp")
         <item>
           <name>jobtype</name>
@@ -62,10 +64,11 @@ def getElemText(elem_, trim=False, precision=3):
     """
     Parse text of xml Elem
 
-    Args:
-        elem_:  xml Elem object,
-                if elem_ node has children, raise ValueError;
-                else return parsed text
+    Parameters
+    ----------
+    elem_:  xml Elem object,
+        if elem_ node has children, raise ValueError;
+        else return parsed text
     """
     text_ = elem_.text
     if text_ is None:
@@ -77,13 +80,15 @@ def getConfigMap(elem, trim=False, precision=3):
     """
     Parse the tag & text of all depth=1 children node into a map.
 
-    Example:
-        <pattern>
-            <kpi>0.741096070383657</kpi>
-            <name>13</name>
-        </pattern>
-        >>> getConfigMap(elem)
-        {'kpi': 0.741, 'name': 13}
+    Example
+    -------
+    >>> elem
+    <pattern>
+        <kpi>0.741096070383657</kpi>
+        <name>13</name>
+    </pattern>
+    >>> getConfigMap(elem)
+    {'kpi': 0.741, 'name': 13}
     """
     rst = {}
     for item in list(elem):

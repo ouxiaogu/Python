@@ -31,10 +31,11 @@ def buildKW(dict_, outtersep=',', innersep='='):
 
 def parseText(text_, trim=False, precision=3):
     """
-    Return:
-        text_:  the conversion relationship
-                string  =>  string
-                numeric =>  int or float, decided by whether text_ contains '.'
+    Returns
+    -------
+    text_:  the conversion relationship
+        string  =>  string
+        numeric =>  int or float, decided by whether text_ contains '.'
     """
     if text_ is None:
         return ""

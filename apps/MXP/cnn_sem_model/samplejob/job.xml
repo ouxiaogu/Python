@@ -2,16 +2,16 @@
   <MXP>
     <global>
       <options>
-        <enable>1-2000</enable>
+        <enable>1-1800</enable>
       </options>
   </global>
     <init>
-      <data_dir></data_dir>
-      <cal_ver_ratio>3</cal_ver_ratio>
+      <data_dir>C:\Localdata\D\Note\Python\apps\MXP\cnn_sem_model\dataset</data_dir>
+      <divide_rule>60:20:20</divide_rule>
       <filter>
-        <folder></folder>
-        <srcfile>*.bmp</file>
-        <tgtfile>*.bmp</file>
+        <folder>*</folder>
+        <srcfile>*_simulatedSEMImage.pgm</srcfile>
+        <tgtfile>*_image.pgm</tgtfile>
       </filter>
       <outxml>mxp_input.xml</outxml>
       <enable>1800</enable>
