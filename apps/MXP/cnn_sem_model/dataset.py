@@ -12,14 +12,14 @@ debug = 1
 
 def load_train(train_path, imgsize, number, input_tag, target_tag):
     '''
-    # @brief load training image folder into array of np.arrays 
-    # @param train_path: the training images folder 
+    # @brief load training image folder into array of np.arrays
+    # @param train_path: the training images folder
     # @param imgsize: the imgsize of each images read into array of np.array. Image must be larger than this size
-    # @param input_tag: regex keyword for input image file name: image full name will be "<patternid><input_tag>". Default is "_optical_image.pgm" 
+    # @param input_tag: regex keyword for input image file name: image full name will be "<patternid><input_tag>". Default is "_optical_image.pgm"
     # @param target_tag: regex keyword for output image file name. default is "sem_image.pgm"
     # @param number: the total number of patterns loaded into result. default value -1 mean load all patterns
     #
-    # @return: input_images (array of np.array), target_images, input_images_file_name, target_images_file_name 
+    # @return: input_images (array of np.array), target_images, input_images_file_name, target_images_file_name
     '''
     assert(imgsize > 0), "imgsize of load_train function is <= 0!"
     input_images = []
@@ -45,8 +45,8 @@ def load_train(train_path, imgsize, number, input_tag, target_tag):
         input_images.append(image)
         flbase = os.path.basename(fl)
         input_images_file_name.append(flbase)
-        #read target images        
-        fl_target = fl.replace(input_tag, target_tag)       
+        #read target images
+        fl_target = fl.replace(input_tag, target_tag)
         if(debug == 1):
             print("read target image %s\n" % fl_target)
         t_image = cv2.imread(fl_target, -1)
@@ -71,24 +71,31 @@ def load_train(train_path, imgsize, number, input_tag, target_tag):
 def load_image(filepath, imgsize = 512):
     '''
     load a single sem image into np.array
-    ''' 
+    '''
     image = cv2.imread(filepath, -1)
     image = cv2.resize(image, (imgsize, imgsize), 0,0, cv2.INTER_LINEAR)
     image = image.astype(np.float32)
     image = np.multiply(image, 1.0 / normal_factor)
-    np.reshape(image, (1, imgsize,imgsize))
+    image = np.reshape(image, (1, imgsize,imgsize))
     return image
 
 
 def batch_generator(X, y, batchsize=1,shuffle=False, random_seed=None):
-    idx = np.arange(y.shape[0])    
+    idx = np.arange(y.shape[0])
     if shuffle:
         rng = np.random.RandomState(random_seed)
         rng.shuffle(idx)
         X = X[idx]
-        y = y[idx]    
+        y = y[idx]
     for i in range(0, X.shape[0], batchsize):
         yield (X[i:i+batchsize, :], y[i:i+batchsize])
+
+def centered_norm(src):
+    '''normalize input ndarray data into [-1,1]'''
+    for i, arr in enumerate(src):
+        mean = np.mean(arr, dtype=np.float64)
+        std = np.std(arr, dtype=np.float64)
+        src[i] = src[i] - mean/std if std!=0 else np.zeros_like(arr)
 
 class DataSet(object):
 
@@ -148,7 +155,7 @@ def read_train_sets(train_path, imgsize, validation_size, number, input_tag, tar
   data_sets = DataSets()
 
   input_images, target_images, input_images_file_name, target_images_file_name = load_train(train_path, imgsize, number, input_tag, target_tag)
-  input_images, target_images, input_images_file_name, target_images_file_name = shuffle(input_images, target_images, input_images_file_name, target_images_file_name)  
+  input_images, target_images, input_images_file_name, target_images_file_name = shuffle(input_images, target_images, input_images_file_name, target_images_file_name)
 
   if isinstance(validation_size, float):
     validation_size = int(validation_size * input_images.shape[0])
