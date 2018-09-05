@@ -93,3 +93,185 @@ freeze_graph \
 ```
 source code of freeze_graph see here: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/tools/freeze_graph.py
 
+
+
+## cnn sem job
+
+### job xml template
+
+refer the lastest job xml teample at : `${branch10}/app/mxp/python/cnn_sem_model/samplejob/job.xml`
+
+```xml
+<root>
+  <MXP>
+    <global>
+      <options>
+        <enable>0-2100</enable>
+      </options>
+      <centered_normalize_X>1</centered_normalize_X>
+      <device>cpu</device>
+    </global>
+    <init>
+      <data_dir>/gpfs/DEV/FEM/SHARED/MXP_ModelDB/MXP_toolbox/cnn_sem_model/dataset3</data_dir>
+      <divide_rule>60:20:20</divide_rule>
+      <filter>
+        <folder>*</folder>
+        <srcfile>*_simulatedSEMImage.pgm</srcfile>
+        <tgtfile>*_image.pgm</tgtfile>
+      </filter>
+      <outxml>mxp_input.xml</outxml>
+      <enable>1800</enable>
+    </init>
+    <DLSEMCalibration>
+      <learning_rate>0.001</learning_rate>
+      <inxml>mxp_input.xml</inxml>
+      <outxml>dlsemcal2000out.xml</outxml>
+      <enable>2000</enable>
+    </DLSEMCalibration>
+    <DLSEMApply>
+      <inxml>dlsemcal2000out.xml</inxml>
+      <outxml>dlsemapply2100out.xml</outxml>
+      <enable>2100</enable>
+    </DLSEMApply>
+  </MXP>
+</root>
+```
+
+### global config
+
+```xml
+    <global>
+      <options>
+        <enable>0-2100</enable>
+      </options>
+      <centered_normalize_X>1</centered_normalize_X>
+      <device>cpu</device>
+    </global>
+```
+
+* **options**: substitution for tachyon job options
+    - **enable**: enable range, just like MXP job, you can use this to control which stages to run
+* **centered\_normalize_X**: two options
+    - `>0`: normalized the source images(X) into array within range of [-1, 1]; 
+    - else: raw images
+* **device**: 2 options
+    - 'cpu', set tensorflow data format into `channels_last`, i.e., dateset array shape as `NHWC`
+    - 'gpu', set tensorflow data format into `channels_first`, i.e., dateset array shape as `NCHW`
+
+
+### init stage
+
+**init** stage for data organization and usage assignment.
+
+```xml
+    <init>
+      <data_dir>/gpfs/DEV/FEM/SHARED/MXP_ModelDB/MXP_toolbox/cnn_sem_model/dataset3</data_dir>
+      <divide_rule>60:20:20</divide_rule>
+      <filter>
+        <folder>*</folder>
+        <srcfile>*_simulatedSEMImage.pgm</srcfile>
+        <tgtfile>*_image.pgm</tgtfile>
+      </filter>
+      <outxml>mxp_input.xml</outxml>
+      <enable>1800</enable>
+    </init>
+```
+
+* **data_dir**: the directory of image dateset, the data hierarchy same as MXP convention, see the example below
+    
+    ```shell
+    [peyang@fdev060501 cnn_sem_model]$ tree /gpfs/DEV/FEM/SHARED/MXP_ModelDB/MXP_toolbox/cnn_sem_model/dataset3
+    /gpfs/DEV/FEM/SHARED/MXP_ModelDB/MXP_toolbox/cnn_sem_model/dataset3
+    ├── 1
+    │   ├── 1_image.pgm
+    │   ├── 1_ResistProfileImage.pgm
+    │   ├── 1_seTermComponent.pgm
+    │   ├── 1_simulatedSEMImage.pgm
+    │   └── 1_upsample_ai.pgm
+    ...
+    └── 530
+        ├── 530_image.pgm
+        ├── 530_ResistProfileImage.pgm
+        ├── 530_seTermComponent.pgm
+        ├── 530_simulatedSEMImage.pgm
+        └── 530_upsample_ai.pgm
+    ```
+
+* **divide\_rule**: by the divide_rule, we divide the dataset patterns into 3 different usages: `training`, `validation`, `test`, dataset in `training` and `validation` will be used in `DLSEMCalibration` stage, dataset in `test` will be used in `DLSEMApply` stage. The 3 division numbers should add up to 100.sub[*]
+
+* **filter**: regex filters for folder and files
+    - **folder**: folder regex filter
+    - **srcfile**: source file regex filter
+    - **tgtfile**: target file regex filter
+
+* **outxml**: as MXP ouxml, but just use depth=1 xml for pattern, this design can greatly simplify our stage I/O code, i.e., the stage inxml and outxml parser become a general parsing process, not necessary to write extra stage specific code. An example as below:
+
+    ```xml
+    <root>
+        <result>
+            <pattern>
+                <name>1</name>
+                <costwt>1</costwt>
+                <usage>training</usage>
+                <srcfile>C:\Localdata\D\Note\Python\apps\MXP\cnn_sem_model\dataset\1\1_simulatedSEMImage.pgm</srcfile>
+                <tgtfile>C:\Localdata\D\Note\Python\apps\MXP\cnn_sem_model\dataset\1\1_image.pgm</tgtfile>
+                <imgpixel>1</imgpixel>
+                <offset_x>0</offset_x>
+                <offset_y>0</offset_y>
+            </pattern>
+            ...
+        </result>
+    </root>
+    ```
+    
+* **enable**: as MXP, enable number for current stage
+
+### DLSEMCalibration stage
+
+**DLSEMCalibration** stage for Deep Learning SEM model calibration
+
+```xml
+    <DLSEMCalibration>
+      <learning_rate>0.001</learning_rate>
+      <inxml>mxp_input.xml</inxml>
+      <outxml>dlsemcal2000out.xml</outxml>
+      <enable>2000</enable>
+    </DLSEMCalibration>
+```
+
+There are no special parameters in config currently, please add the parameters on the demand.
+
+
+### DLSEMApply stage
+
+**DLSEMApply** stage for Deep Learning SEM model apply
+
+```xml
+    <DLSEMApply>
+      <inxml>dlsemcal2000out.xml</inxml>
+      <outxml>dlsemapply2100out.xml</outxml>
+      <enable>2100</enable>
+    </DLSEMApply>
+```
+
+One requirement for inxml in current design, the DL model path should be in its inxml: `root/MXP/result/model`.
+
+### example job results
+
+Run job by command `$ python CnnSemJob.py`
+
+Job results are as below:
+
+```shell
+├─data
+└─result
+    ├─DLSEMApply2100
+    ├─DLSEMCalibration2000
+    │  ├─logs
+    │  └─tflayers-model
+    └─init1800
+
+-a---          9/4/2018   6:24 PM        956 dlsemapply2100out.xml             
+-a---          9/4/2018   6:24 PM       1001 dlsemcal2000out.xml               
+-a---          9/4/2018   6:23 PM        810 mxp_input.xml                     
+```
