@@ -7,7 +7,7 @@ import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
 from FrequencyFlt import *
 
-class TestFilters(unittest.TestCase):
+class TestFreqFilters(unittest.TestCase):
     def setUp(self):
         self.shape = (5, 5)
         self.D0 = 2

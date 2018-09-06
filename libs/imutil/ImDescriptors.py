@@ -12,14 +12,17 @@ import cv2
 import pandas as pd
 from collections import OrderedDict
 
+# mutual import error if add gradient into ImageDescriptors
+# from SpatialFlt import SobelFilter
+
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
-import logger
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
-from filters import cv_gaussian_kernel, applySepFilter
-log = logger.setup(level='info')
+from filters import cv_gaussian_kernel, applySepFilter, fftconvolve
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
 from PlotConfig import getRGBColor
+import logger
+log = logger.setup(level='info')
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
             'calcHistSeries', 'calcHist', 'cdfHisto',

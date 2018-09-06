@@ -18,7 +18,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../../common")
 import logger
 log = logger.setup(level='debug')
 
-class TestImTransform(unittest.TestCase):
+class TestImGUI(unittest.TestCase):
     def test_getPolyROI(self):
         row = np.arange(7)
         im = np.tile(row, (7,1))

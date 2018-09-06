@@ -10,13 +10,12 @@ Last Modified by: ouxiaogu
 import numpy as np
 import cv2
 
-import sys
-import os
-
 from ImTransform import imSub
 from ImDescriptors import getImageInfo
 from FrequencyFlt import distance_map
 
+import sys
+import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding, sync_dtype
 
@@ -69,7 +68,6 @@ def LaplaceFilter(shape):
     '''
     Δf = ∇^2f = f''x + f''y
     f''x = [f(x+1) - f(x)] - [f(x) - f(x-1)]
-    if with Gaussian, it's so-called Laplacian of Gaussian (LoG):
 
         L = f(x, y)*g(x, y)   ΔL = Lxx + Lyy
     '''
@@ -147,24 +145,25 @@ def SobelFilter(shape=None, axis=0, Prewitt=False, dtype=np.float64, normalize=F
     ----------
     axis : 0 or 1
         The axis of x or y
-        - `0`: x, column, Sobel-x
-         -1  0  1  =   [-1.  0.  1.] X  [1]
-         -2  0  2                       [2]
-         -1  0  1                       [1]
-        because of convolve flipud filter, so what we input is [1.  0.  -1.]
-        - `1`: y, row
+        - `0`: y, row, Sobel-y
         [[-1. -2. -1.]
          [ 0.  0.  0.]
          [ 1.  2.  1.]]
-        because of convolve flipud filter, so what we input is [1.  0.  -1.]
+        
+        if to apply convolve, will flipud filter, input need to be [1.  0.  -1.]
+        if to apply correlate, won't flipud filter, just need input [-1.  0.  1.]
 
+        - `1`: x, col, Sobel-x
+        -1  0  1  =   [-1.  0.  1.] X  [1]
+        -2  0  2                       [2]
+        -1  0  1                       [1]
     '''
     N, M, cy, cx = fltGenPreProc(shape)
     if axis == 'x':
-        axis = 0
-    elif axis == 'y':
         axis = 1
-    if axis == 0:
+    elif axis == 'y':
+        axis = 0
+    if axis == 1:
         sobel_flt = np.ones(M)
         sobel_flt[cx:] = -1
         sobel_flt[cx] = 0
