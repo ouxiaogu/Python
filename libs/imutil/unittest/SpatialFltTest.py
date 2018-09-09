@@ -74,7 +74,11 @@ class TestSpFilters(unittest.TestCase):
         log.debug("sobel fftconvolve &cv:\n {}\n {}".format(np.percentile(imdX, np.linspace(0, 100, 6)), np.percentile(imdX_cv, np.linspace(0, 100, 6))))
         np.testing.assert_almost_equal(bas[1:-1, 1:-1], imdX_cv[1:-1, 1:-1], decimal=5) #difference come from padding
         np.testing.assert_almost_equal(np.percentile(imdX, np.linspace(0, 100, 6)), np.percentile(imdX_cv, np.linspace(0, 100, 6)))
-        
+
+        flt_sY = SobelFilter(fltShape, axis=0)
+        bas = fftconvolve(im, flt_sY)
+        imdY_cv = cv2.Sobel(im, cv2.CV_32F, 0, 1, scale=0.25)
+        np.testing.assert_almost_equal(bas[1:-1, 1:-1], imdY_cv[1:-1, 1:-1], decimal=5) #difference come from padding
 
 
     def test_ContraHarmonicMean(self):

@@ -13,6 +13,9 @@ import numpy as np
 # from SpatialFlt import SobelFilter
 from SpatialFlt import SobelFilter
 
+__all__ = ['gradient', 'gradientXY',
+    ]
+
 import sys
 import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
@@ -29,11 +32,21 @@ def gradient(src, tan2=True):
     (G, theta): tuple
         magnitude and angle of gradient
     """
+    Gx, Gy = gradientXY(src)
+    G = np.sqrt(Gx**2+Gy**2)
     tanfuc = np.arctan2 if tan2 else np.arctan
+    theta = tanfuc(Gy, Gx) * 180 / np.pi
+    return (G, theta)
+
+def gradientXY(src):
+    """
+    Returns
+    -------
+    (Gx, Gy): tuple
+        gradient X&Y
+    """
     SobelX = SobelFilter(axis='x')
     SobelY = SobelFilter(axis='y')
     Gx = fftconvolve(src, SobelX)
     Gy = fftconvolve(src, SobelY)
-    G = np.sqrt(Gx**2, Gy**2)
-    theta = tanfuc(Gy, Gx) * 180 / np.pi
-    return (G, theta)
+    return (Gx, Gy)
