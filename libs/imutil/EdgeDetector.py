@@ -29,12 +29,12 @@ def nonmaxSuppress(G, theta):
     '''
     1. classify the theta into H, 45, V, 135 4 directions
     2. G(p)=0 if G(p-1)>G(p), or G(p+1)>G(p)
-    
+
     Parameters
     ----------
     G, theta : ndarray-like image, ndarray-like image
         gradient magnitude & angle
-    
+
     Returns
     -------
     gN: ndarray-like image
@@ -97,7 +97,6 @@ class EdgeDetector(object):
         self.ksize = ksize
         self.thresL = thresL
         self.thresH = thresH
-        
 
     def run(self):
         # smooth
@@ -116,9 +115,14 @@ class EdgeDetector(object):
         self.theta = theta
 
         # double thresholding, tracing contour
+
         gcontour, contour = self.doubleThres()
         self.gcontour = gcontour
         self.contour = contour
+        '''
+        gcontour = self.doubleThres()
+        self.gcontour = gcontour
+        '''
 
     def doubleThres(self):
         minv = np.min(self.gN)
@@ -126,9 +130,10 @@ class EdgeDetector(object):
         gNH = self.gN > self.thresH*(maxv-minv) + minv
         gNL = self.gN > self.thresL*(maxv-minv) + minv
         gNL = ~gNH&gNL
-        print(gNH.shape)
+        self.gNH = gNH
+        self.gNL = gNL
         return self.traceContour(gNH, gNL)
-        
+        # return self.traceContour2(gNH, gNL)
 
     def traceContour(self, gNH, gNL):
         '''
@@ -136,37 +141,65 @@ class EdgeDetector(object):
         x, y, seed, intensity, gradient mag, gradient angle
 
         '''
-        visited = np.zeros(gNH.shape)
-        gcontour = np.zeros_like(gNH)
+        self.attrs = ["x", "y", "seed", "intensity", "slope", "angle"]
+
+        visited = np.zeros(gNH.shape, bool)
 
         contour = []
         N, M = gNH.shape
         dirs = [(1,0), (1,1), (0,1), (-1,1), (-1, 0), (-1, -1), (0, -1)]
-        bbox = ContourBBox(1, 1, M-1, N-1)
+        bbox = ContourBBox(1, 1, N-1, M-1)
         for j in range(1,N-1):
             for i in range(1,M-1):
                 if visited[j, i] or gNH[j, i]<=0:
                     continue
-                seg = [(i, j, 1, self.im[j, i], self.gN[j, i], self.theta[j, i])]
-                gcontour[j, i] = gNH[j, i]
+                seg = [(j, i, 1, self.im[j, i], self.gN[j, i], self.theta[j, i])]
+                visited[j, i] = True
                 n, m = j, i
                 connected = True
                 while connected:
                     connected = False
                     for dx, dy in dirs:
-                        if bbox.contains([m+dx, n+dy]) and \
-                            connectedAdj(visited[n+dy, m+dx], gNL[n+dy, m+dx], gNH[n+dy, m+dx], bbox):
-                            n, m = n+dy, m+dx
-                            seg.append((m, n, 0, self.im[n, m], self.gN[n, m], self.theta[n, m]))
-                            gcontour[n, m] = gNH[n, m]
+                        if bbox.contains([n+dx, m+dy]) and \
+                            connectedAdj(visited[n+dx, m+dy], gNL[n+dx, m+dy], gNH[n+dx, m+dy], bbox):
+                            n, m = n+dx, m+dy
+                            seg.append((n, m, 0, self.im[n, m], self.gN[n, m], self.theta[n, m]))
                             visited[n, m] = True
                             connected = True
                             break
                 contour.append(seg)
-        return (gcontour, contour)
+        return (visited, contour)
+
+    def traceContour2(self, gNH, gNL):
+        self.gmax = gNH.astype(np.float16)*1 + gNL.astype(np.float16)*0.5
+        self.vis = np.zeros(self.im.shape, bool)
+        self.dx = [1, 0, -1,  0, -1, -1, 1,  1] # axis 0
+        self.dy = [0, 1,  0, -1,  1, -1, 1, -1] # axis 1
+        N, M = gNH.shape
+        for j in range(1,N-1):
+            for i in range(1,M-1):
+                if self.vis[j, i] or gNH[j, i]<=0:
+                    continue
+                self.dfs((j, i))
+        return self.vis
+
+    def dfs(self, origin):
+        q = [origin]
+        while len(q) > 0:
+            s = q.pop()
+            self.vis[s] = True
+            for k in range(len(self.dx)): # dirs
+                for c in range(1, 16): # depth
+                    nx, ny = s[0] + c * self.dx[k], s[1] + c * self.dy[k]
+                    if self.contains(nx, ny) and (self.gmax[nx, ny] >= 0.5) and (not self.vis[nx, ny]):
+                        q.append((nx, ny))
+
+    def contains(self, x, y): # x/y: axis 0/1
+        return x >= 0 and x < self.im.shape[0] and y >= 0 and y < self.im.shape[1]
+
 
 def connectedAdj(b_visited, v_gNL, v_gNH, bbox):
-    if not b_visited and (v_gNH != 0 or v_gNH != 0):
+    if not b_visited and (v_gNH > 0 or v_gNL > 0):
         return True
     else:
         return False
