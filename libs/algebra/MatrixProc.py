@@ -72,6 +72,14 @@ def test_decompose2DFilter():
 
     print(decompose2DFilter(np.matmul(LAPLACE_DIRECTIONAL.reshape((3,1) ),  LAPLACE_POSITION.reshape((1,3) ) ) ) )
 
+    G = np.array([[2, 4,  5,  4,  2],
+                   [4, 9,  12, 9,  4],
+                   [5, 12, 15, 12, 5],
+                   [4, 9,  12, 9,  4],
+                   [2, 4,  5,  4,  2]])
+    print(np.sum(G))
+    print(decompose2DFilter(G))
+
 def test_gcd():
     np.testing.assert_equal(10, gcd(60, 50))
     np.testing.assert_equal(1, gcd(1, 13))
@@ -84,11 +92,11 @@ def test_decompose2DIntegerFilter():
     print(decompose2DIntegerFilter(np.ones((3,3), dtype=np.int32) ) )
 
 def main():
-    # test_decompose2DFilter()
+    test_decompose2DFilter()
 
     # test_gcd()
 
-    test_decompose2DIntegerFilter()
+    # test_decompose2DIntegerFilter()
 
 if __name__ == '__main__':
     main()

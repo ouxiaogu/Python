@@ -16,11 +16,15 @@ Last Modified by: ouxiaogu
 import numpy as np
 
 from ImFeatures import gradient
+from ImDescriptors import getImageInfo
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, gaussian_filter, applySepFilter
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
+import logger
+log = logger.setup('EdgeDetector', 'debug')
 
 DELIMITERS = np.linspace(-22.5, 180-22.5, 5)
 g_epslmt = 1e-9
@@ -56,7 +60,7 @@ def nonmaxSuppress(G, theta):
                 val = [G[i-1, j+1], G[i, j], G[i+1, j-1]]
             else:
                 raise ValueError("angle type {} not in {}".format(angle_type, np.arange(len(DELIMITERS))))
-            if val[1] >= val[0] or val[1] >= val[-1]:
+            if val[1] >= val[0] and val[1] >= val[-1]:
                 gN[i, j] = G[i, j]
                 thetaType[i, j] = angle_type
     return gN, thetaType
@@ -107,10 +111,13 @@ class EdgeDetector(object):
 
         # gradient
         G, theta = gradient(gim)
+        log.debug("gradient magnitude info: {}".format(getImageInfo(G)))
+        log.debug("gradient theta info: {}".format(getImageInfo(theta)))
         self.G = G
 
         # nonmaxima suppression
         gN, thetaType = nonmaxSuppress(G, theta)
+        log.debug("gradient nonmaxima suppression: {}".format(getImageInfo(gN)))
         self.gN = gN
         self.theta = theta
 
@@ -127,8 +134,10 @@ class EdgeDetector(object):
     def doubleThres(self):
         minv = np.min(self.gN)
         maxv = np.max(self.gN)
-        gNH = self.gN > self.thresH*(maxv-minv) + minv
-        gNL = self.gN > self.thresL*(maxv-minv) + minv
+        # gNH = self.gN > self.thresH*(maxv-minv) + minv
+        # gNL = self.gN > self.thresL*(maxv-minv) + minv
+        gNH = self.gN > self.thresH*maxv
+        gNL = self.gN > self.thresL*maxv
         gNL = ~gNH&gNL
         self.gNH = gNH
         self.gNL = gNL

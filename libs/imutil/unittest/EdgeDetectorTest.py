@@ -20,20 +20,22 @@ from EdgeDetector import *
 from ImGUI import imshowMultiple
 from ImDescriptors import printImageInfo
 
-IMFILE = r'C:\Users\peyang\github\Canny-edge-detector-master\emilia.jpg'
-#IMFILE = r'C:\Users\ouxiaogu\Documents\github\Canny-edge-detector\emilia.jpg'
+# IMFILE = r'C:\Users\peyang\github\Canny-edge-detector-master\emilia.jpg'
+IMFILE = r'C:\Users\ouxiaogu\Documents\github\Canny-edge-detector\emilia.jpg'
 
 class TestFreqFilters(unittest.TestCase):
     def setUp(self):
         self.imfile = IMFILE
 
 def display(dump_contour=False):
-    im = cv2.imread(IMFILE, 0)
-    dt = EdgeDetector(im, 0.8, 5, 0.1, 0.3)
+    cim = cv2.imread(IMFILE, 1)
+    im = cv2.cvtColor(cim, cv2.COLOR_BGR2GRAY)
+    dt = EdgeDetector(im, 0.6, 5, 0.1, 0.35)
     dt.run()
     diff = dt.gNH ^ dt.gcontour
-    imshowMultiple( [dt.im, dt.gim, dt.G, dt.gN, dt.gNL, dt.gNH, dt.gcontour, diff],
+    imshowMultiple( [im, dt.gim, dt.G, dt.gN, dt.gNL, dt.gNH, dt.gcontour, diff],
                     ['original', 'Gaussian', 'Gradient', 'Gradient nms', 'Gradient NL', 'Gradient NH', 'contour', 'diff NH'] )
+    imshowMultiple([cim, dt.gcontour], ['original', 'contour'])
     if dump_contour:
         with open("./contour.txt", 'w+') as fout:
             header = dt.attrs
