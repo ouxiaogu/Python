@@ -94,18 +94,22 @@ class ContourBBox:
 
 class EdgeDetector(object):
     """docstring for EdgeDetector"""
-    def __init__(self, im, sigma=0.8, ksize=5, thresL=0.1, thresH=0.3):
+    def __init__(self, im, sigma=0.8, ksize=None, thresL=0.1, thresH=0.3, gapLimit=5, minSegLength=10):
         super(EdgeDetector, self).__init__()
         self.im = im
         self.sigma = sigma
         self.ksize = ksize
         self.thresL = thresL
         self.thresH = thresH
+        self.gapLimit = gapLimit
+        self.minSegLength = minSegLength
 
     def run(self):
         # smooth
-        # flt_G = gaussian_filter(self.sigma)
-        flt_G = cv_gaussian_kernel(self.ksize, self.sigma)
+        if self.ksize is None:
+            flt_G = gaussian_filter(self.sigma)
+        else:
+            flt_G = cv_gaussian_kernel(self.ksize, self.sigma)
         gim = applySepFilter(self.im, flt_G, flt_G)
         self.gim = gim
 
@@ -122,17 +126,13 @@ class EdgeDetector(object):
         self.theta = theta
 
         # double thresholding, tracing contour
-
-        gcontour, contour = self.doubleThres()
-        self.gcontour = gcontour
+        self.imcontour = np.zeros(self.im.shape, bool)
+        imcontour, contour = self.doubleThres()
+        self.imcontour = imcontour
         self.contour = contour
-        '''
-        gcontour = self.doubleThres()
-        self.gcontour = gcontour
-        '''
 
     def doubleThres(self):
-        minv = np.min(self.gN)
+        # minv = np.min(self.gN)
         maxv = np.max(self.gN)
         # gNH = self.gN > self.thresH*(maxv-minv) + minv
         # gNL = self.gN > self.thresL*(maxv-minv) + minv
@@ -141,8 +141,8 @@ class EdgeDetector(object):
         gNL = ~gNH&gNL
         self.gNH = gNH
         self.gNL = gNL
-        return self.traceContour(gNH, gNL)
-        # return self.traceContour2(gNH, gNL)
+        # return self.traceContour(gNH, gNL)
+        return self.traceContour2(gNH, gNL)
 
     def traceContour(self, gNH, gNL):
         '''
@@ -150,7 +150,7 @@ class EdgeDetector(object):
         x, y, seed, intensity, gradient mag, gradient angle
 
         '''
-        self.attrs = ["x", "y", "seed", "intensity", "slope", "angle"]
+        self.attrs = ["x", "y", "intensity", "slope", "angle"]
 
         visited = np.zeros(gNH.shape, bool)
 
@@ -162,7 +162,7 @@ class EdgeDetector(object):
             for i in range(1,M-1):
                 if visited[j, i] or gNH[j, i]<=0:
                     continue
-                seg = [(j, i, 1, self.im[j, i], self.gN[j, i], self.theta[j, i])]
+                seg = [(j, i, self.im[j, i], self.gN[j, i], self.theta[j, i])]
                 visited[j, i] = True
                 n, m = j, i
                 connected = True
@@ -172,7 +172,7 @@ class EdgeDetector(object):
                         if bbox.contains([n+dx, m+dy]) and \
                             connectedAdj(visited[n+dx, m+dy], gNL[n+dx, m+dy], gNH[n+dx, m+dy], bbox):
                             n, m = n+dx, m+dy
-                            seg.append((n, m, 0, self.im[n, m], self.gN[n, m], self.theta[n, m]))
+                            seg.append((n, m, self.im[n, m], self.gN[n, m], self.theta[n, m]))
                             visited[n, m] = True
                             connected = True
                             break
@@ -185,23 +185,34 @@ class EdgeDetector(object):
         self.dx = [1, 0, -1,  0, -1, -1, 1,  1] # axis 0
         self.dy = [0, 1,  0, -1,  1, -1, 1, -1] # axis 1
         N, M = gNH.shape
+        contour = []
         for j in range(1,N-1):
             for i in range(1,M-1):
                 if self.vis[j, i] or gNH[j, i]<=0:
                     continue
-                self.dfs((j, i))
-        return self.vis
+                seg = self.dfs((j, i))
+                if len(seg) > self.minSegLength:
+                    seg = [(n, m, self.im[n, m], self.gN[n, m], self.theta[n, m]) for n, m in seg]
+                    contour.append(seg)
+                else:
+                    for point in seg:
+                        self.imcontour[point] = False
+        return (self.imcontour, contour)
 
     def dfs(self, origin):
         q = [origin]
+        seg = [origin]
         while len(q) > 0:
             s = q.pop()
             self.vis[s] = True
+            self.imcontour[s] = True
             for k in range(len(self.dx)): # dirs
-                for c in range(1, 16): # depth
+                for c in range(1, self.gapLimit): # allowed max contour point gap
                     nx, ny = s[0] + c * self.dx[k], s[1] + c * self.dy[k]
                     if self.contains(nx, ny) and (self.gmax[nx, ny] >= 0.5) and (not self.vis[nx, ny]):
+                        seg.append((nx, ny))
                         q.append((nx, ny))
+        return seg
 
     def contains(self, x, y): # x/y: axis 0/1
         return x >= 0 and x < self.im.shape[0] and y >= 0 and y < self.im.shape[1]

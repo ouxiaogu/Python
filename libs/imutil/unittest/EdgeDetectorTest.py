@@ -20,8 +20,9 @@ from EdgeDetector import *
 from ImGUI import imshowMultiple
 from ImDescriptors import printImageInfo
 
+IMFILE = r'C:\Localdata\D\Note\Python\misc\SEM\samples\Calaveras_v3_p1521_regular.bmp'
 # IMFILE = r'C:\Users\peyang\github\Canny-edge-detector-master\emilia.jpg'
-IMFILE = r'C:\Users\ouxiaogu\Documents\github\Canny-edge-detector\emilia.jpg'
+# IMFILE = r'C:\Users\ouxiaogu\Documents\github\Canny-edge-detector\emilia.jpg'
 
 class TestFreqFilters(unittest.TestCase):
     def setUp(self):
@@ -30,12 +31,16 @@ class TestFreqFilters(unittest.TestCase):
 def display(dump_contour=False):
     cim = cv2.imread(IMFILE, 1)
     im = cv2.cvtColor(cim, cv2.COLOR_BGR2GRAY)
-    dt = EdgeDetector(im, 0.6, 5, 0.1, 0.35)
+    dt = EdgeDetector(im, sigma=2, ksize=None, thresL=0.2, thresH=0.6, gapLimit=2, minSegLength=10)
     dt.run()
-    diff = dt.gNH ^ dt.gcontour
-    imshowMultiple( [im, dt.gim, dt.G, dt.gN, dt.gNL, dt.gNH, dt.gcontour, diff],
+    diff = dt.gNH ^ dt.imcontour
+    imshowMultiple( [im, dt.gim, dt.G, dt.gN, dt.gNL, dt.gNH, dt.imcontour, diff],
                     ['original', 'Gaussian', 'Gradient', 'Gradient nms', 'Gradient NL', 'Gradient NH', 'contour', 'diff NH'] )
-    imshowMultiple([cim, dt.gcontour], ['original', 'contour'])
+    fig, ax = plt.subplots()
+    ax.imshow(dt.imcontour)
+    plt.title('contour')
+    plt.show()
+    
     if dump_contour:
         with open("./contour.txt", 'w+') as fout:
             header = dt.attrs

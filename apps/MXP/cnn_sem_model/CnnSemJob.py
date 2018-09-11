@@ -21,6 +21,7 @@ except ImportError:
 import pandas as pd
 from dataset import DataSet, load_image, centered_norm
 from convNN import ConvNN
+import argparse
 
 import logger
 log = logger.setup("MXPJob", "debug")
@@ -695,5 +696,15 @@ class CSemApplyStage(MxpStage):
         cnn.model_apply(test_X, y_pred_filenames, path=applypath)
 
 if __name__ == '__main__':
-    myjob = MXPJob(r'./samplejob')
+    parser = argparse.ArgumentParser(description='xml-driving CNN sem job')
+    parser.add_argument('jobpath', help='cnn sem job path')
+    args = parser.parse_args()
+    jobpath = args.jobpath
+    if jobpath is None:
+        parser.print_help()
+        parser.exit()
+        # jobpath = './samplejob'
+        # print('No jobpath is inputed, use sample job path: %s' % jobpath)
+    print(str(vars(args)))
+    myjob = MXPJob(jobpath)
     myjob.run()

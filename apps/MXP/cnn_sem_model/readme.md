@@ -8,7 +8,8 @@ The tensorflow model graph and variables will be saved at "tflayers-model" folde
 * copy the train.py, predict.py and dataset.py into working folder
 * make the training_data, testing_data folders are ready on working folder
 * traing_data has all optical and sem image with same size and location
-* test _data have same strcture
+* test_data have same strcture
+
 example see: /gpfs/DEV/FEM/SHARED/MXP_ModelDB/MXP_toolbox/cnn_sem_model
 
 ## Run training session
@@ -95,7 +96,7 @@ source code of freeze_graph see here: https://github.com/tensorflow/tensorflow/b
 
 
 
-## cnn sem job
+## xml-driving cnn sem job 
 
 ### job xml template
 
@@ -197,7 +198,7 @@ refer the lastest job xml teample at : `${branch10}/app/mxp/python/cnn_sem_model
         └── 530_upsample_ai.pgm
     ```
 
-* **divide\_rule**: by the divide_rule, we divide the dataset patterns into 3 different usages: `training`, `validation`, `test`, dataset in `training` and `validation` will be used in `DLSEMCalibration` stage, dataset in `test` will be used in `DLSEMApply` stage. The 3 division numbers should add up to 100.sub[*]
+* **divide\_rule**: by the divide_rule, we divide the dataset patterns into 3 different usages: `training`, `validation`, `test`, dataset in `training` and `validation` will be used in `DLSEMCalibration` stage, dataset in `test` will be used in `DLSEMApply` stage. The 3 division numbers should add up to 100[\*].
 
 * **filter**: regex filters for folder and files
     - **folder**: folder regex filter
@@ -256,11 +257,30 @@ There are no special parameters in config currently, please add the parameters o
 
 One requirement for inxml in current design, the DL model path should be in its inxml: `root/MXP/result/model`.
 
-### example job results
+### How to run xml-driving cnn sem job
 
-Run job by command `$ python CnnSemJob.py`
+* Run SEM job by the following command:
 
-Job results are as below:
+  ```shell
+  [peyang@fdev060501 cnn_sem_model]$ ./mxp_python CnnSemJob.py
+  usage: CnnSemJob.py [-h] jobpath
+  CnnSemJob.py: error: too few arguments
+
+  [peyang@fdev060501 cnn_sem_model]$ ./mxp_python CnnSemJob.py /gpfs/DEV/FEM/peyang/release/E9.0/cnn_sem_model/job1
+  {'jobpath': '/gpfs/DEV/FEM/peyang/release/E9.0/cnn_sem_model/job1'}
+  MXPJob   INFO    : Stage init1800 starts
+  ...
+  ```
+  
+* Need user to set: 
+  
+  1. prepare a job path, with **job.xml** under it
+  2. modify global enable range to control which stages to run
+  3. Specify `data_dir`, and `filter/srcfile` `filter/tgtfile` in job.xml init stage, for input/target image types
+
+### cnn sem job result folder
+
+Example job at: **/gpfs/DEV/FEM/peyang/release/E9.0/cnn_sem_model/job1**
 
 ```shell
 ├─data
