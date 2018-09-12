@@ -102,7 +102,7 @@ class FileScanner(object):
 
 if __name__ == '__main__':
     # '''test 1'''
-    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/1Data/LowDosage/Images/3583'
+    INDIR = '/gpfs/DEV/FEM/peyang/release/E9.0/temp/04_modelcheck_small_large_spec_0906_copy/h/data/dummydb/calibrate/job1/lua'
     INDIR = gpfs2WinPath(INDIR)
     print(INDIR)
 

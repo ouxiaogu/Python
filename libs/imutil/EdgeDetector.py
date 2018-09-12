@@ -11,7 +11,7 @@ classic canny edge detector
 3. nonmaxima suppression on gradient magnitude
 4. double thresholding and trace contour by connectivity analysis
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 import numpy as np
 
@@ -126,12 +126,12 @@ class EdgeDetector(object):
         self.theta = theta
 
         # double thresholding, tracing contour
-        self.imcontour = np.zeros(self.im.shape, bool)
-        imcontour, contour = self.doubleThres()
-        self.imcontour = imcontour
-        self.contour = contour
+        self.doubleThresTraceContour()
 
-    def doubleThres(self):
+    def doubleThresTraceContour(self):
+        self.attrs = ["x", "y", "intensity", "slope", "angle"]
+        self.imcontour = np.zeros(self.im.shape, bool)
+
         # minv = np.min(self.gN)
         maxv = np.max(self.gN)
         # gNH = self.gN > self.thresH*(maxv-minv) + minv
@@ -142,7 +142,9 @@ class EdgeDetector(object):
         self.gNH = gNH
         self.gNL = gNL
         # return self.traceContour(gNH, gNL)
-        return self.traceContour2(gNH, gNL)
+        imcontour, contour = self.traceContour2(gNH, gNL)
+        self.imcontour = imcontour
+        self.contour = contour
 
     def traceContour(self, gNH, gNL):
         '''
@@ -150,8 +152,6 @@ class EdgeDetector(object):
         x, y, seed, intensity, gradient mag, gradient angle
 
         '''
-        self.attrs = ["x", "y", "intensity", "slope", "angle"]
-
         visited = np.zeros(gNH.shape, bool)
 
         contour = []

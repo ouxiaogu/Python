@@ -1,10 +1,19 @@
 # -*- coding: utf-8 -*-
 """
+Created: ouxiaogu, 2018-09-12 18:28:33
+
+
+
+Last Modified by:  ouxiaogu
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created: ouxiaogu, 2018-09-09 20:52:17
 
 unit test/visualization for Edge Detection
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 
 import math
@@ -16,7 +25,7 @@ import cv2
 import sys
 import os.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
-from EdgeDetector import *
+from RidgeDetector import *
 from ImGUI import imshowMultiple
 from ImDescriptors import printImageInfo
 
@@ -24,33 +33,33 @@ IMFILE = r'C:\Localdata\D\Note\Python\misc\SEM\samples\Calaveras_v3_p1521_regula
 # IMFILE = r'C:\Users\peyang\github\Canny-edge-detector-master\emilia.jpg'
 # IMFILE = r'C:\Users\ouxiaogu\Documents\github\Canny-edge-detector\emilia.jpg'
 
-class TestED(unittest.TestCase):
+class TestRD(unittest.TestCase):
     def setUp(self):
         self.imfile = IMFILE
 
 def display(dump_contour=False):
     cim = cv2.imread(IMFILE, 1)
     im = cv2.cvtColor(cim, cv2.COLOR_BGR2GRAY)
-    rd = RidgeDetector(im, sigma=2, ksize=None, thresL=0.2, thresH=0.6, gapLimit=2, minSegLength=10)
-    rd.run()
-    diff = rd.gNH ^ rd.imcontour
-    imshowMultiple( [im, rd.Rg_Ig, rd.Rg_Mag, rd.gN, rd.gNL, rd.gNH, rd.imcontour, diff],
-                    ['original', 'Gaussian', 'Gradient', 'Gradient nms', 'Gradient NL', 'Gradient NH', 'contour', 'diff NH'] )
+    dt = RidgeDetector(im, sigma=2, thresL=0.2, thresH=0.6, gapLimit=2, minSegLength=10)
+    dt.run()
+    diff = dt.gNH ^ dt.imcontour
+    imshowMultiple( [im, dt.Ig, dt.Rg_Mag, dt.gN, dt.gNL, dt.gNH, dt.imcontour, diff],
+                    ['original', 'Gaussian', 'Ridge Mag', 'Ridge nms', 'Ridge NL', 'Ridge NH', 'contour', 'diff NH'] )
     fig, ax = plt.subplots()
-    ax.imshow(rd.imcontour)
+    ax.imshow(dt.imcontour)
     plt.title('contour')
     plt.show()
     
     if dump_contour:
         with open("./contour.txt", 'w+') as fout:
-            header = rd.attrs
+            header = dt.attrs
             header.insert(0, 'segId')
             print(type(header), header)
             fout.write('\t'.join(header ) + '\n')
             formater = ["{}" for i in range(len(header))]
             formater = '\t'.join(formater)
             formater += '\n'
-            for i, seg in enumerate(rd.contour):
+            for i, seg in enumerate(dt.contour):
                 for point in seg:
                     point = list(point)
                     point.insert(0, i)
