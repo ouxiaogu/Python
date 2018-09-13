@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-12 16:25:58
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 FileUtil: File/Folder handling utility module
 '''
@@ -26,8 +26,12 @@ def gpfs2WinPath(src):
         if 'gpfs' not in src:
             e = "Can't find 'gpfs' in input file: {}".format(dst)
             raise IOError(e)
-        dst = string.replace(dst, r'/', r"\\")
-        dst = string.replace(dst, '\gpfs\\', prefix, maxreplace=1)
+        try:
+            dst = string.replace(dst, r'/', r"\\")
+            dst = string.replace(dst, '\gpfs\\', prefix, maxreplace=1)
+        except AttributeError:
+            dst = dst.replace(r'/', r"\\")
+            dst = dst.replace('\gpfs\\', prefix, 1)
     return dst
 
 def splitFileName(src):
@@ -102,7 +106,7 @@ class FileScanner(object):
 
 if __name__ == '__main__':
     # '''test 1'''
-    INDIR = '/gpfs/DEV/FEM/peyang/release/E9.0/temp/04_modelcheck_small_large_spec_0906_copy/h/data/dummydb/calibrate/job1/lua'
+    INDIR = '/gpfs/PEG/FEM/jiaohuan/case/GA/GA_E8.1_integration/19-NTDcase52-E8.1GA_Fast_readresultfromjob17/h/data/dummydb/calibrate/job1/lua'
     INDIR = gpfs2WinPath(INDIR)
     print(INDIR)
 
