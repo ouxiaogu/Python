@@ -20,7 +20,8 @@ from EdgeDetector import *
 from ImGUI import imshowMultiple
 from ImDescriptors import printImageInfo
 
-IMFILE = r'C:\Localdata\D\Note\Python\misc\SEM\samples\Calaveras_v3_p1521_regular.bmp'
+IMFILE = r'C:\Localdata\D\Note\Python\misc\SEM\samples\Calaveras_v3_1001_averaged.pgm'
+# IMFILE = r'C:\Localdata\D\Note\Python\misc\SEM\samples\Calaveras_v3_p1521_regular.bmp'
 # IMFILE = r'C:\Users\peyang\github\Canny-edge-detector-master\emilia.jpg'
 # IMFILE = r'C:\Users\ouxiaogu\Documents\github\Canny-edge-detector\emilia.jpg'
 
@@ -29,8 +30,8 @@ class TestED(unittest.TestCase):
         self.imfile = IMFILE
 
 def display(dump_contour=False):
-    cim = cv2.imread(IMFILE, 1)
-    im = cv2.cvtColor(cim, cv2.COLOR_BGR2GRAY)
+    im = cv2.imread(IMFILE, -1)
+    # im = cv2.cvtColor(cim, cv2.COLOR_BGR2GRAY)
     rd = RidgeDetector(im, sigma=2, ksize=None, thresL=0.2, thresH=0.6, gapLimit=2, minSegLength=10)
     rd.run()
     diff = rd.gNH ^ rd.imcontour
