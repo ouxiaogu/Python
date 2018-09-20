@@ -76,30 +76,29 @@ def getElemText(elem_, trim=False, precision=3):
     else:
         return parseText(text_, trim, precision)
 
-def getConfigMap(elem, trim=False, precision=3):
+def getSonConfigMap(elem, trim=False, precision=3):
     """
     Parse the tag & text of all depth=1 children node into a map.
 
     Example
     -------
-    >>> elem
-    <pattern>
-        <kpi>0.741096070383657</kpi>
-        <name>13</name>
-    </pattern>
-    >>> getConfigMap(elem)
-    {'kpi': 0.741, 'name': 13}
+    Return {'kpi': 0.741, 'name': 13}
     """
     rst = {}
     for item in list(elem):
         if len(item) > 0:
             continue
-        rst[item.tag] = getElemText(item)
+        rst[item.tag] = getElemText(item, trim, precision)
     return rst
 
 def getRecurConfigMap(elem):
     """
     Recursively parse the tag & text of all children nodes into a map.
+
+    Example
+    -------
+    Return {'kpi': 0.741096070383657, 'name': 13
+        'test': {'key': 'name', 'value': 212.0, 'options': {'enable': '1-2000'}} }
     """
     rst = {}
     for item in list(elem):
@@ -112,14 +111,38 @@ def getRecurConfigMap(elem):
 def getConfigMapList(node, pattern):
     """
     For all the items met pattern type under current node,
-    based on the result of getConfigMap, output a list of KWs map"""
+    based on the result of getConfigMapDFS, output a list of KWs map
+    suitable for Xml Tree, with multiple pattern node, but every pattern node
+    have unique children.
+    """
     rst = []
     if not pattern.startswith("."): # depth=1
         pattern = "."+pattern
         log.debug("add '.' before pattern to only search depth=1: %s", pattern)
     for child in node.findall(pattern):
-        curMap = getConfigMap(child)
+        curMap = getConfigMapDFS(child)
         rst.append(curMap)
+    return rst
+
+def getConfigMapDFS(elem):
+    '''
+    parse the xml tree into a flat depth=2 KWs map, suitable for xml tree
+    with any two nodes have different name
+
+    Examples
+    --------
+    Return {'kpi': 0.741096070383657, 'name': 13, 'test/key': 'name', 'test/value': 212.0, 'test/options/enable': '1-2000'} 
+    '''
+    tags = ['.']
+    rst = {}
+    while len(tags) > 0:
+        head = tags.pop()
+        for item in list(elem.find(head)):
+            curtag = head+'/'+item.tag
+            if len(item) > 0:
+                tags.append(curtag)
+            else:
+                rst[curtag[2:]] = getElemText(item) # trim the starting './'
     return rst
 
 def dfFromConfigMapList(node, pattern):
@@ -131,9 +154,11 @@ if __name__ == '__main__':
     <test>
         <key>name</key>
         <value>213.</value>
+        <value>212.</value>
+        <options><enable>1-2000</enable></options>
     </test>
     <name>13</name>
-</pattern>"""
+    </pattern>"""
     root = ET.fromstring(nodestr)
     kpi = root.find(".kpi")
     test = root.find(".test")
@@ -143,5 +168,6 @@ if __name__ == '__main__':
     print (len(kpi))
 
     print (root.tag)
-    print (getConfigMap(root, trim=True))
+    print (getSonConfigMap(root, trim=True))
     print (getRecurConfigMap(root))
+    print(getConfigMapDFS(root))

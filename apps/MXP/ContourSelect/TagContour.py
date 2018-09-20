@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-20 12:06:57
 
 Tag contour, by drawing outlier bboxes 
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 
 import numpy as np
@@ -55,7 +55,7 @@ def decideAngleType(angle):
     return angleType
 
 class PolygonDrawer(object):
-    def __init__(self, im, contour=None, window_name='Drawer'):
+    def __init__(self, im, window_name='Drawer'):
         self.raw = im
         if np.ndim(im) == 2:
             self.im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR);
@@ -63,8 +63,6 @@ class PolygonDrawer(object):
             self.im = im
         else:
             sys.exit("image need to be an instance of numpy ndarray \n")
-        if contour is None and not isinstance(contour, SEMContour):
-            sys.exit("contour need to be an instance of SEMContour\n")
         self.window_name = window_name
         self._init_parms()
 
@@ -168,6 +166,7 @@ class PointPairDrawer(PolygonDrawer):
     def __init__(self, im, window_name, **kwargs):
         super(PointPairDrawer, self).__init__(im, window_name)
         self.pairs = []
+        self.mode_HV45 = kwargs.get('HV45', True)
         self.drawfunc = kwargs.get('drawfunc', None)
 
     def on_mouse(self, event, x, y, buttons, user_param):
@@ -184,7 +183,9 @@ class PointPairDrawer(PolygonDrawer):
             sys.stdout.write("Adding point #{} with position({},{})!\n".format(len(self.points), x, y))
             self.points.append((x, y))
             if len(self.points)>=2 and len(self.points)%2 == 0:
-                lastpair = self._enforce_line_type([self.points[-2], self.points[-1]])
+                lastpair = [self.points[-2], self.points[-1]]
+                if self.mode_HV45:
+                    lastpair = self._enforce_HV45(lastpair)
                 self.pairs.append(lastpair)
                 _, lastpnt = lastpair
                 self.points[-1] = lastpnt
@@ -197,13 +198,13 @@ class PointPairDrawer(PolygonDrawer):
             print(str(self.pairs))
             self.done = True
 
-    def _enforce_line_type(self, src):
+    def _enforce_HV45(self, src):
         '''
-        Line type 0, 1, 2, 3
-        - line_type 0: any direction, (x0, y0), (x1, y1)
-        - line_type 1: Horizontal line, (x0, y0), (x1, y0)
+        angle type 0, 1, 2, 3
+        - line_type 0: Horizontal line, (x0, y0), (x1, y0)
         - line_type 2: Vertical line, (x0, y0), (x0, y1)
-        - line_type 3: 45*N line, (x0, y0), (x1, y1')
+        - line_type 1,3: 45*N line, (x0, y0), (x1, y1')
+        - if without enforce line_type: any direction, (x0, y0), (x1, y1)
         '''
         dst = src
 
@@ -293,7 +294,7 @@ def getROIByPointPairs(im, pairs, drawfunc, masked_mat=False):
 class LineDrawer(PointPairDrawer):
     """LineDrawer: line by a pair of points, head&tail,
     support H,V,45,any line"""
-    def __init__(self, im, window_name):
+    def __init__(im, window_name):
         kwargs = {'line_type': line_type}
         super(LineDrawer, self).__init__(im, window_name, **kwargs)
 
@@ -302,3 +303,16 @@ class RectangleDrawer(PointPairDrawer):
     def __init__(self, im, window_name):
         kwargs = {'drawfunc': cv2.rectangle}
         super(RectangleDrawer, self).__init__(im, window_name, **kwargs)
+
+class TagContour(object):
+    """docstring for TagContour"""
+    def __init__(self, cwd, inxml, patternflt=None):
+        super(TagContour, self).__init__()
+        self.cwd = cwd
+        self.inxml = inxml
+        self.patternflt = patternflt
+
+    def readDataSet(self):
+        
+
+        

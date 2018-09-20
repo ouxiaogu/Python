@@ -1,38 +1,18 @@
 # -*- coding: utf-8 -*-
 # tested on python 3
 import unittest
+import xml.etree.ElementTree as ET
+import numpy as np
+import pandas as pd
+
 import sys
 import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../")
 from CnnSemJob import *
-import numpy as np
-import pandas as pd
 
 class TestCNNJob(unittest.TestCase):
     def setUp(self):
         self.myjob = MXPJob(r'../samplejob')
-
-    @unittest.skip("config only test")
-    def test_config(self):
-        nodestr = """<pattern>
-        <kpi>0.741096070383657</kpi>
-        <test>
-            <key>name</key>
-            <value>213.</value>
-            <options><enable>1-2000</enable></options>
-        </test>
-        <name>13</name>
-        </pattern>"""
-        root = ET.fromstring(nodestr)
-        kpi = root.find(".kpi")
-        print(kpi.tag, len(kpi))
-        test = root.find(".test")
-        print (test.tag, len(test))
-        print (root.find("./test/options/enable").text)
-
-        print (root.tag)
-        print (getConfigMap(root))
-        print (getRecurConfigMap(root))
 
     def test_construct_job(self):
         myjob = Job(r'../samplejob')
@@ -64,9 +44,32 @@ class TestCNNJob(unittest.TestCase):
         df = pd.DataFrame(mylist)
         print(dfToXmlStream(df))
 
+    @unittest.skip("run")
     def test_run(self):
         self.myjob.run()
 
+def test_config():
+    nodestr = """<pattern>
+    <kpi>0.741096070383657</kpi>
+    <test>
+        <key>name</key>
+        <value>213.</value>
+        <options><enable>1-2000</enable></options>
+    </test>
+    <name>13</name>
+    </pattern>"""
+    root = ET.fromstring(nodestr)
+    kpi = root.find(".kpi")
+    print(kpi.tag, len(kpi))
+    test = root.find(".test")
+    print (test.tag, len(test))
+    print (root.find("./test/options/enable").text)
+
+    print (root.tag)
+    print (getConfigMap(root))
+    print (getRecurConfigMap(root))
 
 if __name__ == "__main__":
-    unittest.main()
+    # unittest.main()
+
+    test_config()
