@@ -7,7 +7,6 @@ unit test/visualization for Edge Detection
 Last Modified by:  ouxiaogu
 """
 
-import math
 import unittest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,10 +28,18 @@ class TestED(unittest.TestCase):
     def setUp(self):
         self.imfile = IMFILE
 
+    def test_decideAngleType(self):
+        self.assertEqual(decideAngleType(-158), 0)
+        self.assertEqual(decideAngleType(158), 0)
+
+        self.assertEqual(decideAngleType(-157), 1)
+        self.assertEqual(decideAngleType(23), 1)
+
+
 def display(dump_contour=False):
     im = cv2.imread(IMFILE, -1)
     # im = cv2.cvtColor(cim, cv2.COLOR_BGR2GRAY)
-    rd = RidgeDetector(im, sigma=2, ksize=None, thresL=0.2, thresH=0.6, gapLimit=2, minSegLength=10)
+    rd = EdgeDetector(im, sigma=2, ksize=None, thresL=0.2, thresH=0.6, gapLimit=2, minSegLength=10)
     rd.run()
     diff = rd.gNH ^ rd.imcontour
     imshowMultiple( [im, rd.Rg_Ig, rd.Rg_Mag, rd.gN, rd.gNL, rd.gNH, rd.imcontour, diff],
@@ -58,5 +65,6 @@ def display(dump_contour=False):
                     fout.write(formater.format(*point))
 
 if __name__ == '__main__':
-    display()
-    # unittest.main()
+    # display()
+    
+    unittest.main()

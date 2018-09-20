@@ -2,21 +2,11 @@
 """
 Created: ouxiaogu, 2018-09-12 18:28:33
 
-
+unit test/visualization for Ridge Detection
 
 Last Modified by:  ouxiaogu
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created: ouxiaogu, 2018-09-09 20:52:17
-
-unit test/visualization for Edge Detection
-
-Last Modified by: ouxiaogu
-"""
-
-import math
 import unittest
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,19 +46,7 @@ def display(dump_contour=False):
     # plt.show()
     
     if dump_contour:
-        with open("./contour.txt", 'w+') as fout:
-            header = dt.attrs
-            header.insert(0, 'segId')
-            print(type(header), header)
-            fout.write('\t'.join(header ) + '\n')
-            formater = ["{}" for i in range(len(header))]
-            formater = '\t'.join(formater)
-            formater += '\n'
-            for i, seg in enumerate(dt.contour):
-                for point in seg:
-                    point = list(point)
-                    point.insert(0, i)
-                    fout.write(formater.format(*point))
+        dt.saveContour('./contour.txt')
 
 def displayMxpResult():
     cwd = r'/gpfs/SQA/FEM/SHARED/regression/MXP/nightly/target/MXP1_job9/h/cache/dummydb/result/MXP/job1/ContourExtraction400result1'
@@ -83,6 +61,8 @@ def displayMxpResult():
     imshowMultiple(images, filenames)
 
 if __name__ == '__main__':
-    display()
+    display(dump_contour=True)
+    
     # displayMxpResult()
+    
     # unittest.main()
