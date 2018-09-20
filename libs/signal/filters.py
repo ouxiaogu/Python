@@ -6,7 +6,7 @@ Underlying core functions to
   - Build filter
   - Apply filter
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 import math
 
@@ -352,8 +352,8 @@ def dft_2d_matrix(N, M, inverse=False):
     # Think meshgrid(col, row) as a 2D x-y axis grids, then
     # get x, y coordinates, firstly by column, then by row
     x, y = np.meshgrid(np.arange(3), np.arange(2))
-    # => x = { [0, 1, 2], [0, 1, 2] }
-    # => y = { [0, 0, 0], [1, 1, 1] }
+    # => x = [ [0, 1, 2], [0, 1, 2] ], ndarray
+    # => y = [ [0, 0, 0], [1, 1, 1] }
     '''
     coeffx, coeffy, sgn = 1, 1, -1
     if inverse:

@@ -2,19 +2,21 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-26 13:20:55
 
-Last Modified by: peyang
+Last Modified by:  ouxiaogu
 
 MXPJob: Class to hold tachyon MXP job, derived from class TachyonJob
 """
 from TachyonJob import Job
-import logger
 from collections import OrderedDict
 import os.path
 import xml.etree.ElementTree as ET
-from XmlUtil import getRecurConfigMap, getElemText, dfFromConfigMapList
 import re
 
-log = log.setup("MXPJob")
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
+from XmlUtil import getRecurConfigMap, getElemText, dfFromConfigMapList
+import logger
+log = logger.setup("MXPJob")
 
 MXP_XML_TAGS = ["inxml", "outxml"]
 MXP_RESULT_OPTIONS = ["occfs", "osumccfs", "osumkpis"]
@@ -26,24 +28,27 @@ class MXPJob(Job):
         self.__buildjob()
 
     def __buildjob(self):
-        mxpxmls = [r"h/data/dummydb/smo/job1/smo.xml", r"h/data/dummydb/MXP/job1/mxp.xml"]
-        self.resultrelpath = r"h/cache/dummydb/result/MXP/job1/"
+        self.datarelpath = r"h/data/dummydb/MXP/job1"
+        self.resultrelpath = r"h/cache/dummydb/result/MXP/job1"
+        self.resultabspath = os.path.join(self.jobpath, self.resultrelpath)
+        if not os.path.exists(self.resultabspath):
+            os.makedirs(self.resultabspath)
+        self.mxpxml = os.path.join(self.jobpath, self.datarelpath, 'mxp.xml')
 
-        mxpxml_ = ''
-        existed = False
-        for xml_ in mxpxmls:
-            mxpxml_ = os.path.join(self.jobpath, xml_)
-            if os.path.exists(mxpxml_):
-                log.debug("MXP xml exists at %s" % mxpxml_)
-                existed = True
-                break
-        if not existed:
-            raise IOError("MXP xml doesn't exist for job: %s" % self.jobpath)
-        self.mxpxml = mxpxml_
+        mxproot = None
+        try:
+            mxproot = ET.parse(self.mxpxml).getroot().find(".MXP")
+        except KeyError:
+            raise KeyError("MXP tag not find in xml: %s\n" % self.mxpxml)
+        self.mxproot = mxproot
+
         self.getmxpCfgMap()
 
     def resultAbsPath(self, basename):
         return os.path.join(self.jobpath, self.resultrelpath, basename)
+
+    def dataAbsPath(self, basename):
+        return os.path.join(self.jobpath, self.datarelpath, basename)
 
     def getEnableRange(self):
         """
@@ -51,14 +56,15 @@ class MXPJob(Job):
 
         Returns
         -------
-            range_:
-                [-1, -1]: means all the stages are enabled
-                [min, max]:stage between [min max] are enabled
+        range_: list of len=2
+            [-1, -1]: means all the stages are enabled
+            [min, max]:stage between [min max] are enabled
         """
         range_ = [-1, -1]
         try:
-            options = self.getOption()
-            range_ = options["enable"]
+            # options = self.getOption()
+            # range_ = options["enable"]
+            range_ = self.mxproot.find('./global/options/enable').text
             range_ = list(map(int, range_.split('-')))
         except:
             pass
@@ -66,13 +72,8 @@ class MXPJob(Job):
 
     def getmxpCfgMap(self):
         """OrderedDict {(stagename, enable): dict }"""
-        mxproot = None
-        try:
-            mxproot = ET.parse(self.mxpxml).getroot().find(".MXP")
-        except KeyError:
-            raise KeyError("MXP tag not find int xml: %s" % self.mxpxml)
         mxpCfgMap = OrderedDict()
-        for item in list(mxproot):
+        for item in list(self.mxproot):
             stagename = item.tag
             enable = ""
             try:
@@ -84,12 +85,14 @@ class MXPJob(Job):
         self.mxpCfgMap = mxpCfgMap
         return mxpCfgMap
 
-    def getAllMxpStages(self, enabled_only=True):
+    def getAllMxpStages(self, enabled=True):
         """
         Returns
         -------
         stages : sorted list by enable number
             items like [(stagename, enable), ...], ascending order
+        enabled : bool
+            if True, just get the enabled stages; if False, get all
 
         Example
         -------
@@ -98,14 +101,14 @@ class MXPJob(Job):
         """
         range_ = self.getEnableRange()
         if set(range_) == set([-1, -1]):
-            enabled_only = False
+            enabled = False
         inRange = lambda x: True if x >= range_[0] and x <= range_[1] else False
         stages = []
         for key, stagectx in self.mxpCfgMap.items():
             stagename, enable_ = key
             if type(enable_) == str:
                 continue
-            if enabled_only and not inRange(enable_):
+            if enabled and not inRange(enable_):
                 continue
             stages.append((stagename, enable_))
 
@@ -122,32 +125,53 @@ class MXPJob(Job):
                     stages[j]  = stages[j-1]
                     stages[j-1] = tmp
                     swaped = True
+        self.stages = stages
         return stages
 
-    def getAllStageXmlFiles(self):
-        """get the relative path of all stage xml files
-        For both inxml and outxml"""
-        stages = self.getAllMxpStages()
-        stagecfs = OrderedDict()
+    def getAllStageIOFiles(self):
+        """
+        get the relative path of all stage xml files for both inxml and outxml, 
+        by default only export IO files from the enabled stages
+        
+        Example
+        -------
+            {('D2DBAlignment', 500): {'outxml': "d2dbalignment500out.xml", ...}, ...}
+        """
+        stages = self.getAllMxpStages() if not hasattr(self, "stages") else self.stages
+        stageIOFiles = OrderedDict()
         for key in stages:
-            if not stagecfs.has_key(key):
-                stagecfs[key] = OrderedDict()
+            if not key in stageIOFiles:
+                stageIOFiles[key] = OrderedDict()
             for tag in MXP_XML_TAGS:
                 try:
-                    stagecfs[key][tag] = self.mxpCfgMap[key][tag]
+                    stageIOFiles[key][tag] = self.mxpCfgMap[key][tag]
                 except KeyError:
                     pass
-        self.stagecfs = stagecfs
-        return stagecfs
+                except TypeError:
+                    # log.debug("TypeError, key = %s, tag = %s\n" % (str(key), tag))
+                    pass
+        self.stageIOFiles = stageIOFiles
+        return stageIOFiles
 
-    def getStageXmlFile(self, stage_, stagename=None, enable=None, option="outxml"):
-        """get the relative path of stage xml file, default is outxml"""
+    def getStageID(self, stage=None, stagename=None, enable=None):
+        '''
+        get unique stage ID, by combining stage name and enable number
+        '''
+        stageIOFiles = self.getAllStageIOFiles() if not hasattr(self, 'stageIOFiles') else self.stageIOFiles
+        stagenames, enables = zip(*stageIOFiles.keys())
+
+        stage_ = stage
         if stagename is not None and enable is not None:
             stage_ = (stagename, enable)
-        else:
+        elif enable is not None:
             try:
-                if not isinstance(stage_, str):
-                    raise ValueError
+                ix = list(enables).index(enable)
+                stage_ = (stagenames[ix], enable)
+            except:
+                print(stagenames, enables)
+                raise IndexError("Input enable number %s not in Job's enable list: %s" % (enable, str(enables)))
+        else:
+            if isinstance(stage_, str):
                 m = re.search("(\d+)$", stage_)
                 if m:
                     log.debug("re search result: %s" % str(m.groups()))
@@ -158,81 +182,168 @@ class MXPJob(Job):
                     log.debug("stagename: %s" % stagename)
                     log.debug("enable: %d" % enable)
                     stage_ = (stagename, enable)
-                else:
-                    raise ValueError
-            except ValueError:
-                raise ValueError("Wrong input: %s, please input MXP stage name together with enable number, e.g., Average300" % str(stage_))
+            elif isinstance(stage_, tuple):
+                pass
+            else:
+                raise ValueError("Wrong input: %s, please input MXP stage name together with enable number, e.g., Average300\n" % str(stage_))
+        return stage_
 
-        stagecfs = self.getAllStageXmlFiles()
-        if not stagecfs.has_key(stage_):
-            raise KeyError("Input stage %s not in: %s" % (stage_, str(stagecfs.keys())))
+    def getStageConfig(self, stage=None, stagename=None, enable=None):
+        stage_ = self.getStageID(stage=stage, stagename=stagename, enable=enable)
+        if not isinstance(stage_, tuple) and len(stage_) !=2:
+            raise ValueError("Wrong input: %s, please input MXP stage name together with enable number, e.g., (Average, 300)\n" % str(stage_))
+        stagename_, enable_ = stage_
+        found = False
+        for item in list(self.mxproot):
+            stagename = item.tag
+            enable = ""
+            try:
+                enable = getElemText(item.find(".enable"))
+            except:
+                pass
+            if stagename == stagename_ and enable==enable_:
+                found = True
+                return item
+        return None
+
+    def getStageIOFile(self, stage=None, stagename=None, enable=None, option="outxml"):
+        """
+        get the relative path of stage xml file, default is outxml
+
+        Example
+        -------
+        The 4 operations below are equivalent 
+
+        1. input stagename='D2DBAlignment', enable=500, option="outxml", output: "d2dbalignment500out.xml"
+        2. input enable=500, option="outxml", output: "d2dbalignment500out.xml"
+        3. input stage="D2DBAlignment500", option="outxml", output: "d2dbalignment500out.xml"
+        4. input stage=("D2DBAlignment", 500), option="outxml", output: "d2dbalignment500out.xml"
+        """
+        stage_ = self.getStageID(stage=stage, stagename=stagename, enable=enable)
+        
+        stageIOFiles = self.getAllStageIOFiles() if not hasattr(self, 'stageIOFiles') else self.stageIOFiles
+        if stage_ not in stageIOFiles:
+            raise KeyError("Input stage %s not in: %s" % (stage_, str(stageIOFiles.keys())))
         if option not in MXP_XML_TAGS:
             raise KeyError("Input option %s not in: %s" % (option, str(MXP_XML_TAGS)))
-        return stagecfs[stage_][option]
-
-    def getStageOut(self, stage):
-        """Refer to MXPOutXml.getoccfs"""
-        return self.getStageResultFactory(stage, "occfs")
+        xmlfile = stageIOFiles[stage_][option]
+        # xmlfile = self.dataAbsPath(xmlfile) if option == MXP_XML_TAGS[0] else self.resultAbsPath(xmlfile)
+        xmlfile = self.resultAbsPath(xmlfile) # init stage without inxml, other stages inxml and outxml are all in result folder
+        return xmlfile
 
     def getAllStageOut(self):
-        """occf results of all the stage"""
-        stagecfs = self.getAllStageXmlFiles()
+        """
+        occf results of all the stage, i.e., outxml result config
+        
+        Returns
+        -------
+        dfs : OrderedDict
+            key is tuple like, value is dataframe object
+
+        Example
+        -------
+        key=("D2DBAlignment", 500), value: df parsed from the result/pattern of outxml "d2dbalignment500out.xml"
+        """
+        stageIOFiles = self.getAllStageIOFiles()
         dfs = OrderedDict()
-        for stagename in stagecfs.keys():
+        for stagename in stageIOFiles.keys():
             dfs[stagename] = self.getStageOut(self, stagename)
         return dfs
 
-    def getStageSummary(self, stage):
-        """Refer to MXPOutXml.getosumccfs"""
-        return self.getStageResultFactory(stage, "osumccfs")
+    def getStageOut(self, stage=None, stagename=None, enable=None):
+        """Refer to MXPStageXml.getoccfs"""
+        return self.getStageResultFactory(stage=stage, stagename=stagename, enable=enable, result_option="occfs")
 
-    def getStageSummaryKpi(self, stage):
-        """Refer to MXPOutXml.getosumkpis"""
-        return self.getStageResultFactory(stage, "osumkpis")
+    def getStageSummary(self, stage=None, stagename=None, enable=None):
+        """Refer to MXPStageXml.getosumccfs"""
+        return self.getStageResultFactory(stage=stage, stagename=stagename, enable=enable, result_option="osumccfs")
 
-    def getStageResultFactory(self, stage, option="occfs"):
-        xmlfile = self.getStageXmlFile(stage)
+    def getStageSummaryKpi(self, stage=None, stagename=None, enable=None):
+        """Refer to MXPStageXml.getosumkpis"""
+        return self.getStageResultFactory(stage=stage, stagename=stagename, enable=enable, result_option="osumkpis")
+
+    def getStageResultFactory(self, stage=None, stagename=None, enable=None, result_option="occfs"):
+        xmlfile = self.getStageIOFile(stage=stage, stagename=stagename, enable=enable)
         xmlfile = self.resultAbsPath(xmlfile)
-        parser = MXPOutXml(xmlfile)
-
-        if option == "occfs":
+        parser = MXPStageXml(xmlfile)
+        if result_option is None:
+            result_option = MXP_RESULT_OPTIONS[0]
+            
+        if result_option == MXP_RESULT_OPTIONS[0]:
             return parser.getoccfs()
-        elif option == "osumccfs":
+        elif result_option == MXP_RESULT_OPTIONS[1]:
             return parser.getosumccfs()
-        elif option == "osumkpis":
+        elif result_option == MXP_RESULT_OPTIONS[2]:
             return parser.getosumkpis()
         else:
-            raise KeyError("Input MXP result option %s not in: %s" % (option, str(MXP_RESULT_OPTIONS)))
+            raise KeyError("Input MXP result option %s not in: %s" % (result_option, str(MXP_RESULT_OPTIONS)))
 
-class MXPOutXml(object):
-    """docstring for MXPOutXml"""
-    def __init__(self, xmlfile):
-        super(MXPOutXml, self).__init__()
+    def run(self):
+        allstages = self.getAllMxpStages()
+        gcf = self.mxproot.find('.global')
+        for stage in allstages:
+            stagename, enablenum = stage
+            log.info("Stage %s%d starts\n" % (stagename, enablenum))
+            df = None
+            if stagename != "init":
+                inxmlfile = self.getStageIOFile(stage, option=MXP_XML_TAGS[0])
+                stagexml = MXPStageXml(inxmlfile, option=MXP_XML_TAGS[0])
+                df = stagexml.geticcfs()
+            cf = self.getStageConfig(stage)
+            stagepath = self.resultAbsPath('{}{}'.format(stagename, enablenum))
+            curstage = eval(STAGE_REGISTER_TABLE[stagename])(gcf, cf, df, stagepath)
+            curstage.run()
+            outxmlfile = self.getStageIOFile(stage, option="outxml")
+            curstage.save(outxmlfile)
+            log.info("Stage %s%d successfully finished\n" % (stagename, enablenum))
+
+class MXPStageXml(object):
+    """docstring for MXPStageXml"""
+    def __init__(self, xmlfile, option=MXP_XML_TAGS[1]):
+        super(MXPStageXml, self).__init__()
         self.xmlfile = xmlfile
+        self.option = option
         self.buildschema()
 
     def buildschema(self):
-        self.getocf()
-        self.getosumcf()
+        if self.option==MXP_XML_TAGS[0]:
+            self.geticf()
+        elif self.option==MXP_XML_TAGS[1]:
+            self.getocf()
+            self.getosumcf()
+
+    def geticf(self):
+        try:
+            self.icf = ET.parse(self.xmlfile).getroot().find("result")
+            log.debug("icf tag: "+self.icf.tag)
+        except AttributeError:
+            raise AttributeError("%s has no attribute 'tag'" % self.icf)
+        return self.icf
 
     def getocf(self):
-        self.ocf = ET.parse(self.xmlfile).getroot().find("result")
         try:
+            self.ocf = ET.parse(self.xmlfile).getroot().find("result")
             log.debug("ocf tag: "+self.ocf.tag)
         except AttributeError:
             raise AttributeError("%s has no attribute 'tag'" % self.ocf)
 
     def getosumcf(self):
         self.osumcf = self.ocf.find("summary")
-        log.debug("osumcf tag: "+self.osumcf.tag)
+        try:
+            log.debug("osumcf tag: "+self.osumcf.tag)
+        except:
+            log.debug("No summary tag in input xml： %s" % self.xmlfile)
+            pass
+
+    def geticcfs(self):
+        return dfFromConfigMapList(self.icf, ".pattern")
 
     def getoccfs(self):
         """
         Returns
         -------
-            ret : DataFrame object
-                all the pattern's results in xmlfile
-        Example:
+        ret : DataFrame object
+            all the pattern's results in xmlfile
         """
         return dfFromConfigMapList(self.ocf, ".pattern")
 
@@ -240,17 +351,36 @@ class MXPOutXml(object):
         """
         Returns
         -------
-            ret : DataFrame object
-                all the pattern's summary in xmlfile"""
+        ret : DataFrame object
+            all the pattern's summary in xmlfile"""
         return dfFromConfigMapList(self.osumcf, ".pattern")
 
     def getosumkpis(self):
         """
         Returns
         -------
-            ret : DataFrame object\
-                all the pattern's KPIsummary in xmlfile"""
+        ret : DataFrame object\
+            all the pattern's KPIsummary in xmlfile"""
         return dfFromConfigMapList(self.osumcf, ".pattern/KPI")
+
+class MxpStage(object):
+    """docstring for MxpStage"""
+    def __init__(self, gcf, cf, df, stagepath):
+        self.d_gcf = gcf
+        self.d_cf = cf
+        self.d_df = df
+        if not os.path.exists(stagepath):
+            os.mkdir(stagepath)
+        self.stagepath = stagepath
+        self.jobresultpath = os.path.dirname(stagepath)
+        self.stagename = os.path.basename(stagepath)
+
+    def save(self, path):
+        ss = dfToXmlStream(self.d_df)
+        log.debug("Result save path: %s\n" % (path))
+        with open(path, 'w') as fout:
+            fout.write(ss)
+        log.info("Result saved at %s\n" % (path))
 
 if __name__ == '__main__':
     jobpath = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/8GF02/Case3E_GF_EP5_study_c2c_id2db_v1'
@@ -258,10 +388,10 @@ if __name__ == '__main__':
     jobpath = gpfs2WinPath(jobpath)
     m_job = MXPJob(jobpath)
     m_stages =  m_job.getAllMxpStages()
-    print m_stages
-    print m_job.getEnableRange()
+    print(m_stages)
+    print(m_job.getEnableRange())
 
-    print m_job.getAllStageXmlFiles()
-    print m_job.getStageOut("Average300")
-    print m_job.getStageSummary("ImageD2DBAlignment600")
-    print m_job.getStageSummaryKpi("ResistModelCheck610")
+    print (m_job.getAllStageXmlFiles())
+    print (m_job.getStageOut("Average300"))
+    print (m_job.getStageSummary("ImageD2DBAlignment600"))
+    print (m_job.getStageSummaryKpi("ResistModelCheck610"))

@@ -4,7 +4,7 @@ Created: peyang, 2018-08-31 10:53:39
 
 CNN SEM model Job flow
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import os.path
@@ -442,9 +442,9 @@ class MXPStageXml(object):
         super(MXPStageXml, self).__init__()
         self.xmlfile = xmlfile
         self.option = option
-        self.buildschema()
+        self.__build()
 
-    def buildschema(self):
+    def __build(self):
         if self.option==MXP_XML_TAGS[0]:
             self.geticf()
         elif self.option==MXP_XML_TAGS[1]:

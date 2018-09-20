@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: hshi & peyang, 2018-01-25 12:02:59
 
-Last Modified by: peyang
+Last Modified by:  ouxiaogu
 
 TachyonJob: Base Class to hold tachyon job
 Since GUI don't provide the base TAC job api, use own xml parser instead
@@ -14,13 +14,15 @@ Since GUI don't provide the base TAC job api, use own xml parser instead
 
 import os.path
 import xml.etree.ElementTree as ET
+import time
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import addChildNode, setChildNodeVal, getChildNodeVal
 import logger
-import time
 from StrUtil import parseKW, buildKW
 
-logger.initlogging(debug=False)
-log = logger.getLogger("TachyonJob")
+log = logger.setup('TachyonJob', 'info')
 
 NEWSTATUS = frozenset(['New'])
 TERMINATESTATUS = frozenset(['Aborted', 'Cancelled', 'Failed', 'Exited', 'Terminated'])
@@ -101,7 +103,7 @@ class Job(object):
         else:
             root = setChildNodeVal(root, "item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'running', message))
             root = setChildNodeVal(root, "item/[name='status']", 'Running')
-        tree.write(xmlfile)
+        tree.write(self.jobxml)
 
     def getOption(self, astype="dict"):
         self.checkJobXml()
@@ -124,8 +126,8 @@ if __name__ == '__main__':
     jobpath = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/8GF02/06_study_c2c_id2db_Case2E_IMEC_EP5_old_bin'
     from FileUtil import gpfs2WinPath
     jobpath = gpfs2WinPath(jobpath)
-    print jobpath
+    print(jobpath)
     m_job = Job(jobpath)
-    print m_job.status
-    print m_job.getOption()
+    print (m_job.status)
+    print (m_job.getOption())
     m_job.setOption(a=1, b=2)

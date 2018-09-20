@@ -26,8 +26,45 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('EdgeDetector', 'debug')
 
-DELIMITERS = np.linspace(-22.5, 180-22.5, 5)
+__all__ = ['decideAngleType', 'EdgeDetector']
+
 g_epslmt = 1e-9
+
+def decideAngleType(angle):
+    '''
+    normalize angle into (-180, 180], then get angle types:
+
+    np.linspace(22.5, 180-22.5, 4)
+    Out[18]: array([  22.5,   67.5,  112.5,  157.5])
+
+    np.linspace(22.5-180, -22.5, 4)
+    Out[19]: array([-157.5, -112.5,  -67.5,  -22.5])
+
+    in the range of interval [-22.5, 22.5) from center line
+    
+    angle type, direction, center lines
+
+    * 0, H: 0, 180, -180
+    * 1, +45: 45, -135
+    * 2, V: 90, -90
+    * 3, -45: 135, -45
+    '''
+
+    # angle into (-180, 180]
+    angle = angle%360
+    if angle > 180:
+        angle = angle - 360
+
+    angleType = 0
+    if -22.5<=angle<22.5 or -22.5<=(angle-180)<22.5 or -22.5<=(angle+180)<22.5:
+        angleType=0
+    elif -22.5<=(angle-45)<22.5 or -22.5<=(angle+135)<22.5:
+        angleType=1
+    elif -22.5<=(angle-90)<22.5 or -22.5<=(angle+90)<22.5:
+        angleType=2
+    elif -22.5<=(angle-135)<22.5 or -22.5<=(angle+45)<22.5:
+        angleType=3
+    return angleType
 
 def nonmaxSuppress(G, theta):
     '''
@@ -65,21 +102,6 @@ def nonmaxSuppress(G, theta):
                 thetaType[i, j] = angle_type
     return gN, thetaType
 
-def decideAngleType(angle):
-    ntypes = len(DELIMITERS)
-    ret = 0
-    for k in range(ntypes):
-        if k == 0:
-            lim = [0, DELIMITERS[k+1]]
-        elif k < ntypes-1:
-            lim = [DELIMITERS[k], DELIMITERS[k+1]]
-        elif k == ntypes - 1:
-            lim = [DELIMITERS[k], 180]
-        if lim[0] <= abs(angle) and abs(angle) < lim[1]:
-            ret = k
-            break
-    ret = ret%(ntypes - 1)
-    return ret
 
 class ContourBBox:
     def __init__(self, xini, yini, xend, yend):

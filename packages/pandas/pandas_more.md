@@ -60,7 +60,21 @@ import pandas as pd
 ### 1.2 write
 
 
+## series
 
+1. how to get True values of the Boolean Series
+
+```shell
+flt = (gg.ptnid==2)
+
+flt.loc[flt>0]
+Out[46]: 
+812    True
+dtype: bool
+
+flt.loc[flt>0].index
+Out[47]: Int64Index([812], dtype='int64')
+```
 
 
 

@@ -4,7 +4,7 @@ Created: peyang, 2018-01-15 16:07:20
 
 ImDescriptors: Image Descriptors Module
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 '''
 
 import numpy as np
@@ -81,7 +81,7 @@ def hist_lines(im):
     h = np.flipud(h)
     return h
 
-def hist_rect(im=None, hbins=100, hist_in=None, color_hist=False, fit_hist=False):
+def hist_rect(im=None, hbins=100, hist_in=None, color_hist=True, fit_hist=False):
     '''return histogram of any image as some rectangle bins
     In python, it seems cv2 don't support the float type image,
     But for c++, it's supported
@@ -375,7 +375,7 @@ def calcHistSeries(series_, ranges=RMS_BIN_RANGES, column=None):
         log.debug("series_: {}".format(str(series.values )))
         for j, filt in enumerate(filts):
             hists[i, j] = len(series.ix[ series.apply(filt) ] )
-            log.debug("{}: {}".format((labels[j], hists[i, j])) )
+            log.debug("{}: {}".format(labels[j], hists[i, j]) )
     histDF = pd.DataFrame(hists, columns=labels).astype('int32')
     histDF = histDF.transpose() # for barplot, column as range lables
     return histDF

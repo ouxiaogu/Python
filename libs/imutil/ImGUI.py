@@ -6,7 +6,7 @@ ImGUI:
     - Image input/ output
     - Image plot utility module
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -45,13 +45,19 @@ def read_pgm(filename, byteorder='>'):
                         offset=len(header)
                         ).reshape((int(height), int(width)))
 
-def write_pgm(img, filename, byteorder='>'):
+def write_pgm(img, filename, bbox=None):
     ###write image to a pgm file
-    Nx, Ny = img.shape;
-    maxval = img.max();
+    N, M = img.shape;
+    maxval = np.iinfo(img.dtype).max
 
     with open(filename,'wb') as f:
-        f.write('P5 {} {} {}\n'.format(Ny, Nx, maxval))
+        f.write('P5\n')
+        if bbox is None:
+            f.write('# bbox: 0 0 {} {}\n'.format(M, N))
+        else:
+            f.write('# bbox: {} {} {} {}\n'.format(*bbox))
+        f.write('{} {}\n'.format(M, N))
+        f.write('{}\n'.format(maxval))
         img.tofile(f)
 
 def readDumpImage(infile, skip_header=0):
@@ -61,14 +67,15 @@ def readDumpImage(infile, skip_header=0):
 
 def readBBox(infile):
     bbox = None
-    with open(infile) as f:
+    with open(infile, 'rb') as f:
         for i, line in enumerate(f.readlines()):
             if i > 2:
                 break
-            m = re.search("^BBox: xini = (\d+), xend = (\d+), yini = (\d+), yend = (\d+)", line)
+            m = re.search(b"^# bbox:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)", line)
             if m is not None:
                 bbox = m.groups()
                 break
+    bbox = list(int(d) for d in bbox)
     return bbox
 
 def gen_multi_image_overview(src_dir, reg_pattern=None, title=None, im_name=None):
@@ -543,8 +550,6 @@ def getROIByPointPairs(im, pairs, drawfunc, masked_mat=False):
         roi = matrix.compressed()
         # roi = matrix[~matrix.mask]
     return roi
-
-
 
 class LineDrawer(PointPairDrawer):
     """LineDrawer: line by a pair of points, head&tail,
