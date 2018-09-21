@@ -67,7 +67,7 @@ def test_config():
 
     print (root.tag)
     print (getConfigMap(root))
-    print (getRecurConfigMap(root))
+    print (getUniqKeyConfigMap(root))
 
 if __name__ == "__main__":
     # unittest.main()

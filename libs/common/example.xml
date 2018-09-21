@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <result>
+    <pattern>
+      <key>name</key>
+      <options>
+        <enable>1-2000</enable>
+      </options>
+      <value>213.0</value>
+      <value>212.0</value>
+    </pattern>
+    <pattern>
+      <value>211.0</value>
+    </pattern>
+    <pattern>
+      <key>
+        <option>revive_bug=Ticket111</option>
+      </key>
+      <value>210.0</value>
+    </pattern>
+  </result>
+</root>

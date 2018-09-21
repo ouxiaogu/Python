@@ -115,14 +115,14 @@ def getConfigMap(elem, trim=False, precision=3):
         rst[item.tag] = getElemText(item)
     return rst
 
-def getRecurConfigMap(elem):
+def getUniqKeyConfigMap(elem):
     """
     Recursively parse the tag & text of all children nodes into a map.
     """
     rst = {}
     for item in list(elem):
         if len(item) > 0:
-            rst[item.tag] = getRecurConfigMap(item)
+            rst[item.tag] = getUniqKeyConfigMap(item)
         else:
             rst[item.tag] = getElemText(item)
     return rst
@@ -276,7 +276,7 @@ class MXPJob(Job):
                 enable = getElemText(item.find(".enable"))
             except:
                 pass
-            cfgMap = getRecurConfigMap(item)
+            cfgMap = getUniqKeyConfigMap(item)
             mxpCfgMap[(stagename, enable)] = cfgMap
         self.mxpCfgMap = mxpCfgMap
         return mxpCfgMap

@@ -6,14 +6,13 @@ Last Modified by: ouxiaogu
 
 StrUtil: String handling utility module
 """
-import string
 from collections import OrderedDict
 import re
 
 def parseKW(content, outer_sep=',', inner_sep='='):
     """parser for string kwargs"""
     kw = [c.strip() for c in content.split(outer_sep)]
-    kw = [tuple(map(string.strip, c.split(inner_sep))) for c in kw]
+    kw = [[v.strip() for v in c.split(inner_sep)] for c in kw ]
     try:
         rst = OrderedDict(kw)
     except ValueError:

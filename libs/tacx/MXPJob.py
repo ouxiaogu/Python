@@ -14,7 +14,7 @@ import re
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-from XmlUtil import getRecurConfigMap, getElemText, dfFromConfigMapList
+from XmlUtil import getUniqKeyConfigMap, getElemText, dfFromConfigMapList
 import logger
 log = logger.setup("MXPJob")
 
@@ -80,7 +80,7 @@ class MXPJob(Job):
                 enable = getElemText(item.find(".enable"))
             except:
                 pass
-            cfgMap = getRecurConfigMap(item)
+            cfgMap = getUniqKeyConfigMap(item)
             mxpCfgMap[(stagename, enable)] = cfgMap
         self.mxpCfgMap = mxpCfgMap
         return mxpCfgMap

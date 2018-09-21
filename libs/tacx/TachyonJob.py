@@ -18,7 +18,7 @@ import time
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-from XmlUtil import addChildNode, setChildNodeVal, getChildNodeVal
+from XmlUtil import JobInfoXml
 import logger
 from StrUtil import parseKW, buildKW
 
@@ -75,41 +75,43 @@ class Job(object):
         self.checkJobXml()
         tree = ET.parse(self.jobxml) # for xml writing
         root = tree.getroot()
+        jobroot = JobInfoXml(root)
         s_time = time.strftime('%Y-%m-%d %H:%M:%S')
         if jobstart or curstage==0:
             try:
                 if descr is not None:
                     log.debug('descr=%s' % descr)
-                    root = setChildNodeVal(root, "item/[name='descr']", descr)
-                root = setChildNodeVal(root, "item/[name='status']", 'Submitted')
-                root = setChildNodeVal(root, "item/[name='message']", "%s[%d/%d]:%s" % (stagename, curstage+1, totstage, 'running'))
-                root = setChildNodeVal(root, "item/[name='submittime']", )
-                root = setChildNodeVal(root, "item/[name='starttime']", s_time)
-                root = setChildNodeVal(root, "item/[name='endtime']", '')
+                    jobroot.setChildNodeVal("item/[name='descr']", descr)
+                jobroot.setChildNodeVal("item/[name='status']", 'Submitted')
+                jobroot.setChildNodeVal("item/[name='message']", "%s[%d/%d]:%s" % (stagename, curstage+1, totstage, 'running'))
+                jobroot.setChildNodeVal("item/[name='submittime']", )
+                jobroot.setChildNodeVal("item/[name='starttime']", s_time)
+                jobroot.setChildNodeVal("item/[name='endtime']", '')
             except AttributeError:
-                root = addChildNode(root, 'message', '%s[%d/%d]:%s' % (stagename, curstage, totstage, 'running'))
-                root = addChildNode(root, "submittime", s_time)
-                root = addChildNode(root, "starttime", s_time)
-                root = addChildNode(root, "endtime", '')
-                root = addChildNode(root, "status", 'Submitted')
+                jobroot.addChildNode("message", '%s[%d/%d]:%s' % (stagename, curstage, totstage, 'running'))
+                jobroot.addChildNode("submittime", s_time)
+                jobroot.addChildNode("starttime", s_time)
+                jobroot.addChildNode("endtime", '')
+                jobroot.addChildNode("status", 'Submitted')
         elif jobabort:
-            root = setChildNodeVal(root, "item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'Aborted', message))
-            root = setChildNodeVal(root, "item/[name='endtime']", s_time)
-            root = setChildNodeVal(root, "item/[name='status']", 'Aborted')
+            jobroot.setChildNodeVal("item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'Aborted', message))
+            jobroot.setChildNodeVal("item/[name='endtime']", s_time)
+            jobroot.setChildNodeVal("item/[name='status']", 'Aborted')
         elif jobdone or curstage==totstage:
-            root = setChildNodeVal(root, "item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'Done', message))
-            root = setChildNodeVal(root, "item/[name='endtime']", s_time)
-            root = setChildNodeVal(root, "item/[name='status']", 'Done')
+            jobroot.setChildNodeVal("item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'Done', message))
+            jobroot.setChildNodeVal("item/[name='endtime']", s_time)
+            jobroot.setChildNodeVal("item/[name='status']", 'Done')
         else:
-            root = setChildNodeVal(root, "item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'running', message))
-            root = setChildNodeVal(root, "item/[name='status']", 'Running')
+            jobroot.setChildNodeVal("item/[name='message']", '%s[%d/%d]:%s(%s)' % (stagename, curstage, totstage, 'running', message))
+            jobroot.setChildNodeVal("item/[name='status']", 'Running')
         tree.write(self.jobxml)
 
     def getOption(self, astype="dict"):
         self.checkJobXml()
         root = ET.parse(self.jobxml).getroot()
+        jobroot = JobInfoXml(root)
         try:
-            options = getChildNodeVal(root, ".item/[name='options']")
+            options = jobroot.getChildNodeVal(".item/[name='options']")
             if astype == "dict":
                 options = parseKW(options)
             return options
@@ -118,9 +120,12 @@ class Job(object):
 
     def setOption(self, **kwargs):
         self.checkJobXml()
-        root = ET.parse(self.jobxml).getroot()
+        tree = ET.parse(self.jobxml) # for xml writing
+        root = tree.getroot()
+        jobroot = JobInfoXml(root)
         options = buildKW(dict(kwargs));
-        setChildNodeVal(root, ".item/[name='options']", options)
+        jobroot.setChildNodeVal(".item/[name='options']", options)
+        tree.write(self.jobxml)
 
 if __name__ == '__main__':
     jobpath = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/8GF02/06_study_c2c_id2db_Case2E_IMEC_EP5_old_bin'
@@ -129,5 +134,10 @@ if __name__ == '__main__':
     print(jobpath)
     m_job = Job(jobpath)
     print (m_job.status)
-    print (m_job.getOption())
-    m_job.setOption(a=1, b=2)
+    joboptions = m_job.getOption()
+    print(joboptions)
+    print(buildKW(joboptions))
+
+    joboptions = "enable=1-2000,MXP.debug=1,avx=1"
+    # m_job.setOption(a=1, b=2)
+    m_job.setOption(**parseKW(joboptions))
