@@ -12,7 +12,7 @@ from CnnSemJob import *
 
 class TestCNNJob(unittest.TestCase):
     def setUp(self):
-        self.myjob = MXPJob(r'../samplejob')
+        self.myjob = MxpJob(r'../samplejob')
 
     def test_construct_job(self):
         myjob = Job(r'../samplejob')

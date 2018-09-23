@@ -6,7 +6,7 @@ ImGUI:
     - Image input/ output
     - Image plot utility module
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 
 import numpy as np
@@ -324,13 +324,51 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
         if cbar:
             fig.colorbar(cax)
 
+def decideAngleType(angle):
+    '''
+    normalize angle into (-180, 180], then get angle types:
+
+    np.linspace(22.5, 180-22.5, 4)
+    Out[18]: array([  22.5,   67.5,  112.5,  157.5])
+
+    np.linspace(22.5-180, -22.5, 4)
+    Out[19]: array([-157.5, -112.5,  -67.5,  -22.5])
+
+    in the range of interval [-22.5, 22.5) from center line
+    
+    angle type, direction, center lines
+
+    * 0, H: 0, 180, -180
+    * 1, +45: 45, -135
+    * 2, V: 90, -90
+    * 3, -45: 135, -45
+    '''
+
+    # angle into (-180, 180]
+    angle = angle%360
+    if angle > 180:
+        angle = angle - 360
+
+    angleType = 0
+    if -22.5<=angle<22.5 or -22.5<=(angle-180)<22.5 or -22.5<=(angle+180)<22.5:
+        angleType=0
+    elif -22.5<=(angle-45)<22.5 or -22.5<=(angle+135)<22.5:
+        angleType=1
+    elif -22.5<=(angle-90)<22.5 or -22.5<=(angle+90)<22.5:
+        angleType=2
+    elif -22.5<=(angle-135)<22.5 or -22.5<=(angle+45)<22.5:
+        angleType=3
+    return angleType
+
 class PolygonDrawer(object):
-    def __init__(self, im, window_name):
+    def __init__(self, im, window_name='Drawer'):
         self.raw = im
         if np.ndim(im) == 2:
             self.im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR);
-        else:
+        elif np.ndim(im) == 3:
             self.im = im
+        else:
+            sys.exit("image need to be an instance of numpy ndarray \n")
         self.window_name = window_name
         self._init_parms()
 
@@ -394,7 +432,7 @@ class PolygonDrawer(object):
         cv2.destroyWindow(self.window_name)
         return self.final
 
-    def getROI(self, masked_mat=False):
+    def getROIData(self, masked_mat=False):
         '''
         generate polygon ROI by self.points, access the raw image data under
         the polygon ROI
@@ -434,7 +472,7 @@ class PointPairDrawer(PolygonDrawer):
     def __init__(self, im, window_name, **kwargs):
         super(PointPairDrawer, self).__init__(im, window_name)
         self.pairs = []
-        self.line_type = kwargs.get('line_type', None)
+        self.mode_HV45 = kwargs.get('HV45', True)
         self.drawfunc = kwargs.get('drawfunc', None)
 
     def on_mouse(self, event, x, y, buttons, user_param):
@@ -451,7 +489,9 @@ class PointPairDrawer(PolygonDrawer):
             sys.stdout.write("Adding point #{} with position({},{})!\n".format(len(self.points), x, y))
             self.points.append((x, y))
             if len(self.points)>=2 and len(self.points)%2 == 0:
-                lastpair = self._enforce_line_type([self.points[-2], self.points[-1]])
+                lastpair = [self.points[-2], self.points[-1]]
+                if self.mode_HV45:
+                    lastpair = self._enforce_HV45(lastpair)
                 self.pairs.append(lastpair)
                 _, lastpnt = lastpair
                 self.points[-1] = lastpnt
@@ -464,27 +504,30 @@ class PointPairDrawer(PolygonDrawer):
             print(str(self.pairs))
             self.done = True
 
-    def _enforce_line_type(self, src):
+    def _enforce_HV45(self, src):
         '''
-        Line type 0, 1, 2, 3
-        - line_type 0: any direction, (x0, y0), (x1, y1)
-        - line_type 1: Horizontal line, (x0, y0), (x1, y0)
+        angle type 0, 1, 2, 3
+        - line_type 0: Horizontal line, (x0, y0), (x1, y0)
         - line_type 2: Vertical line, (x0, y0), (x0, y1)
-        - line_type 3: 45*N line, (x0, y0), (x1, y1')
+        - line_type 1,3: 45*N line, (x0, y0), (x1, y1')
+        - if without enforce line_type: any direction, (x0, y0), (x1, y1)
         '''
         dst = src
-        if self.line_type != None:
-            head, tail = src
-            x0, y0 = head
-            x1, y1 = tail
-            if self.line_type == 1: # H
-                dst[-1] = (x1, y0)
-            elif self.line_type == 2: # V
-                dst[-1] = (x0, y1)
-            elif self.line_type == 3: # 45*N
-                tan_theta = np.copysign(1, y1-y0)/np.copysign(1, x1-x0)
-                y1 = y0 + tan_theta*(x1-x0)
-                dst[-1] = (x1, y1)
+
+        head, tail = src
+        x0, y0 = head
+        x1, y1 = tail
+        angle = np.arctan2(y1-y0, x1-x0)
+        angle_type = decideAngleType(angle)
+
+        if angle_type == 0: # H
+            dst[-1] = (x1, y0)
+        elif self.line_type == 2: # V
+            dst[-1] = (x0, y1)
+        else: # 45*N
+            tan_theta = np.copysign(1, y1-y0)/np.copysign(1, x1-x0)
+            y1 = y0 + tan_theta*(x1-x0)
+            dst[-1] = (x1, y1)
         return dst
 
     def run(self):
@@ -523,13 +566,16 @@ class PointPairDrawer(PolygonDrawer):
         cv2.destroyWindow(self.window_name)
         return self.final
 
-    def getROI(self, masked_mat=False):
+    def getROIData(self, masked_mat=False):
         '''
         generate rectangle/line ROI by self.pairs, access the raw image data
         under the corresponding ROI
         '''
-        roi = getROIByPointPairs(self.raw, self.pairs, self.drawfunc, masked_mat)
-        return roi
+        roidata = getROIByPointPairs(self.raw, self.pairs, self.drawfunc, masked_mat)
+        return roidata
+
+    def getROICoord(self):
+        return self.pairs
 
 def getROIByPointPairs(im, pairs, drawfunc, masked_mat=False):
     '''get ROI by point pairs, a pair of points can generate a rectangle or
@@ -545,17 +591,17 @@ def getROIByPointPairs(im, pairs, drawfunc, masked_mat=False):
         drawfunc(mask, head, tail, 255, thickness)
     matrix = np.ma.array(im, mask=~(mask>128))
     if masked_mat:
-        roi = matrix
+        roidata = matrix
     else:
-        roi = matrix.compressed()
-        # roi = matrix[~matrix.mask]
-    return roi
+        roidata = matrix.compressed()
+        # roidata = matrix[~matrix.mask]
+    return roidata
 
 class LineDrawer(PointPairDrawer):
     """LineDrawer: line by a pair of points, head&tail,
     support H,V,45,any line"""
-    def __init__(self, im, window_name, line_type=1):
-        kwargs = {'line_type': line_type, 'drawfunc': cv2.line}
+    def __init__(im, window_name):
+        kwargs = {'line_type': line_type}
         super(LineDrawer, self).__init__(im, window_name, **kwargs)
 
 class RectangleDrawer(PointPairDrawer):

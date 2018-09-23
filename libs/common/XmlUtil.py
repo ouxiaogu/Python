@@ -2,12 +2,17 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-24 15:17:55
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 
-XmlUtil: Tachyon Job Xml handling module
+XmlUtil: Xml handling module
+
+* Tree level: ElementTree is  
+    - Tree level: Those naming are all for node level
+
+    `Elem`, `cf`, `gcf`, `root`
+
 """
 
-from xml.etree import ElementTree
 import xml.etree.ElementTree as ET
 import re
 import pandas as pd
@@ -16,6 +21,11 @@ from StrUtil import parseText
 from collections import deque
 
 log = logger.setup("XmlUtil")
+
+__all__ = ['JobInfoXml', 'addChildNode', 'getChildNode', 
+            'setConfigData', 'getConfigData', 
+            'getSonConfigMap', 'getUniqKeyConfigMap', 'getFullConfigMap', 
+            'dfFromConfigMapList', 'dfToMxpOcf', ]
 
 class JobInfoXml(object):
     """
@@ -56,68 +66,76 @@ class JobInfoXml(object):
         child.append(grandchild)
         self.root.append(child)
 
-    def setChildNodeVal(self, pattern, intext=''):
-        p = self.root.find(pattern)
+    def setConfigData(self, key, intext=''):
+        p = self.root.find(key)
         child = p.find('value')
         child.text = intext
 
-    def getChildNodeVal(self, pattern):
+    def getConfigData(self, key):
         try:
-            p = self.root.find(pattern)
+            p = self.root.find(key)
             child = p.find('value')
             return child.text
         except:
-            log.error("Cannot find the value of pattern %s in root" % pattern)
+            log.error("Cannot find the value of key %s in root" % key)
             return ''
 
-def addChildNode(node, key='', val=None):
+def addChildNode(cf, key='', val=None):
     child = ET.Element(key)
     if val is not None:
         child.text = val
-    node.append(child)
+    cf.append(child)
     return child
 
-def getChildNode(node, pattern, count=0, suppress_warn=False):
-    if not pattern.startswith("."): # depth=1
-        pattern = "."+pattern
-        log.debug("add '.' before pattern to only search depth=1: %s", pattern)
-    if '/' in pattern:
-        log.warning("Warning, please avoid ambiguous by removing '/' in pattern")
-    for i, inode in enumerate(node.findall(pattern)):
+def getChildNode(cf, key, count=0, suppress_warn=False):
+    if not key.startswith("."): # depth=1
+        key = "."+key
+        log.debug("add '.' before key to only search depth=1: %s", key)
+    if '/' in key:
+        log.warning("Warning, please avoid ambiguous by removing '/' in key")
+    for i, inode in enumerate(cf.findall(key)):
         if i==count:
             return inode
     if suppress_warn:
-        log.warning("Warning, getChildNode, Failed to find No. {} child with pattern {} in giving node".format(count, pattern))
+        log.warning("Warning, getChildNode, Failed to find No. {} child with key {} in giving cf".format(count, key))
     return None
 
-def setChildNodeVal(node, pattern, intext='', count=0):
-    p = getChildNode(node, pattern, count)
+def setConfigData(cf, key, val='', count=0):
+    p = getChildNode(cf, key, count)
     if p is not None:
-        p.text = intext
+        p.text = val
+    else:
+        addChildNode(cf, key, val)
 
-def getChildNodeVal(node, pattern, count=0, defaultval=None):
-    p = getChildNode(node, pattern, count)
+def getConfigData(cf, key, defaultval=None, count=0):
+    p = getChildNode(cf, key, count)
     if p is not None:
         return getElemText(p)
     return defaultval
 
-def getElemText(elem_, trim=False, precision=3):
+def getGlobalConfigData(gcf, cf, key, defaultval=None):
+    lval = getConfigData(cf, key, defaultval)
+    if lval is None or lval == defaultval:
+        return getConfigData(gcf, key, defaultval)
+    return lval
+
+def getElemText(elem, trim=False, precision=3):
     """
     Parse text of xml Elem
 
     Parameters
     ----------
-    elem_:  xml Elem object,
-        if elem_ node has children, raise ValueError;
+    elem:  xml Elem object,
+        if elem node has children, raise ValueError;
         else return parsed text
     """
-    text_ = elem_.text
-    if text_ is None:
+    text = elem.text
+    if text is None:
         return ""
     else:
-        return parseText(text_, trim, precision)
+        return parseText(text, trim, precision)
 
-def getSonConfigMap(elem, trim=False, precision=3):
+def getSonConfigMap(cf, trim=False, precision=3):
     """
     Parse the tag & text of all depth=1 children node into a map.
 
@@ -126,13 +144,13 @@ def getSonConfigMap(elem, trim=False, precision=3):
     Return {'kpi': 0.741, 'name': 13}
     """
     rst = {}
-    for item in list(elem):
+    for item in list(cf):
         if len(item) > 0:
             continue
         rst[item.tag] = getElemText(item, trim, precision)
     return rst
 
-def getUniqKeyConfigMap(elem):
+def getUniqKeyConfigMap(cf):
     """
     Recursively parse the tag & text of all children nodes into a map.
 
@@ -141,30 +159,29 @@ def getUniqKeyConfigMap(elem):
     Return {'kpi': 0.741096070383657, 'name': 13, 'test': {'value': 211.0}}
     """
     rst = {}
-    for item in list(elem):
+    for item in list(cf):
         if len(item) > 0:
             rst[item.tag] = getUniqKeyConfigMap(item)
         else:
             rst[item.tag] = getElemText(item)
     return rst
 
-def getConfigMapList(node, pattern):
+def getConfigMapList(cf, key):
     """
-    For all the items met pattern type under current node,
+    For all the items met key type under current cf,
     based on the result of getConfigMapBFS, output a list of KWs map
-    suitable for Xml Tree, with multiple pattern node, but every pattern node
-    have unique children.
+    suitable for Xml Tree, with multiple key node instances
     """
     rst = []
-    if not pattern.startswith("."): # depth=1
-        pattern = "."+pattern
-        log.debug("add '.' before pattern to only search depth=1: %s", pattern)
-    for child in node.findall(pattern):
+    if not key.startswith("."): # depth=1
+        key = "."+key
+        log.debug("add '.' before key to only search depth=1: %s", key)
+    for child in cf.findall(key):
         curMap = getFullConfigMap(child)
         rst.append(curMap)
     return rst
 
-def getFullConfigMap(elem):
+def getFullConfigMap(cf):
     '''
     parse the complete xml tree into a flat depth=2 KWs map
 
@@ -176,10 +193,10 @@ def getFullConfigMap(elem):
     '''
     rst = {}
     visited= []
-    for inode in list(elem): # inode, just get tag
+    for inode in list(cf): # inode, just get tag
         curtag = './'+inode.tag
         if curtag not in visited:
-            for j, jnode in enumerate(elem.findall(curtag)): # jnode, parse all children matched pattern
+            for j, jnode in enumerate(cf.findall(curtag)): # jnode, parse all children matched key
                 visited.append(curtag)
                 nodekey = inode.tag if j==0 else inode.tag+'@'+str(j)
                 if len(jnode) > 0:
@@ -190,13 +207,13 @@ def getFullConfigMap(elem):
                 rst = {k: v for d in (rst, jrst) for k, v in d.items()}
     return rst
 
-def getConfigMapBFS(elem):
+def getConfigMapBFS(cf):
     '''
     Examples
     --------
     Return {'kpi': 0.741096070383657, 'name': 13, 'test/key': 'name', 'test/value': 213.0, 'test/value@1': 212.0, 'test@1/value': 211.0, 'test/options/enable': '1-2000'}
     '''
-    tags = deque([(elem, [''], [0])])
+    tags = deque([(cf, [''], [0])])
     rst = {}
     while len(tags) > 0:
         visited = []
@@ -220,13 +237,13 @@ def getConfigMapBFS(elem):
     final = {(re.sub(r'\./', r'/', k)[1:]): v for k, v in rst.items()}
     return final
 
-def getConfigMapDFS(elem):
+def getConfigMapDFS(cf):
     '''
     Examples
     --------
     Return {'kpi': 0.741096070383657, 'name': 13, 'test/key': 'name', 'test/value': 213.0, 'test/value@1': 212.0, 'test/options/enable': '1-2000', 'test@1/value': 211.0}
     '''
-    tags = deque([(elem, [''], [0])])
+    tags = deque([(cf, [''], [0])])
     rst = {}
     while len(tags) > 0:
         visited = []
@@ -254,8 +271,8 @@ def getConfigMapDFS(elem):
     final = {(re.sub(r'\./', r'/', k)[1:]): v for k, v in rst.items()}
     return final
 
-def dfFromConfigMapList(node, pattern):
-    return pd.DataFrame(getConfigMapList(node, pattern))
+def dfFromConfigMapList(cf, key):
+    return pd.DataFrame(getConfigMapList(cf, key))
 
 def updateXmlPath(root, paths_indice, value):
     '''
@@ -268,7 +285,7 @@ def updateXmlPath(root, paths_indice, value):
     while len(paths_indice) != 0:
         tag, idx = paths_indice.popleft()
         # print(tag, idx)
-        nextnode = getChildNode(curnode, pattern=tag, count=idx, suppress_warn=True)
+        nextnode = getChildNode(curnode, key=tag, count=idx, suppress_warn=True)
         if nextnode is None:
             if len(paths_indice) == 0:
                 nextnode = addChildNode(curnode, tag, str(value))
@@ -287,13 +304,14 @@ def dfRowToXmlNode(rowSeries, tag='pattern', path_sep='/', index_sep='@'):
         updateXmlPath(node, paths_indice, series[tag])
     return node
 
-def dfToMxpXml(df):
+def dfToMxpOcf(df):
     root = ET.Element('root')
     ocf = ET.Element('result')
     root.append(ocf)
     for _, series in df.iterrows():
         occf = dfRowToXmlNode(series)
         ocf.append(occf)
+    indent(root)
     return root
 
 def indent(elem, level=0):
@@ -333,7 +351,7 @@ if __name__ == '__main__':
     root = ET.fromstring(nodestr)
     kpi = root.find(".kpi")
     test = root.find(".test")
-    print ('getChildNodeVal(root, ".test/value")', getChildNodeVal(root, ".test/value"))
+    print ('getConfigData(root, ".test/value")', getConfigData(root, ".test/value"))
     print ('len(test) 1st', len(test), test.text)
     print ('len(kpi) 1st', len(kpi))
 
@@ -347,12 +365,11 @@ if __name__ == '__main__':
     # print(getConfigMapList(root, '.test'))
     df = dfFromConfigMapList(root, '.test')
     print(df)
-    root = dfToMxpXml(df)
-    indent(root)
+    root = dfToMxpOcf(df)
     tree = ET.ElementTree(root)
     tree.write("example.xml", encoding="utf-8", xml_declaration=True)
 
     root = ET.parse('example.xml').getroot().find('.result')
-    print ('\ngetChildNodeVal(root, "/value")', getChildNodeVal(root, ".pattern/value"))
+    print ('getConfigData(.pattern/value)', getConfigData(root, ".pattern/value"))
     df = dfFromConfigMapList(root, '.pattern')
     print(df)

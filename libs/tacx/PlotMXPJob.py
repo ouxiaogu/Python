@@ -2,12 +2,12 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-30 14:24:25
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 
 MXPJobPlot: some frequently used plot for MXP job
 """
 
-from MXPJob import MXPJob
+from MxpJob import MxpJob
 import matplotlib.pyplot as plt
 import os.path
 import pandas as pd
@@ -49,7 +49,7 @@ class MXPStageData(object):
         '''only parse costwt>0 patterns, and use pattern name as index'''
         dataset = []
         for jobpath in self.jobpaths:
-            job = MXPJob(jobpath)
+            job = MxpJob(jobpath)
             df = job.getStageResultFactory(stage=self.stage, stagename=self.stagename, enable=self.enable, 
                 result_option=self.result_option)
             df = df.loc[df.costwt>0, :].set_index('name')
@@ -155,7 +155,7 @@ def histplot_rstChkResults(jobs):
     STGNAME = "DLSEMModelDataPrepare"
     COLNAME = "offset_x"
     OPTION = "occfs"
-    if isinstance(jobs, MXPJob):
+    if isinstance(jobs, MxpJob):
         jobs = [jobs]
     hists = pd.DataFrame()
     lsuffix_ = os.path.basename(os.path.normpath(jobs[0].jobpath))

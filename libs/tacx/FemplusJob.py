@@ -9,7 +9,7 @@ from TachyonJob import Job
 from collections import OrderedDict
 import os.path
 import re
-from XmlUtil import getChildNodeVal
+from XmlUtil import getConfigData
 
 # TACX GUI classes
 import sys

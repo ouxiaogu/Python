@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-24 21:07:29
 
-Last Modified by: peyang
+Last Modified by: ouxiaogu
 
 SEM: class to hold SEM Spec Table
 
@@ -15,7 +15,7 @@ Generate SEM spec table from:
 
 from StringIO import StringIO
 import pandas as pd
-from MXPJob import MXPOutXml
+from MxpStage import MxpStageXmlParser
 import os.path
 from TachyonJob import Job
 from StrUtil import parseKW
@@ -96,7 +96,7 @@ class SEMSpec(object):
             xmlfile will convert to pattern occfs DataFrame
             then call from_mxp_occfs to generate the desired SEM Spec table
         """
-        mxpocf = MXPOutXml(xmlfile)
+        mxpocf = MxpStageXmlParser(xmlfile)
         src = mxpocf.getoccfs()
         spec = self.from_mxp_occfs(src)
         return spec
