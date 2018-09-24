@@ -15,11 +15,13 @@ import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
 from SEMContour import SEMContour
 from MxpStage import MxpStage
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/imutil/")
+from ImGUI import imread_gray
 
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
-from
+from XmlUtil import addChildNode, getConfigData, setConfigData
 import logger
-log = logger.setup("ContourLabeling")
+log = logger.setup("ContourLabeling", 'debug')
 
 g_epslmt = 1e-9
 
@@ -28,7 +30,7 @@ class RectangleDrawer(object):
     def __init__(self, im, window_name, **kwargs):
         self.raw = im
         if np.ndim(im) == 2:
-            self.im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR);
+            self.im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
         elif np.ndim(im) == 3:
             self.im = im
         else:
@@ -46,6 +48,14 @@ class RectangleDrawer(object):
         self.points = [] # List of points defining our polygon
         self.FINAL_LINE_COLOR = (0, 0, 255) # Red
         self.WORKING_LINE_COLOR = (127, 127, 127)
+
+    def printUsage(self):
+        print("\nUsage: RectangleDrawer\n")
+        print("mouse odd  left click:   Rectangle top left point")
+        print("mouse move:              Rectangle bottom right point updating")
+        print("mouse even left click:   Rectangle bottom right point")
+        print("mouse right click:       Stop drawing rectangle")
+        print("ESC:                     Exit drawing")
 
     def on_mouse(self, event, x, y, buttons, user_param):
         # Mouse callback that gets called for every mouse event (i.e. moving, clicking, etc.)
@@ -158,9 +168,66 @@ class ContourSelLabelStage(MxpStage):
     """
 
     def run(self):
-
-        for idx, series in self.d_df.iterrows():
-            if series.loc['cost'] <= 0:
+        for idx, iccf in enumerate(self.d_icf.findall('.pattern')):
+            if getConfigData(iccf, 'costwt') <= 0:
                 continue
+            imgfile = os.path.join(self.jobresultabspath, getConfigData(iccf, '.image/path'))
+            contourfile = os.path.join(self.jobresultabspath, getConfigData(iccf, '.contour/path'))
 
-            
+            im = loadPatternData(imgfile, contourfile)
+
+            drawer = RectangleDrawer(im, "Contour Point outlier area labeling...")
+            drawer.printUsage()
+            drawer.run()
+            rectcoord = drawer.getROICoord()
+            bboxcf = addChildNode(iccf, 'bbox')
+            for idx, tl, br in enumerate(rectcoord):
+                xini, yini = tl
+                xend, yend = br
+                bboxstr = "{}, {}, {}, {}".format(xini, yini, xend, yend)
+                setConfigData(bboxcf, 'Outlier', val=bboxstr, count=idx)
+
+def loadPatternData(imgfile='', contourfile=''):
+    bSucceedReadCt, bSucceedReadIm = False, False
+    try:
+        contour = SEMContour()
+        bSucceedReadCt = contour.parseFile(contourfile)
+        df = contour.toDf()
+        log.debug("contour df head\n{}".format(df.head(1)))
+        polygonIds = df.loc[:, 'polygonId'].drop_duplicates().values.tolist()
+        log.debug('#polygon: {}'.format(len(polygonIds)))
+        contourPointsVec = []
+        for polygonId in polygonIds:
+            contourpoints = df.loc[df.polygonId==polygonId, ['offsetx', 'offsety']].values
+            contourpoints = np.round(contourpoints).astype(int)
+            contourPointsVec.append(contourpoints)
+        log.debug("contour points {} head\n{}".format(contourPointsVec[0].shape, contourPointsVec[0][0]))
+    except:
+        raise
+        pass
+    try:
+        im, _ = imread_gray(imgfile)
+        im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
+        bSucceedReadIm = True
+    except:
+        # raise
+        pass
+    if not bSucceedReadCt and not bSucceedReadIm:
+        raise IOError("Neither imgfile('{}') nor contourfile('{}') can be parsed".format(imgfile, contourfile))
+    elif bSucceedReadIm:
+        if bSucceedReadCt:
+            vmax = np.iinfo(im.dtype).max
+            CONTOUR_COLOR = (0, vmax, vmax) # yellow
+            im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, 2)
+    elif bSucceedReadCt:
+        imw, imh = contour.getshape()
+        imw, imh = int(imw), int(imh)
+        vmax = 255
+        im = vmax//2 * np.zeros((imh, imw, 3), dtype=np.uint8) # gray background
+        CONTOUR_COLOR = (0, vmax, vmax) # yellow
+        im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, 2)
+    return im
+
+
+
+

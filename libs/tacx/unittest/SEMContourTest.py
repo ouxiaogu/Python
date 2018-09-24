@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-19 15:38:14
 
 SEMContour class test and plots
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ class ContourAnalyzer(object):
         if not contour:
             sys.exit("ERROR: read in contour file %s fails\n" % contourfile)
         self.contour = contour
-        self.df = contour.cvtToDf()
+        self.df = contour.toDf()
 
 def plot_corr(df):
     matplotlib.style.use('ggplot')

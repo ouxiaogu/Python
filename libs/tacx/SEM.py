@@ -97,7 +97,7 @@ class SEMSpec(object):
             then call from_mxp_occfs to generate the desired SEM Spec table
         """
         mxpocf = MxpStageXmlParser(xmlfile)
-        src = mxpocf.getoccfs()
+        src = mxpocf.occfs2df()
         spec = self.from_mxp_occfs(src)
         return spec
 

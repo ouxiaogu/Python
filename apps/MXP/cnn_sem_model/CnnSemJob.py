@@ -61,7 +61,7 @@ class CnnSemJob(MxpJob):
             if stagename != "init":
                 inxmlfile = self.getStageIOFile(stage, option=MXP_XML_TAGS[0])
                 stagexml = MxpStageXmlParser(inxmlfile, option=MXP_XML_TAGS[0])
-                df = stagexml.geticcfs()
+                df = stagexml.iccfs2df()
             cf = self.getStageConfig(stage)
             stagepath = self.resultAbsPath('{}{}'.format(stagename, enablenum))
             curstage = eval(STAGE_REGISTER_TABLE[stagename])(gcf, cf, df, stagename, self.jobpath)
@@ -233,7 +233,7 @@ class CSemApplyStage(MxpStage):
         inxmlfile = getConfigData(self.d_cf, MXP_XML_TAGS[0])
         inxmlfile = os.path.join(self.jobresultpath, inxmlfile)
         parser = MxpStageXmlParser(inxmlfile, option=MXP_XML_TAGS[0])
-        modelpath = getConfigData(parser.geticf(), '.model')
+        modelpath = getConfigData(parser.loadicf(), '.model')
         if not os.path.exists(modelpath):
             raise ValueError("%s, Error, does not exists model path: %s" % (self.stagename, modelpath))
         cnn.load(epoch=epoch, path=modelpath)

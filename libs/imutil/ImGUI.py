@@ -12,7 +12,7 @@ Last Modified by: ouxiaogu
 import numpy as np
 import re
 import matplotlib.pyplot as plt
-import matplotlib
+import os.path
 import sys
 import math
 import cv2
@@ -20,6 +20,7 @@ import cv2
 __all__ = ['readDumpImage', 'readBBox', 'gen_multi_image_overview',
         'imshowCmap', 'cvtFloat2Gray', 'imreadFolder', 'imshowMultiple',
         'imshowMultiple_TitleMatrix', 'read_pgm', 'write_pgm',
+        'imread_gray',
         'PolygonDrawer', 'LineDrawer', 'RectangleDrawer',
         'getPolyROI', 'getROIByPointPairs']
 
@@ -59,6 +60,19 @@ def write_pgm(img, filename, bbox=None):
         f.write('{} {}\n'.format(M, N))
         f.write('{}\n'.format(maxval))
         img.tofile(f)
+
+def imread_gray(imfile):
+    if not os.path.exists(imfile):
+        raise IOError("Error, file doesn't exist at: {}".format(imfile))
+    if imfile[-3:] == 'pgm':
+        im = cv2.imread(imfile, -1)
+        bbox = readBBox(imfile)
+    else:
+        im = cv2.imread(imfile, 0)
+        N, M = im.shape
+        bbox = [0, 0, M, N]
+    print("bbox in origin image: {}".format(bbox))
+    return im, bbox
 
 def readDumpImage(infile, skip_header=0):
     im = np.genfromtxt(infile, skip_header=skip_header).astype('float32')

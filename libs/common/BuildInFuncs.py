@@ -113,6 +113,26 @@ class DateTime(Date):
   def tostr(self):
       return "{0}-{1}-{2} - 00:00:00PM".format(self.month, self.day, self.year)
 
+class Dog:
+    kind = 'canine'         # class variable shared by all instances
+    tricks = []             # mistaken use of a class variable
+
+    def __init__(self, name):
+        self.name = name    # instance variable unique to each instance
+
+    def add_trick(self, trick):
+        self.tricks.append(trick)
+
+def test_Dog():
+    d = Dog('Fido')
+    e = Dog('Buddy')
+    print(d.kind == 'canine')   # shared by all dogs
+    print(e.kind == 'canine')   # shared by all dogs
+    print(d.name)               # unique to d, 'Fido'
+    print(e.name)               # unique to e, 'Buddy'
+
+    # tricks will be unexpectedly as combine of all Dog instances
+
 def all(iterable):
     for element in iterable:
         if not element:
@@ -137,6 +157,11 @@ def slice(start, stop, step=None):
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Test')
+    parser.add_argument('BAR', help='BAR help')
+    parser.add_argument('-f', '--foo', help='foo help')
+    args = argparse.parse_args(['BAR', '--foo', 'FOO'])
 
     '''test 1, zip'''
     print("\ntest 1, zip different length\n")

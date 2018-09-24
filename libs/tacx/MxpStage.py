@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf
 import logger
-log = logger.setup("MxpStage")
+log = logger.setup("MxpStage", 'debug')
 
 __all__ = ['MXP_XML_TAGS', 'MXP_RESULT_OPTIONS',
          'MxpStage', 'MxpStageXmlParser',]
@@ -33,12 +33,12 @@ class MxpStageXmlParser(object):
 
     def __build(self):
         if self.option==MXP_XML_TAGS[0]:
-            self.geticf()
+            self.loadicf()
         elif self.option==MXP_XML_TAGS[1]:
-            self.getocf()
-            self.getosumcf()
+            self.loadocf()
+            self.loadosumcf()
 
-    def geticf(self):
+    def loadicf(self):
         try:
             self.icf = ET.parse(self.xmlfile).getroot().find("result")
             log.debug("icf tag: "+self.icf.tag)
@@ -46,14 +46,14 @@ class MxpStageXmlParser(object):
             raise AttributeError("%s has no attribute 'tag'" % self.icf)
         return self.icf
 
-    def getocf(self):
+    def loadocf(self):
         try:
             self.ocf = ET.parse(self.xmlfile).getroot().find("result")
             log.debug("ocf tag: "+self.ocf.tag)
         except AttributeError:
             raise AttributeError("%s has no attribute 'tag'" % self.ocf)
 
-    def getosumcf(self):
+    def loadosumcf(self):
         self.osumcf = self.ocf.find("summary")
         try:
             log.debug("osumcf tag: "+self.osumcf.tag)
@@ -61,10 +61,10 @@ class MxpStageXmlParser(object):
             log.debug("No summary tag in input xml： %s" % self.xmlfile)
             pass
 
-    def geticcfs(self):
+    def iccfs2df(self):
         return dfFromConfigMapList(self.icf, ".pattern")
 
-    def getoccfs(self):
+    def occfs2df(self):
         """
         Returns
         -------
@@ -73,7 +73,7 @@ class MxpStageXmlParser(object):
         """
         return dfFromConfigMapList(self.ocf, ".pattern")
 
-    def getosumccfs(self):
+    def osumccfs2df(self):
         """
         Returns
         -------
@@ -81,7 +81,7 @@ class MxpStageXmlParser(object):
             all the pattern's summary in xmlfile"""
         return dfFromConfigMapList(self.osumcf, ".pattern")
 
-    def getosumkpis(self):
+    def osumkpis2df(self):
         """
         Returns
         -------
@@ -97,19 +97,23 @@ class MxpStage(object):
     def __init__(self, gcf, cf, stagename, jobpath):
         self.d_gcf = gcf
         self.d_cf = cf
-        self.stagepath = stagepath
         self.stagename = stagename
         self.jobpath = jobpath
-        jobresultabspath = os.path.join(jobpath, resultrelpath, stagename+'result1')
+        jobresultabspath = os.path.join(self.jobpath, self.resultrelpath)
         if not os.path.exists(jobresultabspath):
-            os.mkdirs(jobresultabspath)
+            log.debug('job result abspath: {}'.format(jobresultabspath))
+            os.makedirs(jobresultabspath)
         self.jobresultabspath = jobresultabspath
+        stageresultabspath = os.path.join(jobpath, self.resultrelpath, stagename+'result1')
+        if not os.path.exists(stageresultabspath):
+            log.debug('stage result abspath: {}'.format(stageresultabspath))
+            os.makedirs(stageresultabspath)
+        self.stageresultabspath = stageresultabspath
 
         self.__build()
 
     def __symbollink(self):
         self.dataabspath = os.path.join(self.jobpath, self.datarelpath)
-        self.resultabspath = os.path.join(self.jobpath, self.resultrelpath)
         for item in os.listdir(self.dataabspath):
             try:
                 os.symlink(os.path.join(self.dataabspath, item), os.path.join(self.resultrelpath, item))
@@ -117,17 +121,18 @@ class MxpStage(object):
                 call('ln -s {} {}'.format(os.path.join(self.dataabspath, item), 
                     os.path.join(self.resultrelpath, item)), shell=True)
 
-    def __readDf(self):
+    def __loadCfg(self):
         inxmlfile = getConfigData(self.d_cf, MXP_XML_TAGS[0])
-        inxmlfile_abspath = os.path.join(self.resultrelpath, inxmlfile)
+        inxmlfile_abspath = os.path.join(self.jobresultabspath, inxmlfile)
         icf_Parser = MxpStageXmlParser(inxmlfile_abspath, option=MXP_XML_TAGS[0])
-        self.d_df = icf_Parser.geticcfs()
+        self.d_df = icf_Parser.iccfs2df()
+        self.d_icf = icf_Parser.icf
 
     def __build(self):
         self.__symbollink()
 
         if "init" not in self.stagename.lower():
-            self.__readDf()
+            self.__loadCfg()
 
     def save(self, path):
         ocf = dfToMxpOcf(self.d_df)

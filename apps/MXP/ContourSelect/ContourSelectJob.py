@@ -6,6 +6,7 @@ ContourSelect job
 
 Last Modified by: ouxiaogu
 """
+import argparse
 
 import sys
 import os.path
@@ -14,13 +15,13 @@ from MxpJob import MxpJob
 from MxpStage import MXP_XML_TAGS
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../../libs/common")
 import logger
-log = logger.setup("ContourSelectJob")
+log = logger.setup("ContourSelectJob", 'debug')
 
 ###############################################################################
 # MXP Contour Select Job Stage Register Area
 from ContourLabeling import ContourSelLabelStage
-from ContourSelModelCal import ContourSelCalStage
-from ContourSelModelApply import ContourSelApplyStage
+#from ContourSelModelCal import ContourSelCalStage
+#from ContourSelModelApply import ContourSelApplyStage
 
 STAGE_REGISTER_TABLE = {
     'ContourSelectDataLabeling': 'ContourSelLabelStage',
@@ -33,18 +34,15 @@ class ContourSelJob(MxpJob):
     """
     ContourSelJob: ContourSelect job
     """
-    def __init__(self, jobpath)
-        super(ContourSelJob, self).__init__(jobpath)
-    
-    def run(self, range):
-        allstages = self.getAllMxpStages()
+    def run(self):
+        allstages = self.getAllMxpStages(enabled_only=True)
         gcf = self.mxproot.find('.global')
         for stage in allstages:
             stagename, enablenum = stage
             log.info("Stage %s%d starts\n" % (stagename, enablenum))
             cf = self.getStageConfig(stage)
-            stagepath = self.resultAbsPath('{}{}'.format(stagename, enablenum))
-            curstage = eval(STAGE_REGISTER_TABLE[stagename])(gcf, cf, stagename, stagepath)
+            stagestr = '{}{}'.format(stagename, enablenum)
+            curstage = eval(STAGE_REGISTER_TABLE[stagename])(gcf, cf, stagestr, self.jobpath) # MxpStage
             curstage.run()
             outxmlfile = self.getStageIOFile(stage, option=MXP_XML_TAGS[1])
             curstage.save(outxmlfile)
@@ -52,13 +50,17 @@ class ContourSelJob(MxpJob):
 
 def main():
     parser = argparse.ArgumentParser(description='MXP Contour Selection job in python')
-    parser.add_argument('jobpath', help='MXP Contour Selection job path')
-    args = parser.parse_args()
-    jobpath = args.jobpath
-    if jobpath is None:
+    parser.add_argument('jobpath', help='job path')
+    parser.add_argument('--enable', help='job enable range, only run stages in range')
+    try:
+        args = parser.parse_args()
+        jobpath = args.jobpath
+    except:
         parser.print_help()
-        parser.exit()
+        # parser.exit()
 
+        args = parser.parse_args(['./samplejob', '--enable', '1-610'])
+        jobpath = args.jobpath
     print(str(vars(args)))
     myjob = ContourSelJob(jobpath)
     myjob.run()

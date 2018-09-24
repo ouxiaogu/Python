@@ -39,6 +39,7 @@ class Job(object):
         if not os.path.exists(jobpath):
             e = "Job not exists at: {}".format(jobpath)
             raise IOError(e)
+        jobpath = os.path.abspath(jobpath)
         self.jobpath = jobpath
 
         jobxml = os.path.join(self.jobpath, 'jobinfo', 'job.xml')

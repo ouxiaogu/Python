@@ -4,7 +4,7 @@ Created: peyang, 2018-09-19 12:07:08
 
 SEM Contour class definition and IO files
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 
 import math
@@ -172,7 +172,7 @@ class SEMContour:
                 fh.write('\t'.join(s)+'\n')
         fh.close()
 
-    def cvtToDf(self):
+    def toDf(self):
         header = ['polygonId']
         header.extend(self.columnTitle)
         allpoints = []
