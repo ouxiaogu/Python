@@ -4,7 +4,7 @@ Created: peyang, 2018-09-19 12:07:08
 
 SEM Contour class definition and IO files
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import math
@@ -116,7 +116,7 @@ class SEMContour:
             self.pixel = float(head[0][2])
             self.offset[0] = float(head[0][3])
             self.offset[1] = float(head[0][4])
-            self.bbox = [head[0][5], head[0][6], head[0][7], head[0][8]]
+            self.bbox = list(map(int, [head[0][5], head[0][6], head[0][7], head[0][8]]))
         else:
             print ('ERROR: Fail to get contour version')
             return False
@@ -172,13 +172,18 @@ class SEMContour:
                 fh.write('\t'.join(s)+'\n')
         fh.close()
 
-    def toDf(self):
+    def toDf(self, in_bbox_only=True):
         header = ['polygonId']
         header.extend(self.columnTitle)
         allpoints = []
+        c_bbox = ContourBBox(*self.bbox)
         for polygon in self.polygonData:
             polygonId = polygon['polygonId']
             for point in polygon['points']:
+                if in_bbox_only:
+                    coord = list(map(float, [point[0], point[1]]))
+                    if not c_bbox.contains(coord):
+                        continue
                 p = [polygonId]
                 p.extend(point)
                 allpoints.append(p)
@@ -186,6 +191,25 @@ class SEMContour:
         allpoints = np.array(allpoints).reshape(shape)
         df = pd.DataFrame(allpoints, columns=header)
         return df
+
+    def fromDf(self, df):
+        '''
+        Contour polygonData
+
+        Example
+        -------
+        [{'polygonId': 1, 'vertexNum': 10, 'polygon0Hole1': 0, 'points': [[], ...]}, {}, ...]
+        '''
+        self.columnTitle = df.columns[1:]
+        polygonIds = df.loc[:, 'polygonId'].drop_duplicates().values.tolist()
+        polygons = []
+        for ix, polygonId in enumerate(polygonIds):
+            polygons.append({})
+            polygons[ix]['polygonId'] = polygonId
+            polygons[ix]['vertexNum'] = len(df.loc[df.polygonId==polygonId, :])
+            polygons[ix]['points'] = df.loc[df.polygonId==polygonId, self.columnTitle].values.tolist()
+        self.setPolygonData(polygons)
+        return self
 
 class ContourBBox:
     def __init__(self, xini, yini, xend, yend):

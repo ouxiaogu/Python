@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-22 23:17:50
 
 MXP Stage base
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import os, os.path
@@ -13,7 +13,7 @@ from subprocess import call
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf
+from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf, indentCf
 import logger
 log = logger.setup("MxpStage", 'debug')
 
@@ -104,7 +104,8 @@ class MxpStage(object):
             log.debug('job result abspath: {}'.format(jobresultabspath))
             os.makedirs(jobresultabspath)
         self.jobresultabspath = jobresultabspath
-        stageresultabspath = os.path.join(jobpath, self.resultrelpath, stagename+'result1')
+        self.stageresultrelpath = stagename+'result1'
+        stageresultabspath = os.path.join(jobpath, self.resultrelpath, self.stageresultrelpath)
         if not os.path.exists(stageresultabspath):
             log.debug('stage result abspath: {}'.format(stageresultabspath))
             os.makedirs(stageresultabspath)
@@ -127,6 +128,7 @@ class MxpStage(object):
         icf_Parser = MxpStageXmlParser(inxmlfile_abspath, option=MXP_XML_TAGS[0])
         self.d_df = icf_Parser.iccfs2df()
         self.d_icf = icf_Parser.icf
+        self.d_ocf = self.d_icf # directly use reference, without copy here
 
     def __build(self):
         self.__symbollink()
@@ -134,8 +136,12 @@ class MxpStage(object):
         if "init" not in self.stagename.lower():
             self.__loadCfg()
 
-    def save(self, path):
-        ocf = dfToMxpOcf(self.d_df)
+    def save(self, path, viaDf=False):
+        if viaDf:
+            ocf = dfToMxpOcf(self.d_df)
+        else:
+            ocf = self.d_ocf
+            indentCf(ocf)
         log.debug("Result save path: %s\n" % (path))
         tree = ET.ElementTree(ocf)
         tree.write(path, encoding="utf-8", xml_declaration=True)

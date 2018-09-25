@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-24 15:17:55
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 XmlUtil: Xml handling module
 
@@ -25,7 +25,7 @@ log = logger.setup("XmlUtil")
 __all__ = ['JobInfoXml', 'addChildNode', 'getChildNode', 
             'setConfigData', 'getConfigData', 
             'getSonConfigMap', 'getUniqKeyConfigMap', 'getFullConfigMap', 
-            'dfFromConfigMapList', 'dfToMxpOcf', ]
+            'dfFromConfigMapList', 'dfToMxpOcf', 'indentCf']
 
 class JobInfoXml(object):
     """
@@ -91,17 +91,17 @@ def getChildNode(cf, key, count=0, suppress_warn=False):
     if not key.startswith("."): # depth=1
         key = "."+key
         log.debug("add '.' before key to only search depth=1: %s", key)
-    if '/' in key:
+    if '/' in key and not suppress_warn:
         log.warning("Warning, please avoid ambiguous by removing '/' in key")
     for i, inode in enumerate(cf.findall(key)):
         if i==count:
             return inode
-    if suppress_warn:
+    if not suppress_warn:
         log.warning("Warning, getChildNode, Failed to find No. {} child with key {} in giving cf".format(count, key))
     return None
 
-def setConfigData(cf, key, val='', count=0):
-    p = getChildNode(cf, key, count)
+def setConfigData(cf, key, val='', count=0, suppress_warn=True):
+    p = getChildNode(cf, key, count, suppress_warn)
     if p is not None:
         p.text = val
     else:
@@ -311,10 +311,10 @@ def dfToMxpOcf(df):
     for _, series in df.iterrows():
         occf = dfRowToXmlNode(series)
         ocf.append(occf)
-    indent(root)
+    indentCf(root)
     return root
 
-def indent(elem, level=0):
+def indentCf(elem, level=0):
     i = "\n" + level*"  "
     if len(elem):
         if not elem.text or not elem.text.strip():
@@ -322,7 +322,7 @@ def indent(elem, level=0):
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
         for elem in elem:
-            indent(elem, level+1)
+            indentCf(elem, level+1)
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
     else:

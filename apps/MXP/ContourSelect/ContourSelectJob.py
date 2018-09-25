@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-23 11:35:37
 
 ContourSelect job
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 import argparse
 
@@ -20,7 +20,7 @@ log = logger.setup("ContourSelectJob", 'debug')
 ###############################################################################
 # MXP Contour Select Job Stage Register Area
 from ContourLabeling import ContourSelLabelStage
-#from ContourSelModelCal import ContourSelCalStage
+from ContourSelModelCal import ContourSelCalStage
 #from ContourSelModelApply import ContourSelApplyStage
 
 STAGE_REGISTER_TABLE = {
