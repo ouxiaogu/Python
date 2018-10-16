@@ -13,7 +13,7 @@ from XmlUtil import getConfigData
 
 # TACX GUI classes
 import sys
-sys.path.append(r'/n/filer3b/home/dev/qsun/gui_10/build_root/libs')
+sys.path.insert(0, r'/n/filer3b/home/dev/qsun/gui_10/build_root/libs')
 import FEMPlusJob
 import jobresult
 import mod

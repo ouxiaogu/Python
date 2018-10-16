@@ -3,7 +3,7 @@
 Created: peyang, 2018-04-20 2:33:40 PM
 
 Refer to Hong-fei's ExpressModel/express_model/common/femplusAPI.py
-Last Modified by: peyang
+Last Modified by:  ouxiaogu
 
 FemplusJob: Class to hold tachyon FEM+ job, derived from class TachyonJob
 
@@ -27,7 +27,7 @@ import re
 
 # TACX GUI classes
 import sys
-sys.path.append(r'/n/filer3b/home/dev/qsun/gui_10/build_root/libs')
+sys.path.insert(0, r'/n/filer3b/home/dev/qsun/gui_10/build_root/libs')
 import FEMPlusJob
 import jobresult
 import mod

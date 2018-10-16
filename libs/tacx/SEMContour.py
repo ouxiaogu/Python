@@ -194,7 +194,7 @@ class SEMContour:
 
     def fromDf(self, df):
         '''
-        Contour polygonData
+        replace current Contour's polygonData by df, and return the new Contour 
 
         Example
         -------
@@ -229,6 +229,7 @@ def plot_contour(contour, wi_eigen=False):
 
     plt.ioff()
     fig = plt.figure()
+    plt.gca().invert_yaxis()
     ax = fig.add_subplot(111)
     ax.set_aspect('equal')
     ax.set_xlim(0, width)
@@ -241,12 +242,14 @@ def plot_contour(contour, wi_eigen=False):
         for point in segment['points']:
             coord = (point[0], point[1])
             vertsx.append(coord[0])
-            vertsy.append(height - 1 - coord[1])
+            # vertsy.append(height - 1 - coord[1])
+            vertsy.append(coord[1])
             if wi_eigen:
-                flipCoord = (coord[0], height - 1 - coord[1])
-                angle = -point[2] # Y flip, reverse angle
+                # flipCoord = (coord[0], height - 1 - coord[1])
+                # angle = -point[2] # Y flip, reverse angle
+                angle = point[2]
                 Rg    = point[8]
-                eigenx, eigeny = gen_eigen_vector_points(flipCoord, angle, Rg)
+                eigenx, eigeny = gen_eigen_vector_points(coord, angle, Rg)
                 ax.plot(eigenx, eigeny, 'r-')
 
     ax.plot(vertsx, vertsy, 'b.', markersize=3)

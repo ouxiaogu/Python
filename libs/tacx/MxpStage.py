@@ -138,11 +138,13 @@ class MxpStage(object):
 
     def save(self, path, viaDf=False):
         if viaDf:
-            ocf = dfToMxpOcf(self.d_df)
+            root = dfToMxpOcf(self.d_df)
         else:
+            root = ET.Element('root')
             ocf = self.d_ocf
-            indentCf(ocf)
+            root.append(ocf)
+            indentCf(root)
         log.debug("Result save path: %s\n" % (path))
-        tree = ET.ElementTree(ocf)
+        tree = ET.ElementTree(root)
         tree.write(path, encoding="utf-8", xml_declaration=True)
         log.debug("Result saved at %s\n" % (path))
