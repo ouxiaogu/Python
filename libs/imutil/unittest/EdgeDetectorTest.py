@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-09 20:52:17
 
 unit test/visualization for Edge Detection
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import unittest
@@ -14,7 +14,7 @@ import cv2
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/..")
 from EdgeDetector import *
 from ImGUI import imshowMultiple
 from ImDescriptors import printImageInfo

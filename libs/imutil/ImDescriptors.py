@@ -17,18 +17,20 @@ from collections import OrderedDict
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, applySepFilter, fftconvolve
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from PlotConfig import getRGBColor
 import logger
 log = logger.setup(level='info')
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
+            'printImageInfo', 'getImageInfo',
+            'hist_curve', 'hist_rect', 'hist_lines',
             'calcHistSeries', 'calcHist', 'cdfHisto',
             'addOrdereddDict', 'subOrdereddDict', 'Histogram',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
-            'printImageInfo', 'getImageInfo', 'calculate_cutoff',
+             'calculate_cutoff',
             'statHist'
         ]
 
@@ -387,12 +389,12 @@ def im_fft_amplitude_phase(im, freqshift=True, method=None, raw_amplitude=False)
     if method == 'fft':
         fourierfunc = np.fft.fft2
     elif method == 'dft':
-        sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../signal")
+        sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../signal")
         from filters import dft
         fourierfunc = dft
     if not freqshift:
     # gen transform matrix T, so fft spectrum is zero-centered
-        sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../signal")
+        sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../signal")
         T = np.zeros(im.shape, im.dtype)
         nrows, ncols = im.shape
         for y in range(nrows):

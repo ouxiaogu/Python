@@ -136,7 +136,6 @@ class RidgeDetector(object):
                     else:
                         eigenIdx = 1
                     minEigenVal = eigen_values[eigenIdx] 
-                    Rg_OrgMag[i, j] = minEigenVal
                     if minEigenVal < 0: # only negative eigenvalue could be ridge
                         minEigenVal = -eigen_values[eigenIdx]
                         minEigenVec = eigen_vectors[:, eigenIdx] # store positive ridge for nms
@@ -145,12 +144,13 @@ class RidgeDetector(object):
                         Rg_Nx[i, j] = minEigenVec[0]
                         Rg_Ny[i, j] = minEigenVec[1]
                         Rg_angle[i, j] = minAngle
+                    Rg_OrgMag[i, j] = abs(eigenvalue[0]) if abs(eigenvalue[0]) > abs(eigenvalue[1]) else abs(eigenvalue[1])
 
         self.Rg_Mag = Rg_Mag
         self.Rg_Nx = Rg_Nx
         self.Rg_Ny = Rg_Ny
         self.Rg_angle = Rg_angle
-        self.Rg_OrgMag = Rg_OrgMag
+        self.Rg_OrgMag = Rg_OrgMag # max abs eigenvalue
 
     def nonmaxSuppress(self, G, theta):
         '''
@@ -175,14 +175,6 @@ class RidgeDetector(object):
                 if angle_type in list(range(len(DIRS))):
                     dy, dx = DIRS[angle_type]
                     val = [G[i-dy, j-dx], G[i, j], G[i+dy, j+dx]]
-                # if angle_type == 0:
-                #     val = [G[i, j-1], G[i, j], G[i, j+1]]
-                # elif angle_type == 1:
-                #     val = [G[i-1, j-1], G[i, j], G[i+1, j+1]]
-                # elif angle_type == 2:
-                #     val = [G[i-1, j], G[i, j], G[i+1, j]]
-                # elif angle_type == 3:
-                #     val = [G[i-1, j+1], G[i, j], G[i+1, j-1]]
                 else:
                     raise ValueError("angle type {} not in {}".format(angle_type, np.arange(len(DELIMITERS))))
                 if val[1] >= val[0] and val[1] >= val[-1]:

@@ -4,7 +4,7 @@ import numpy as np
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/..")
 from FrequencyFlt import *
 
 class TestFreqFilters(unittest.TestCase):

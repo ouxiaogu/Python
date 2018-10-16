@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-06 23:48:05
 
 
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -18,7 +18,7 @@ __all__ = ['gradient', 'gradientXY',
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, applySepFilter, fftconvolve
 
 def gradient(src, tan2=True):

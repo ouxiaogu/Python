@@ -4,7 +4,7 @@ Created: peyang, 2018-07-02 11:44:17
 
 Test the Code in DIP chapter 4: Filtering in Frequency Domain
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import cv2
@@ -13,7 +13,7 @@ import re
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import imshowCmap, cvtFloat2Gray, imshowMultiple, imshowMultiple_TitleMatrix
 from FrequencyFlt import *
 from ImDescriptors import im_fft_amplitude_phase
@@ -36,7 +36,7 @@ def try_paramid():
     """
 
     """method 1, cv2.pyrDown"""
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
     # from PlatformUtil import home
     # import os
     # IMFILE = os.path.join(home(), r"github\OpenCV-3.3.1\samples\data\building.jpg")
@@ -71,7 +71,7 @@ def try_paramid():
     # imshowCmap(im_pyrDown, "freq. domain, step-by-step ideal half window filter",)
 
     """method 3, spatial domain, convolve Gaussian filter & downsample"""
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import convolve, gaussian_filter
     flt_G = gaussian_filter(1)
     im_conv = convolve(im, flt_G)
@@ -136,7 +136,7 @@ def try_power_ratio_loci():
     im = cv2.imread(IMFILE, 0)
 
     # padding into 2X
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import padding_backward
     rawShape = im.shape
     fp = padding_backward(im, rawShape)
@@ -260,7 +260,7 @@ def try_notch_filter():
     im = cv2.imread(IMFILE, 0)
 
     # padding into 2X
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import padding_backward
     rawShape = im.shape
     fp = padding_backward(im, rawShape)

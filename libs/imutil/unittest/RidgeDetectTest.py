@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/..")
 from RidgeDetector import *
 from ImGUI import imshowMultiple
 from ImDescriptors import printImageInfo
@@ -50,7 +50,7 @@ def display(dump_contour=False):
 
 def displayMxpResult():
     cwd = r'/gpfs/SQA/FEM/SHARED/regression/MXP/nightly/target/MXP1_job9/h/cache/dummydb/result/MXP/job1/ContourExtraction400result1'
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../../common")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../common")
     from FileUtil import gpfs2WinPath
     from ImGUI import read_pgm
     cwd = gpfs2WinPath(cwd)

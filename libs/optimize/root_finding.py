@@ -2,7 +2,7 @@
 import numpy as np
 from sympy import *
 import sys
-sys.path.append(r'C:\Users\peyang\Perforce\peyang_LT324319_3720\app\mxp\scripts\util')
+sys.path.insert(0, r'C:\Users\peyang\Perforce\peyang_LT324319_3720\app\mxp\scripts\util')
 import logger
 logger.initlogging(debug=True)
 log = logger.getLogger("Root finding")

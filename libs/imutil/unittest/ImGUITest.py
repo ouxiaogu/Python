@@ -12,9 +12,9 @@ import numpy as np
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../")
 from ImGUI import *
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../common")
 import logger
 log = logger.setup(level='debug')
 

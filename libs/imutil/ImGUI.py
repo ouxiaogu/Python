@@ -6,7 +6,7 @@ ImGUI:
     - Image input/ output
     - Image plot utility module
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -20,7 +20,7 @@ import cv2
 __all__ = ['readDumpImage', 'readBBox', 'gen_multi_image_overview',
         'imshowCmap', 'cvtFloat2Gray', 'imreadFolder', 'imshowMultiple',
         'imshowMultiple_TitleMatrix', 'read_pgm', 'write_pgm',
-        'imread_gray',
+        'imread_gray', 'cropToCommonBBox',
         'PolygonDrawer', 'LineDrawer', 'RectangleDrawer',
         'getPolyROI', 'getROIByPointPairs']
 
@@ -92,6 +92,12 @@ def readBBox(infile):
     bbox = list(int(d) for d in bbox)
     return bbox
 
+def cropToCommonBBox(imgs, bboxes):
+    xinis, yinis, xends, yends = zip(*bboxes)
+    xini, yini, xend, yend = max(xinis), max(yinis), min(xends), min(yends)
+    dst = [im[yini:yend, xini:xend] for im in imgs]
+    return dst
+
 def gen_multi_image_overview(src_dir, reg_pattern=None, title=None, im_name=None):
     '''generate a overview for multiple image with image title
 
@@ -105,7 +111,7 @@ def gen_multi_image_overview(src_dir, reg_pattern=None, title=None, im_name=None
     '''
     import os
     from subprocess import call
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
     from FileUtil import FileScanner, getFileLabels
     fsc = FileScanner(src_dir)
     files = fsc.scan_files(regex_pattern=reg_pattern)
@@ -145,7 +151,7 @@ def imreadFolder(src_dir, reg_pattern=None):
         list of image file label, {file} = "{dir}/{label}.{extension}", here
         just need the labels as subplot titles
     '''
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
     from FileUtil import FileScanner, getFileLabels
     fsc = FileScanner(src_dir)
     files = fsc.scan_files(regex_pattern=reg_pattern)
@@ -175,7 +181,7 @@ def cvtFloat2Gray(im):
     return np.array((im - vmin)/(vmax - vmin)*255, dtype = np.uint8)
 
 
-def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray", **kwargs):
+def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray", axis_on=False, **kwargs):
     '''
     show Multiple Image in one function
 
@@ -245,11 +251,12 @@ def imshowMultiple(images, titles=None, nrows=None, ncols=4, cmap="gray", **kwar
 
         # %  plot the subplot
         ax = fig.add_axes( [field_l, field_b, field_w, field_h] );
-        ax.set_axis_off()
         ax.imshow(images[ix], cmap=cmap, **kwargs)
+        if not axis_on:
+            ax.set_axis_off()
         ax.set_title(titles[ix])
 
-def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None, cbar=False, **kwargs):
+def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cmap="gray", x_cmap=None, cbar=False, axis_on=False, **kwargs):
     '''
     similar with `imshowMultiple`, but share the X axis& Y axis title
 
@@ -332,9 +339,10 @@ def imshowMultiple_TitleMatrix(images, nrows, ncols, row_titles, col_titles, cma
 
         # %  plot the subplot
         ax = fig.add_axes( [field_l, field_b, field_w, field_h] );
-        ax.set_axis_off()
         cmap = cmap if x_cmap is None else x_cmap[col]
         cax = ax.imshow(images[ix], cmap=cmap, **kwargs)
+        if not axis_on:
+            ax.set_axis_off()
         if cbar:
             fig.colorbar(cax)
 

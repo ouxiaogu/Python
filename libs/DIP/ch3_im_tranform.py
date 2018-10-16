@@ -4,19 +4,19 @@ Created: peyang, 2018-07-16 11:26:04
 
 DIP Image intensity transform and spatial filter practice
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImTransform import *
 from SpatialFlt import *
 from ImGUI import imshowMultiple_TitleMatrix, imshowMultiple
 from ImDescriptors import hist_lines
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import fftconvolve
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from FileUtil import splitFileName
 
 import cv2
@@ -161,7 +161,7 @@ def try_1st_2nd_deriative():
     # profile[18] = 10 # sharp noise
     profile[25:] = 6 # sharp step, then flat high
 
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
     from filters import padding
     hlPadSz = 1
     profilePad = padding(profile, hlPadSz)
@@ -179,7 +179,7 @@ def try_1st_2nd_deriative():
     ax.plot(xx, derivative_1st , 'o--', label='derivative_1st ')
     ax.plot(xx, derivative_2nd , 'g-.', label='derivative_2nd ')
 
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
     from PlotConfig import addLegend
     addLegend([ax])
 

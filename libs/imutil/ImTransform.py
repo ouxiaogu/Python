@@ -4,7 +4,7 @@ Created: peyang, 2018-07-16 10:29:47
 
 Image intensity transform and spatial filter
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 import numpy as np
 import math
@@ -12,7 +12,7 @@ from collections import OrderedDict
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import kernelPreProc
 from ImDescriptors import Histogram, calcHist, cdfHisto
 

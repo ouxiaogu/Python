@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-07-18 18:33:04
 
 Unit test for spatial domain filters
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import math
@@ -19,11 +19,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../common")
 import logger
 log = logger.setup(name='SpatialTest', level='debug')
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/..")
 from SpatialFlt import *
 from ImTransform import normalize
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../signal")
 from filters import fftconvolve, convolve
 
 DIPPATH = r'D:\book\DIP\DIP\imageset\DIP3E_Original_Images_CH03'

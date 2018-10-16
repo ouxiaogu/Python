@@ -4,7 +4,7 @@ from sympy import Matrix, symbols, pprint
 
 import sys
 import os.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('NL_LSQ', level='debug')
 

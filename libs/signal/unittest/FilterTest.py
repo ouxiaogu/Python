@@ -6,10 +6,10 @@ import scipy
 
 import sys
 import os.path
-sys.path.append(os.path.abspath("../"))
+sys.path.insert(0, os.path.abspath("../"))
 from filters import *
 
-sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../../common")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../common")
 from PlotConfig import choosePalette, addLegend
 
 import sympy
@@ -141,7 +141,7 @@ class TestFilters(unittest.TestCase):
         np.testing.assert_almost_equal(bas, ref, decimal=5)
 
 def plot_flt_dG(sigma=2):
-    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
+    sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../common")
     from PlotConfig import choosePalette, addLegend
     pal = choosePalette()
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
@@ -172,7 +172,7 @@ def plot_flt_sz(sigma=2):
     addLegend([ax ])
 
 def plot_rect_func_fft():
-    sys.path.append((os.path.dirname(os.path.abspath(__file__)))+"/../common")
+    sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../common")
     from MathUtil import rectFunc
     fig, axes = plt.subplots(nrows=3, ncols=1)
 

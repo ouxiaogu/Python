@@ -4,7 +4,7 @@ Created: peyang, 2018-07-10 16:37:18
 
 Frequency Domain Filters, so basically will have same shape with image
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -13,9 +13,9 @@ import collections
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import padding, padding_backward, nearest_power, centered, fltGenPreProc
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('FrequencyFlt', 'info')
 

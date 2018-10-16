@@ -41,8 +41,16 @@ class ContourSelCalStage(MxpStage):
     TODO, if without this Contour Labeling Stage, use the MXP_Flag as UserLabel,
     MXP_Flag with filter BitMask to label 'good' & 'bad'.
     """
-    srcColNames = 'intensity  ridge_intensity   contrast    EigenRatio'.split()
+    srcColNames = 'slope, intensity, ridge_intensity, contrast, EigenRatio'
     tgtColName = 'UserLabel'
+
+    def __init__(self, gcf, cf, stagename, jobpath):
+        super(ContourSelCalStage, self).__init__(gcf, cf, stagename, jobpath)
+        self.__getXTrainCols()
+
+    def __getXTrainCols(self):
+        self.srcColNames = getConfigData(self.d_cf, ".X_train_columns", self.srcColNames)
+        self.srcColNames = [c.strip() for c in self.srcColNames.split(",")]
 
     def splitDataSet(self):
         df = self.d_df.loc[self.d_df.costwt>0, :] # valid dataset
@@ -78,7 +86,9 @@ class ContourSelCalStage(MxpStage):
             contour = SEMContour()
             contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
             if contour.parseFile(contourfile):
-                cal_dataset.append(contour.toDf())
+                curdf = contour.toDf()
+                curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :]
+                cal_dataset.append(curdf)
         cal_dataset = pd.concat(cal_dataset)
         X_cal, y_cal = cal_dataset[self.srcColNames], cal_dataset[self.tgtColName]
 
@@ -89,7 +99,9 @@ class ContourSelCalStage(MxpStage):
             contour = SEMContour()
             contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
             if contour.parseFile(contourfile):
-                ver_dataset.append(contour.toDf())
+                curdf = contour.toDf()
+                curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :]
+                ver_dataset.append(curdf)
         ver_dataset = pd.concat(ver_dataset)
         X_ver, y_ver = ver_dataset[self.srcColNames], ver_dataset[self.tgtColName]
         return X_cal, y_cal, X_ver, y_ver

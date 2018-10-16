@@ -4,7 +4,7 @@ Created: peyang, 2018-07-18 17:59:20
 
 Spatial Filters
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -16,10 +16,10 @@ from FrequencyFlt import distance_map
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding, sync_dtype
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 import logger
 log = logger.setup('SpatialFlt', level='info')
 

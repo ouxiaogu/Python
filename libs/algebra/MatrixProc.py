@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-07-20 10:52:30
 
 Utility to process matrix
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -12,7 +12,7 @@ import numpy as np
 import sys
 import os.path
 # print(sys.version_info )
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from SpatialFlt import *
 
 epslmt = 1e-9

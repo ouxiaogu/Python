@@ -38,6 +38,8 @@ class RectangleDrawer(object):
     - rect 2: [(481, 732), (522, 774)]
 
     """
+    
+
     def __init__(self, im, window_name, **kwargs):
         self.raw = im
         if np.ndim(im) == 2:
@@ -57,16 +59,22 @@ class RectangleDrawer(object):
         self.done = False # Flag signalling we're done
         self.current = (0, 0) # Current position, so we can draw the line-in-progress
         self.points = [] # List of points defining our polygon
-        self.FINAL_LINE_COLOR = (0, 0, 255) # Red
-        self.WORKING_LINE_COLOR = (127, 127, 127)
+
+        vmax = np.iinfo(self.im.dtype).max
+        self.FINAL_OUTLIER_COLOR = (0, 0, vmax) # Red
+        self.FINAL_GOOD_COLOR = (0, vmax, 0) # Green
+        self.WORKING_LINE_COLOR = (vmax//2, vmax//2, vmax//2)
 
     def printUsage(self):
-        print("\nUsage: RectangleDrawer\n")
-        print("mouse odd  left click:   Rectangle top left point")
-        print("mouse move:              Rectangle bottom right point updating")
-        print("mouse even left click:   Rectangle bottom right point")
-        print("mouse right click:       Stop drawing rectangle")
-        print("ESC:                     Exit drawing")
+        print("\nUsage of RectangleDrawer:\n\n"
+            "Rectangle composed by a pair of points:\n"
+            "  - To input Good Contour Points area, needs: xini< xend and yini < yend;\n"
+            "  - Otherwise, it's Outlier Area\n\n"
+            "mouse odd  left click:   Rectangle top left point\n"
+            "mouse move:              Rectangle bottom right point updating\n"
+            "mouse even left click:   Rectangle bottom right point\n"
+            "mouse right click:       Stop drawing rectangle\n"
+            "ESC:                     Exit drawing\n")
 
     def on_mouse(self, event, x, y, buttons, user_param):
         # Mouse callback that gets called for every mouse event (i.e. moving, clicking, etc.)
@@ -109,7 +117,10 @@ class RectangleDrawer(object):
                 # Draw all the lines
                 for pair in self.pairs:
                     head, tail = pair
-                    self.drawfunc(self.im, head, tail, self.FINAL_LINE_COLOR)
+                    if head[0] < tail[0] and head[1] < tail[1]:
+                        self.drawfunc(self.im, head, tail, self.FINAL_GOOD_COLOR)
+                    else:
+                        self.drawfunc(self.im, head, tail, self.FINAL_OUTLIER_COLOR)
                 # And  also show what the current segment would look like
                 if len(self.points) > 0:
                     cv2.line(self.im, self.points[-1], self.current, self.WORKING_LINE_COLOR)
@@ -123,7 +134,10 @@ class RectangleDrawer(object):
         # of a final polygon
         for pair in self.pairs:
             head, tail = pair
-            self.drawfunc(self.final, head, tail, self.FINAL_LINE_COLOR)
+            if head[0] < tail[0] and head[1] < tail[1]:
+                self.drawfunc(self.final, head, tail, self.FINAL_GOOD_COLOR)
+            else:
+                self.drawfunc(self.final, head, tail, self.FINAL_OUTLIER_COLOR)
         # And show it
         cv2.imshow(self.window_name, self.final)
         # Waiting for the user to press any key
@@ -165,20 +179,33 @@ class ContourSelLabelStage(MxpStage):
             im, rawcontour = self.loadPatternData(imgfile, contourfile)
             patternid = getConfigData(occf, '.name')
 
-            drawer = RectangleDrawer(im, "Pattern {} Contour Point outlier area labeling...".format(patternid))
+            drawer = RectangleDrawer(im, "Pattern {} Contour Data Labeling...".format(patternid))
             drawer.printUsage()
             drawer.run()
             rectcoord = drawer.getROICoord()
             bboxcf = addChildNode(occf, 'bbox')
+            goodContourAreas = []
             outlierAreas = []
-            for idx, rect in enumerate(rectcoord):
+            idxGoodRect, idxOutlierRect = 0, 0
+            for rect in rectcoord:
                 tl, br = rect
                 xini, yini = tl
                 xend, yend = br
                 bboxstr = "{}, {}, {}, {}".format(xini, yini, xend, yend)
-                setConfigData(bboxcf, 'Outlier', val=bboxstr, count=idx)
-                outlierAreas.append((xini, yini, xend, yend))
-            labeledconour = self.labelPatternContour(rawcontour, outlierAreas)
+                if (xini < xend) and (yini < yend):
+                    setConfigData(bboxcf, 'Good', val=bboxstr, count=idxGoodRect)
+                    goodContourAreas.append((xini, yini, xend, yend))
+                    idxGoodRect += 1
+
+                else:
+                    setConfigData(bboxcf, 'Outlier', val=bboxstr, count=idxOutlierRect)
+                    xmin, xmax = min(xini, xend), max(xini, xend)
+                    ymin, ymax = min(yini, yend), max(yini, yend)
+                    outlierAreas.append((xmin, ymin, xmax, ymax))
+                    idxOutlierRect += 1
+            log.debug("#Good contour areas: {}\n{}".format(len(goodContourAreas), goodContourAreas))
+            log.debug("#Outlier contour areas: {}\n{}".format(len(outlierAreas), outlierAreas))
+            labeledconour = self.labelPatternContour(rawcontour, goodContourAreas, outlierAreas)
             newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))
             newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
             labeledconour.saveContour(newcontourfile)
@@ -224,20 +251,21 @@ class ContourSelLabelStage(MxpStage):
             im = cv2.polylines(im, contourPointsVec, False, CONTOUR_COLOR, thickness)
         return im, contour
 
-    def labelPatternContour(self, contour, outlierAreas):
+    def labelPatternContour(self, contour, goodContourAreas, outlierAreas):
         columnTitle = contour.getColumnTitle()
-        columnTitle.append(self.tgtColName)
+        columnTitle.append(self.tgtColName) # UserLabel
         contour.setColumnTitle(columnTitle)
         
         polygons = contour.getPolygonData()
         for polygon in polygons:
             for j, point in enumerate(polygon['points']):
-                polygon['points'][j].append(1) # 'good'
-                if len(outlierAreas) == 0:
-                    continue
+                label = np.nan
+
                 coord = [point[0], point[1]]
-                b_outlier = [ContourBBox(*rect).contains(coord) for rect in outlierAreas]
-                if any(b_outlier):
-                    polygon['points'][j][-1] = 0 #'bad'
+                if any([ContourBBox(*rect).contains(coord) for rect in outlierAreas]): # outlierAreas have higher priority than goodContourAreas
+                    label = 0 # 'bad'
+                elif any([ContourBBox(*rect).contains(coord) for rect in goodContourAreas]):
+                    label = 1 # 'good'
+                polygon['points'][j].append(label)
         contour.setPolygonData(polygons)
         return contour

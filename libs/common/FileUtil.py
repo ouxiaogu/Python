@@ -24,8 +24,9 @@ def gpfs2WinPath(src):
     prefix = r"\\devshare-brion.asml.com\cnfs-"
     if inWindows():
         if 'gpfs' not in src:
-            e = "Can't find 'gpfs' in input file: {}".format(dst)
-            raise IOError(e)
+            print("Warning, can't find 'gpfs' in input file: {}".format(dst))
+            return dst
+            # raise IOError(e)
         try:
             dst = string.replace(dst, r'/', r"\\")
             dst = string.replace(dst, '\gpfs\\', prefix, maxreplace=1)
@@ -106,7 +107,7 @@ class FileScanner(object):
 
 if __name__ == '__main__':
     # '''test 1'''
-    INDIR = '/gpfs/PEG/FEM/jiaohuan/case/GA/GA_E8.1_integration/19-NTDcase52-E8.1GA_Fast_readresultfromjob17/h/data/dummydb/calibrate/job1/lua'
+    INDIR = '/gpfs/DEV/FEM/peyang/release/E9.0/MOD11134_gds/contourAdj_wiSEPE_mem/h/data/dummydb/MXP/job1/d2dbalignmentkpi550out.xml'
     INDIR = gpfs2WinPath(INDIR)
     print(INDIR)
 

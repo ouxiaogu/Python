@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-07-22 21:30:20
 
 image degradation and restoration
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
@@ -14,17 +14,17 @@ import scipy
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../imutil")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
 from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve, calculate_cutoff, getImageInfo, statHist
 from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, localHistoEqualize, powerFunc, convertTo
 from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimmedMean, setNLMParams
 from FrequencyFlt import BNRF, BNPF, applyFreqFilter, GLPF
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from FileUtil import splitFileName
 from PlotConfig import addLegend, getHexColor
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../signal")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import padding_backward
 
 KWARGS = {'vmin': 0, 'vmax': 255}
