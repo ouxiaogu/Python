@@ -52,7 +52,7 @@ def display(dump_contour=False):
     if dump_contour:
         with open("./contour.txt", 'w+') as fout:
             header = dt.attrs
-            header.insert(0, 'segId')
+            header.insert(0, 'polygonId')
             print(type(header), header)
             fout.write('\t'.join(header ) + '\n')
             formater = ["{}" for i in range(len(header))]

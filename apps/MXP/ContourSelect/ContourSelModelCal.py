@@ -9,7 +9,9 @@ Last Modified by:  ouxiaogu
 
 import numpy as np
 import pandas as pd
+import io
 from sklearn import svm
+from sklearn.metrics import confusion_matrix
 
 import sys
 import os.path
@@ -25,6 +27,7 @@ log = logger.setup("ContourModelCal", 'debug')
 __all__ = ["ContourSelCalStage"]
 
 USAGE_TYPES = ['training', 'validation', 'test']
+
 
 class ContourSelCalStage(MxpStage):
     """
@@ -43,6 +46,8 @@ class ContourSelCalStage(MxpStage):
     """
     srcColNames = 'slope, intensity, ridge_intensity, contrast, EigenRatio'
     tgtColName = 'UserLabel'
+    neighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism']
+    debugOn = True
 
     def __init__(self, gcf, cf, stagename, jobpath):
         super(ContourSelCalStage, self).__init__(gcf, cf, stagename, jobpath)
@@ -50,7 +55,31 @@ class ContourSelCalStage(MxpStage):
 
     def __getXTrainCols(self):
         self.srcColNames = getConfigData(self.d_cf, ".X_train_columns", self.srcColNames)
+        log.debug("X_train columns: {}".format(self.srcColNames))
         self.srcColNames = [c.strip() for c in self.srcColNames.split(",")]
+        if getConfigData(self.d_cf, "use_per_seg_feature", 0) > 0:
+            self.usePerSegFeatures = True
+        if self.usePerSegFeatures:
+            self.srcColNames += self.neighborColNames
+        self.modelColNames = self.srcColNames + [self.tgtColName]
+
+    @staticmethod
+    def splitSample(nsamples, divide_rule):
+        totSlices = sum(divide_rule)
+        divides = [max(0, int(d/totSlices*nsamples)) for d in divide_rule]
+        while sum(divides) < nsamples:
+            gap = nsamples - sum(divides)
+            curGap = gap
+            for i, d in enumerate(divide_rule):
+                if sum(divides) >= nsamples:
+                    break
+                increment = min(curGap, int(gap * d/totSlices + 0.5))
+                divides[i] += increment
+                curGap -= increment
+        assert(all(np.array(divides)>=0))
+        divides = np.cumsum(divides)
+        assert(divides[-1]==nsamples)
+        return divides
 
     def splitDataSet(self):
         df = self.d_df.loc[self.d_df.costwt>0, :] # valid dataset
@@ -59,13 +88,9 @@ class ContourSelCalStage(MxpStage):
 
         # divide rule
         divide_rule = getConfigData(self.d_cf, ".divide_rule", "60:40:0")
-        divide_rule = list(map(int, divide_rule.split(":")))
-        if sum(divide_rule) != 100:
-            log.warning("Warning, sum of training set, validation set and test set should be 100, input is %s, use 60:40:0 instead." % ':'.join(divide_rule))
-        divides = [max(1, int(d/100.*nsamples)) for d in divide_rule]
-        divides[-1] = nsamples - sum(divides[:-1])
-        assert(all(np.array(divides)>=0))
-        divides = np.cumsum(divides)
+        log.debug("divide_rule: {}".format(divide_rule))
+        divide_rule = list(map(float, divide_rule.split(":")))
+        divides = ContourSelCalStage.splitSample(nsamples, divide_rule)
 
         # assign usage
         usages = np.tile(None, (nsamples,))
@@ -79,71 +104,137 @@ class ContourSelCalStage(MxpStage):
         self.d_df = pd.concat([df, df_skipped], axis=0)
 
     def loadDataSet(self):
-        cal_df = self.d_df.loc[self.d_df.usage==USAGE_TYPES[0], :]
-        log.debug("cal set pattern names: {}".format(cal_df['name'].values))
         cal_dataset = []
-        for _, row in cal_df.iterrows():
-            contour = SEMContour()
-            contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
-            if contour.parseFile(contourfile):
-                curdf = contour.toDf()
-                curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :]
-                cal_dataset.append(curdf)
-        cal_dataset = pd.concat(cal_dataset)
-        X_cal, y_cal = cal_dataset[self.srcColNames], cal_dataset[self.tgtColName]
-
-        ver_df = self.d_df.loc[self.d_df.usage==USAGE_TYPES[1], :]
-        log.debug("ver set pattern names: {}".format(ver_df['name'].values))
         ver_dataset = []
-        for _, row in ver_df.iterrows():
-            contour = SEMContour()
-            contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
-            if contour.parseFile(contourfile):
-                curdf = contour.toDf()
-                curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :]
-                ver_dataset.append(curdf)
+        cal_patterns = []
+        ver_patterns = []
+
+        for _, row in self.d_df.iterrows(): # loop pattern ocf
+            if row.usage in (USAGE_TYPES[:-1]) :
+                contour = SEMContour()
+                contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
+                if contour.parseFile(contourfile):
+                    curdf = contour.toDf()
+                    curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :] # only use SEM points in ROI
+                    if self.usePerSegFeatures:
+                        curdf = self.addNeighborFeatures(curdf)
+                    # curdf = curdf.loc[:, self.modelColNames]
+                    if row.loc['usage'] == USAGE_TYPES[0]: # cal pattern SEM points
+                        cal_dataset.append(curdf)
+                        cal_patterns.append(row.loc['name'])
+                    elif row.loc['usage'] == USAGE_TYPES[1]: # ver pattern SEM points
+                        ver_dataset.append(curdf)
+                        ver_patterns.append(row.loc['name'])
+
+        cal_dataset = pd.concat(cal_dataset)
+        if self.debugOn:
+            caldatapath = os.path.join(self.stageresultabspath, 'caldata.txt')
+            cal_dataset.to_csv(caldatapath, index=False, sep='\t')
+            log.debug("training data set saved at "+caldatapath)
         ver_dataset = pd.concat(ver_dataset)
+
+        X_cal, y_cal = cal_dataset[self.srcColNames], cal_dataset[self.tgtColName]
         X_ver, y_ver = ver_dataset[self.srcColNames], ver_dataset[self.tgtColName]
+        log.debug("cal set pattern names: {}".format(cal_patterns))
+        log.debug("cal set memory info: \n{}".format(ContourSelCalStage.getDfMemoryInfo(cal_dataset)))
+        log.debug("ver set pattern names: {}".format(ver_patterns))
+        log.debug("ver set memory info: \n{}".format(ContourSelCalStage.getDfMemoryInfo(ver_dataset)))
+
         return X_cal, y_cal, X_ver, y_ver
 
-    def run(self):
-        from sklearn.metrics import confusion_matrix
-        self.splitDataSet()
+    @staticmethod
+    def getDfMemoryInfo(df):
+        buffer = io.StringIO()
+        df.info(buf=buffer, verbose=False, memory_usage='deep')
+        s = buffer.getvalue()
+        return s
 
+    @staticmethod
+    def calcRMS(y_pred, y):
+        return np.sqrt(np.mean(np.power(y_pred - y, 2)))
+
+    def addNeighborFeatures(self, df):
+        '''
+        add Features for the input contour DataFrame, based on the neighbor relationship in the context of segment
+
+        Parameters:
+        -----------
+        df: [in, out] contour as DataFrame
+            [in] Contour df, must contains `polygonId`, `angle`, `offsetx`, `offsety`
+            [out] Contour df, added `NeighborContinuity`, `NeighborOrientation`, `NeighborParalism`
+
+                - `NeighborContinuity`:  |X(n) - X(n-1)|^2, usually need to be close
+                - `NeighborOrientation`:  dot(EigenVector(n), EigenVector(n-1)), closer to 1, the better(may use 1-dot)
+                - `NeighborParalism`:  ||cross((X(n) - X(n-1)), EigenVector(n-1))||, closer to 1, the better(may use 1-cross)
+        TODO, the segment neighborhood based features can only be obtained by the whole segment, can't use ROI cropped segment 
+        '''
+        polygonIds = df.loc[:, 'polygonId'].drop_duplicates().values
+        preIdx = df.index[0]
+        for polygonId in polygonIds:
+            isPolygonHead = True
+            for curIdx, _ in df.loc[df['polygonId']==polygonId, :].iterrows():
+                NeighborContinuity = 1
+                NeighborOrientation = 0
+                NeighborParalism = 0
+                if not isPolygonHead:
+                    eigenvector_n_1 = np.array([np.cos(df.loc[preIdx, 'angle']), np.sin(df.loc[preIdx, 'angle'])])
+                    eigenvector_n = np.array([np.cos(df.loc[curIdx, 'angle']), np.sin(df.loc[curIdx, 'angle'])])
+                    neighorvector = np.array([df.loc[curIdx, 'offsetx'] - df.loc[preIdx, 'offsetx'],
+                                            df.loc[curIdx, 'offsety'] - df.loc[preIdx, 'offsety']])
+                    crossvector = np.cross(neighorvector, eigenvector_n_1)
+
+                    NeighborContinuity = np.sqrt(neighorvector.dot(neighorvector))
+                    NeighborOrientation = 1 - eigenvector_n.dot(eigenvector_n_1)
+                    NeighborParalism = 1 - np.sqrt(crossvector.dot(crossvector))/NeighborContinuity
+                preIdx = curIdx
+                isPolygonHead = False
+                for ii, val in enumerate([NeighborContinuity, NeighborOrientation, NeighborParalism]):
+                    df.loc[curIdx, self.neighborColNames[ii]] = val
+        return df
+
+    def calibrate(self):
+        # split DataSet into Cal or Ver Usage, and loading data
+        self.splitDataSet()
         X_cal, y_cal, X_ver, y_ver = self.loadDataSet()
+        log.debug("y_cal values count:\n{}".format(y_cal.value_counts()))
+        log.debug("y_ver values count:\n{}".format(y_ver.value_counts()))
         
-        clf = svm.SVC(kernel='linear', class_weight={0: 10})
+        # classification model
+        clf = svm.SVC(kernel='linear', class_weight='balanced') # {0: 10, 1: 1}
         model = clf.fit(X_cal, y_cal)
         log.info("SVC model, coef: {}, intercept: {}".format(clf.coef_, clf.intercept_))
-        rmsfunc = lambda y, y0 : np.sqrt(1 / len(y0) * np.sum(np.power(y - y0, 2)))
 
         # cal data
         y_cal_pred = model.predict(X_cal)
-        rms = rmsfunc(y_cal_pred, y_cal)
-        cnf_matrix = confusion_matrix(y_cal, y_cal_pred)
-        cm_norm = cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
+        rms = ContourSelCalStage.calcRMS(y_cal_pred, y_cal)
+        cm = confusion_matrix(y_cal, y_cal_pred)
+        cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         log.info("SVC model rms on calibration set: {}".format(rms))
-        log.info("SVC model confusion matrix on calibration set:\n{}\n{}".format(cnf_matrix, cm_norm))
+        log.info("SVC model confusion matrix on calibration set:\n{}\n{}".format(cm, cm_norm))
 
-        # cal data
+        # ver data
         y_ver_pred = model.predict(X_ver)
-        rms = rmsfunc(y_ver_pred, y_ver)
-        cnf_matrix = confusion_matrix(y_ver, y_ver_pred)
-        cm_norm = cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
+        rms = ContourSelCalStage.calcRMS(y_ver_pred, y_ver)
+        cm = confusion_matrix(y_ver, y_ver_pred)
+        cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         log.info("SVC model rms on verification set: {}".format(rms))
-        log.info("SVC model confusion matrix on verification set:\n{}\n{}".format(cnf_matrix, cm_norm))
+        log.info("SVC model confusion matrix on verification set:\n{}\n{}".format(cm, cm_norm))
         del X_cal, y_cal, X_ver, y_ver
 
-        # per pattern info
+        return model
+
+    def predict(self, model):
         for idx, row in self.d_df.iterrows():
             contour = SEMContour()
             contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
             if contour.parseFile(contourfile):
                 curdf = contour.toDf()
+                if self.usePerSegFeatures:
+                    curdf = self.addNeighborFeatures(curdf)
                 X, y = curdf[self.srcColNames], curdf[self.tgtColName]
                 y_pred = model.predict(X)
-                rms = rmsfunc(y_pred, y)
-                curdf.loc[:, 'clf_label'] = y_pred
+                rms = ContourSelCalStage.calcRMS(y_pred, y)
+                curdf.loc[:, 'ClfLabel'] = y_pred
                 self.d_df.loc[idx, 'clf_rms'] = rms
                 newcontour = contour.fromDf(curdf)
                 patternid = self.d_df.loc[idx, 'name']
@@ -152,5 +243,15 @@ class ContourSelCalStage(MxpStage):
                 newcontour.saveContour(newcontourfile)
                 self.d_df.loc[idx, 'contour/path'] = newcontourfile_relpath
 
-    def save(self, path, viaDf=True):
+    def run(self):
+        # preprocess data, add some features
+        # self.addVLineFeatures()
+
+        # model calibration
+        model = self.calibrate()
+
+        # model predict, calculate all pattern SEM point's info
+        self.predict(model)
+
+    def save(self, path, viaDf=True): # override the base save() method, to save via DataFrame
         super(ContourSelCalStage, self).save(path, viaDf=True)
