@@ -4,7 +4,7 @@ Created: peyang, 2018-08-31 10:53:39
 
 CNN SEM model Job flow
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import time
@@ -188,12 +188,9 @@ class CSemCalStage(MxpStage):
         self.d_df.loc[input_flt, 'rms'] = rmses
 
     def save(self, path):
-        ocf = dfToMxpOcf(self.d_df)
-        log.debug("Result save path: %s\n" % (path))
-        setConfigData(ocf, 'model', self.modelpath)
-        tree = ET.ElementTree(ocf)
-        tree.write(path, encoding="utf-8", xml_declaration=True)
-        log.debug("Result saved at %s\n" % (path))
+        extraNodes = {'DLSEM_model_path', self.modelpath}
+        log.debug("DLSEM model path {} saved in outxml%s\n" % (self.modelpath))
+        super(ContourSelCalStage, self).save(path, viaDf=True, extraNodes=extraNodes)
 
 class CSemApplyStage(MxpStage):
     def loadDataSet(self):

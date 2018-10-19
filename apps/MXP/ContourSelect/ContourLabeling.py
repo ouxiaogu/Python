@@ -38,8 +38,6 @@ class RectangleDrawer(object):
     - rect 2: [(481, 732), (522, 774)]
 
     """
-    
-
     def __init__(self, im, window_name, **kwargs):
         self.raw = im
         if np.ndim(im) == 2:
@@ -49,16 +47,16 @@ class RectangleDrawer(object):
         else:
             sys.exit("image need to be an instance of numpy ndarray \n")
         self.window_name = window_name
-        self._init_parms()
-
-        self.pairs = []
         self.drawfunc = kwargs.get('drawfunc', cv2.rectangle)
+
+        self._init_parms()
 
     def _init_parms(self):
         self.final = self.im.copy()
         self.done = False # Flag signalling we're done
         self.current = (0, 0) # Current position, so we can draw the line-in-progress
         self.points = [] # List of points defining our polygon
+        self.pairs = []  # List of point pairs
 
         vmax = np.iinfo(self.im.dtype).max
         self.FINAL_OUTLIER_COLOR = (0, 0, vmax) # Red
@@ -169,34 +167,76 @@ class ContourSelLabelStage(MxpStage):
     """
     tgtColName = 'UserLabel'
 
-    def run(self):
+    def getLabelingPatterns(self):
+        start_pattern_name = getConfigData(self.d_cf, 'start_pattern_name', 0)
+        nsamples = getConfigData(self.d_cf, 'samples', -1)
+        allpatternids = []
+        validpatternids = []
+        
+        # get pattern names
         for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
             if getConfigData(occf, 'costwt') <= 0:
                 continue
+            pid = getConfigData(occf, 'name')
+            try:
+                if int(pid) > start_pattern_name:
+                    validpatternids.append(pid)
+            except:
+                pass
+            allpatternids.append(pid)
+
+        # randomly choose sample patterns
+        selectedpatternids = allpatternids
+        if len(validpatternids) != 0:
+            nsamples = min(len(validpatternids), nsamples)
+        else:
+            nsamples = min(len(allpatternids), nsamples)
+        if nsamples > 0:
+            samplepatternids = allpatternids
+            if len(validpatternids) >= nsamples:
+                samplepatternids = validpatternids
+
+            np.random.seed(128)
+            np.random.shuffle(samplepatternids)
+            selectedpatternids = samplepatternids[:nsamples]
+        return selectedpatternids
+
+    def run(self):
+        selectedpatternids = self.getLabelingPatterns()
+
+        for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
+            if getConfigData(occf, 'costwt') <= 0:
+                continue
+            patternid = getConfigData(occf, '.name')
+            if patternid not in selectedpatternids:
+                continue
+
+            # load image and contour
             imgfile = os.path.join(self.jobresultabspath, getConfigData(occf, '.image/path'))
             contourfile = os.path.join(self.jobresultabspath, getConfigData(occf, '.contour/path'))
+            im, rawcontour, origin = self.loadPatternData(imgfile, contourfile)
 
-            im, rawcontour = self.loadPatternData(imgfile, contourfile)
-            patternid = getConfigData(occf, '.name')
-
+            # load image and contour
             drawer = RectangleDrawer(im, "Pattern {} Contour Data Labeling...".format(patternid))
             drawer.printUsage()
             drawer.run()
             rectcoord = drawer.getROICoord()
+
+            # save bbox into occf
             bboxcf = addChildNode(occf, 'bbox')
             goodContourAreas = []
             outlierAreas = []
             idxGoodRect, idxOutlierRect = 0, 0
             for rect in rectcoord:
                 tl, br = rect
-                xini, yini = tl
-                xend, yend = br
+                xini, yini = map(np.add, tl, origin) # compensate the origin
+                xend, yend = map(np.add, br, origin)
+
                 bboxstr = "{}, {}, {}, {}".format(xini, yini, xend, yend)
                 if (xini < xend) and (yini < yend):
                     setConfigData(bboxcf, 'Good', val=bboxstr, count=idxGoodRect)
                     goodContourAreas.append((xini, yini, xend, yend))
                     idxGoodRect += 1
-
                 else:
                     setConfigData(bboxcf, 'Outlier', val=bboxstr, count=idxOutlierRect)
                     xmin, xmax = min(xini, xend), max(xini, xend)
@@ -205,6 +245,8 @@ class ContourSelLabelStage(MxpStage):
                     idxOutlierRect += 1
             log.debug("#Good contour areas: {}\n{}".format(len(goodContourAreas), goodContourAreas))
             log.debug("#Outlier contour areas: {}\n{}".format(len(outlierAreas), outlierAreas))
+
+            # apply bbox into contour files
             labeledconour = self.labelPatternContour(rawcontour, goodContourAreas, outlierAreas)
             newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))
             newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
@@ -219,15 +261,17 @@ class ContourSelLabelStage(MxpStage):
         bSucceedReadCt = contour.parseFile(contourfile)
         if not bSucceedReadCt:
             raise OSError("Error, contourfile('{}') cannot be parsed".format(contourfile))
+        xini, yini, xend, yend = contour.getBBox()
         contourPointsVec = []
         for polygon in contour.getPolygonData():
             contourpoints = []
             for point in polygon['points']:
-                contourpoints.append([point[0], point[1]])
+                contourpoints.append([point[0]-xini, point[1]-yini]) # origin as (xini, yini)
             contourPointsVec.append(np.around(contourpoints).astype(int))
         log.debug("contour points shape {} 1st point {}".format(contourPointsVec[0].shape, contourPointsVec[0][0]))
             
-        try:  # read image
+        # read image
+        try:
             im, _ = imread_gray(imgfile)
             im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
             bSucceedReadIm = True
@@ -235,21 +279,24 @@ class ContourSelLabelStage(MxpStage):
             # raise
             pass
 
+        # overlay image & contour
         thickness = 1
         if bSucceedReadIm:
             vmax = np.iinfo(im.dtype).max
             CONTOUR_COLOR = (0, vmax, vmax) # yellow
             # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
-            im = cv2.polylines(im, contourPointsVec, False, CONTOUR_COLOR, thickness)
+            im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
         else:
+            '''
             imw, imh = contour.getshape()
             imw, imh = int(imw), int(imh)
+            '''
             vmax = 255
             im = vmax//2 * np.zeros((imh, imw, 3), dtype=np.uint8) # gray background
             CONTOUR_COLOR = (0, vmax, vmax) # yellow
             # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
-            im = cv2.polylines(im, contourPointsVec, False, CONTOUR_COLOR, thickness)
-        return im, contour
+            im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
+        return im, contour, (xini, yini)
 
     def labelPatternContour(self, contour, goodContourAreas, outlierAreas):
         columnTitle = contour.getColumnTitle()

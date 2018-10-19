@@ -25,10 +25,11 @@ sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
 from PlotConfig import *
 from FileUtil import gpfs2WinPath
 
-CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1'
+# CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1'
+CWD = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns\h\cache\dummydb\result\MXP\job1'
 CWD = gpfs2WinPath(CWD)
 
-inxml = os.path.join(CWD, r'contourselcal430out.xml') # contourlabeling410out.xml
+inxml = os.path.join(CWD, r'contourextraction400out.xml') # contourlabeling410out.xml, contourselcal430out.xml
 
 def loadPatternData(imgfile='', contourfile=''):
     bSucceedReadCt = False

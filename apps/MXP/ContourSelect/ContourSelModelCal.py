@@ -12,6 +12,7 @@ import pandas as pd
 import io
 from sklearn import svm
 from sklearn.metrics import confusion_matrix
+import pickle
 
 import sys
 import os.path
@@ -27,7 +28,6 @@ log = logger.setup("ContourModelCal", 'debug')
 __all__ = ["ContourSelCalStage"]
 
 USAGE_TYPES = ['training', 'validation', 'test']
-
 
 class ContourSelCalStage(MxpStage):
     """
@@ -46,8 +46,11 @@ class ContourSelCalStage(MxpStage):
     """
     srcColNames = 'slope, intensity, ridge_intensity, contrast, EigenRatio'
     tgtColName = 'UserLabel'
-    neighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism']
+    neighborColNames = ['NeighborOrientation', 'NeighborParalism'] # used neigbor filters
+    allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism'] 
     debugOn = True
+    pickleName = "pickle_model.pkl"
+    reuseModel = True
 
     def __init__(self, gcf, cf, stagename, jobpath):
         super(ContourSelCalStage, self).__init__(gcf, cf, stagename, jobpath)
@@ -82,8 +85,14 @@ class ContourSelCalStage(MxpStage):
         return divides
 
     def splitDataSet(self):
+        # filter 1: costwt 
+        df_zerowt = self.d_df.loc[self.d_df.costwt<=0, :]
         df = self.d_df.loc[self.d_df.costwt>0, :] # valid dataset
-        df_skipped = self.d_df.loc[self.d_df.costwt<=0, :]
+
+        # filter 2: bbox 
+        wi_bbox = np.logical_or(pd.notnull(df['bbox/Outlier']), pd.notnull(df['bbox/Good']))
+        df_wobbox = df.loc[~wi_bbox, :]
+        df = df.loc[wi_bbox, :]
         nsamples = len(df)
 
         # divide rule
@@ -101,7 +110,7 @@ class ContourSelCalStage(MxpStage):
         log.debug("Usages: {} {}".format(len(usages), usages))
 
         # restore df
-        self.d_df = pd.concat([df, df_skipped], axis=0)
+        self.d_df = pd.concat([df, df_wobbox, df_zerowt], axis=0)
 
     def loadDataSet(self):
         cal_dataset = []
@@ -115,9 +124,11 @@ class ContourSelCalStage(MxpStage):
                 contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
                 if contour.parseFile(contourfile):
                     curdf = contour.toDf()
-                    curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :] # only use SEM points in ROI
                     if self.usePerSegFeatures:
                         curdf = self.addNeighborFeatures(curdf)
+                    curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :] # only use SEM points in ROI
+                    if len(curdf) == 0:
+                        continue
                     # curdf = curdf.loc[:, self.modelColNames]
                     if row.loc['usage'] == USAGE_TYPES[0]: # cal pattern SEM points
                         cal_dataset.append(curdf)
@@ -163,7 +174,7 @@ class ContourSelCalStage(MxpStage):
             [in] Contour df, must contains `polygonId`, `angle`, `offsetx`, `offsety`
             [out] Contour df, added `NeighborContinuity`, `NeighborOrientation`, `NeighborParalism`
 
-                - `NeighborContinuity`:  |X(n) - X(n-1)|^2, usually need to be close
+                - `NeighborContinuity`:  |X(n) - X(n-1)|^2, usually is to 1 (because of 8-neighbor contour tracing)
                 - `NeighborOrientation`:  dot(EigenVector(n), EigenVector(n-1)), closer to 1, the better(may use 1-dot)
                 - `NeighborParalism`:  ||cross((X(n) - X(n-1)), EigenVector(n-1))||, closer to 1, the better(may use 1-cross)
         TODO, the segment neighborhood based features can only be obtained by the whole segment, can't use ROI cropped segment 
@@ -173,9 +184,9 @@ class ContourSelCalStage(MxpStage):
         for polygonId in polygonIds:
             isPolygonHead = True
             for curIdx, _ in df.loc[df['polygonId']==polygonId, :].iterrows():
-                NeighborContinuity = 1
-                NeighborOrientation = 0
-                NeighborParalism = 0
+                NeighborContinuity = 0
+                NeighborOrientation = 1
+                NeighborParalism = 1
                 if not isPolygonHead:
                     eigenvector_n_1 = np.array([np.cos(df.loc[preIdx, 'angle']), np.sin(df.loc[preIdx, 'angle'])])
                     eigenvector_n = np.array([np.cos(df.loc[curIdx, 'angle']), np.sin(df.loc[curIdx, 'angle'])])
@@ -184,12 +195,16 @@ class ContourSelCalStage(MxpStage):
                     crossvector = np.cross(neighorvector, eigenvector_n_1)
 
                     NeighborContinuity = np.sqrt(neighorvector.dot(neighorvector))
-                    NeighborOrientation = 1 - eigenvector_n.dot(eigenvector_n_1)
-                    NeighborParalism = 1 - np.sqrt(crossvector.dot(crossvector))/NeighborContinuity
+                    NeighborOrientation = eigenvector_n.dot(eigenvector_n_1)
+                    NeighborParalism = np.sqrt(crossvector.dot(crossvector))/NeighborContinuity
+                    NeighborContinuity = abs(1-NeighborContinuity)
                 preIdx = curIdx
                 isPolygonHead = False
+                
                 for ii, val in enumerate([NeighborContinuity, NeighborOrientation, NeighborParalism]):
-                    df.loc[curIdx, self.neighborColNames[ii]] = val
+                    colname = self.allNeighborColNames[ii]
+                    if colname in self.neighborColNames:
+                        df.loc[curIdx, colname] = val
         return df
 
     def calibrate(self):
@@ -221,9 +236,14 @@ class ContourSelCalStage(MxpStage):
         log.info("SVC model confusion matrix on verification set:\n{}\n{}".format(cm, cm_norm))
         del X_cal, y_cal, X_ver, y_ver
 
+        # Save model to pickle file
+        pkl_filename = os.path.join(self.stageresultabspath, self.pickleName)
+        with open(pkl_filename, 'wb') as file:  
+            pickle.dump(model, file)
         return model
 
     def predict(self, model):
+
         for idx, row in self.d_df.iterrows():
             contour = SEMContour()
             contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
@@ -231,24 +251,37 @@ class ContourSelCalStage(MxpStage):
                 curdf = contour.toDf()
                 if self.usePerSegFeatures:
                     curdf = self.addNeighborFeatures(curdf)
-                X, y = curdf[self.srcColNames], curdf[self.tgtColName]
+                X = curdf[self.srcColNames]
                 y_pred = model.predict(X)
-                rms = ContourSelCalStage.calcRMS(y_pred, y)
                 curdf.loc[:, 'ClfLabel'] = y_pred
-                self.d_df.loc[idx, 'clf_rms'] = rms
+                if self.tgtColName in curdf.columns:
+                    y_true = curdf[self.tgtColName]
+                    rms = ContourSelCalStage.calcRMS(y_pred, y)
+                    self.d_df.loc[idx, 'clf_rms'] = rms
+
                 newcontour = contour.fromDf(curdf)
                 patternid = self.d_df.loc[idx, 'name']
                 newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))
                 newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
-                newcontour.saveContour(newcontourfile)
+                try:
+                    newcontour.saveContour(newcontourfile)
+                except FileNotFoundError:
+                    print("jobresultabspath: ", self.jobresultabspath)
+                    print("old contour file: ", contourfile)
+                    print("new contour file: ", newcontourfile)
+                    raise
+
                 self.d_df.loc[idx, 'contour/path'] = newcontourfile_relpath
 
     def run(self):
-        # preprocess data, add some features
-        # self.addVLineFeatures()
-
         # model calibration
-        model = self.calibrate()
+        if not self.reuseModel:
+            model = self.calibrate()
+        else:
+            # Load model from pickle file
+            pkl_filename = os.path.join(self.stageresultabspath, self.pickleName)
+            with open(pkl_filename, 'rb') as file:  
+                model = pickle.load(file)
 
         # model predict, calculate all pattern SEM point's info
         self.predict(model)

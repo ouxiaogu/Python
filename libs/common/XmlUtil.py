@@ -220,11 +220,11 @@ def getConfigMapBFS(cf):
         curnode, abspaths, indices = tags.popleft()
         for i, inode in enumerate(list(curnode)):
             reltag = './'+inode.tag
-            new_abspaths = abspaths.copy()
+            new_abspaths = abspaths[:]
             new_abspaths.append(reltag)
             if reltag not in visited:
                 for j, jnode in enumerate(curnode.findall(reltag)):
-                    new_indices = indices.copy()
+                    new_indices = indices[:]
                     new_indices.append(j)
                     postfixes = ['' if ix==0 else '@'+str(ix) for ix in new_indices]
                     nodekey = ''.join([a+b for a, b in zip(new_abspaths, postfixes)])
@@ -251,11 +251,11 @@ def getConfigMapDFS(cf):
         for i, inode in enumerate(list(curnode)):
             reltag = './'+inode.tag
             abstag = ''.join(abspaths)
-            new_abspaths = abspaths.copy()
+            new_abspaths = abspaths[:]
             new_abspaths.append(reltag)
             if reltag not in visited:
                 for j, jnode in enumerate(curnode.findall(reltag)):
-                    new_indices = indices.copy()
+                    new_indices = indices[:]
                     new_indices.append(j)
                     postfixes = ['' if ix==0 else '@'+str(ix) for ix in new_indices]
                     nodekey = ''.join([a+b for a, b in zip(new_abspaths, postfixes)])
@@ -305,14 +305,11 @@ def dfRowToXmlNode(rowSeries, tag='pattern', path_sep='/', index_sep='@'):
     return node
 
 def dfToMxpOcf(df):
-    root = ET.Element('root')
     ocf = ET.Element('result')
-    root.append(ocf)
     for _, series in df.iterrows():
         occf = dfRowToXmlNode(series)
         ocf.append(occf)
-    indentCf(root)
-    return root
+    return ocf
 
 def indentCf(elem, level=0):
     i = "\n" + level*"  "
@@ -365,7 +362,10 @@ if __name__ == '__main__':
     # print(getConfigMapList(root, '.test'))
     df = dfFromConfigMapList(root, '.test')
     print(df)
-    root = dfToMxpOcf(df)
+    ocf = dfToMxpOcf(df)
+    root = ET.Element('root')
+    root.append(ocf)
+    indentCf(root)
     tree = ET.ElementTree(root)
     tree.write("example.xml", encoding="utf-8", xml_declaration=True)
 

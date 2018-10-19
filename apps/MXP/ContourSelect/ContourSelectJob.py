@@ -59,8 +59,11 @@ def main():
         parser.print_help()
         # parser.exit()
 
-        args = parser.parse_args(['./samplejob', '--enable', '1-610'])
+        # args = parser.parse_args(['./samplejob1', '--enable', '1-610'])
+        args = parser.parse_args(['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns', '--enable', '410-410'])
         jobpath = args.jobpath
+        from FileUtil import gpfs2WinPath
+        jobpath = gpfs2WinPath(jobpath)
     print(str(vars(args)))
     myjob = ContourSelJob(jobpath)
     myjob.run()

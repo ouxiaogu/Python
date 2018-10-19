@@ -13,7 +13,7 @@ from subprocess import call
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf, indentCf
+from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf, indentCf, setConfigData
 import logger
 log = logger.setup("MxpStage", 'debug')
 
@@ -91,8 +91,8 @@ class MxpStageXmlParser(object):
 
 class MxpStage(object):
     """docstring for MxpStage"""
-    datarelpath = r"h/data/dummydb/MXP/job1"
-    resultrelpath = r"h/cache/dummydb/result/MXP/job1"
+    datarelpath = os.sep.join(['h', 'data', 'dummydb', 'MXP', 'job1']) # r"h/data/dummydb/MXP/job1"
+    resultrelpath = os.sep.join(['h', 'cache', 'dummydb', 'result', 'MXP', 'job1']) # r"h/cache/dummydb/result/MXP/job1"
 
     def __init__(self, gcf, cf, stagename, jobpath):
         self.d_gcf = gcf
@@ -136,14 +136,17 @@ class MxpStage(object):
         if "init" not in self.stagename.lower():
             self.__loadCfg()
 
-    def save(self, path, viaDf=False):
+    def save(self, path, viaDf=False, extraNodes=None):
         if viaDf:
-            root = dfToMxpOcf(self.d_df)
+            ocf = dfToMxpOcf(self.d_df)
         else:
-            root = ET.Element('root')
             ocf = self.d_ocf
-            root.append(ocf)
-            indentCf(root)
+        if extraNodes is not None:
+            for key, val in extraNodes.iteritems():
+                setConfigData(ocf, key, val)
+        root = ET.Element('root')
+        root.append(ocf)
+        indentCf(root)
         log.debug("Result save path: %s\n" % (path))
         tree = ET.ElementTree(root)
         tree.write(path, encoding="utf-8", xml_declaration=True)
