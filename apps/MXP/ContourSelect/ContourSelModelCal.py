@@ -122,6 +122,8 @@ class ContourSelCalStage(MxpStage):
             if row.usage in (USAGE_TYPES[:-1]) :
                 contour = SEMContour()
                 contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
+                if not os.path.exists(contourfile):
+                    contourfile = os.path.join(self.jobresultabspath, os.path.join(*row.loc['contour/path'].split('\\')))
                 if contour.parseFile(contourfile):
                     curdf = contour.toDf()
                     if self.usePerSegFeatures:
@@ -179,6 +181,8 @@ class ContourSelCalStage(MxpStage):
                 - `NeighborParalism`:  ||cross((X(n) - X(n-1)), EigenVector(n-1))||, closer to 1, the better(may use 1-cross)
         TODO, the segment neighborhood based features can only be obtained by the whole segment, can't use ROI cropped segment 
         '''
+        if len(df) <= 0:
+            return df
         polygonIds = df.loc[:, 'polygonId'].drop_duplicates().values
         preIdx = df.index[0]
         for polygonId in polygonIds:
@@ -203,8 +207,7 @@ class ContourSelCalStage(MxpStage):
                 
                 for ii, val in enumerate([NeighborContinuity, NeighborOrientation, NeighborParalism]):
                     colname = self.allNeighborColNames[ii]
-                    if colname in self.neighborColNames:
-                        df.loc[curIdx, colname] = val
+                    df.loc[curIdx, colname] = val
         return df
 
     def calibrate(self):
@@ -238,15 +241,27 @@ class ContourSelCalStage(MxpStage):
 
         # Save model to pickle file
         pkl_filename = os.path.join(self.stageresultabspath, self.pickleName)
-        with open(pkl_filename, 'wb') as file:  
-            pickle.dump(model, file)
+        with open(pkl_filename, 'wb') as fout:  
+            pickle.dump(model, fout)
         return model
 
     def predict(self, model):
 
         for idx, row in self.d_df.iterrows():
+            if row.loc['costwt'] <= 0:
+                continue
+            
+            patternid = row.loc['name']
+
+
             contour = SEMContour()
-            contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
+            log.debug("Start processing pattern {} ...".format(patternid))
+            try:
+                contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
+            except AttributeError:
+                continue
+            if not os.path.exists(contourfile):
+                contourfile = os.path.join(self.jobresultabspath, os.path.join(*row.loc['contour/path'].split('\\')))
             if contour.parseFile(contourfile):
                 curdf = contour.toDf()
                 if self.usePerSegFeatures:
@@ -256,22 +271,15 @@ class ContourSelCalStage(MxpStage):
                 curdf.loc[:, 'ClfLabel'] = y_pred
                 if self.tgtColName in curdf.columns:
                     y_true = curdf[self.tgtColName]
-                    rms = ContourSelCalStage.calcRMS(y_pred, y)
+                    rms = ContourSelCalStage.calcRMS(y_pred, y_true)
                     self.d_df.loc[idx, 'clf_rms'] = rms
 
                 newcontour = contour.fromDf(curdf)
-                patternid = self.d_df.loc[idx, 'name']
                 newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))
                 newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
-                try:
-                    newcontour.saveContour(newcontourfile)
-                except FileNotFoundError:
-                    print("jobresultabspath: ", self.jobresultabspath)
-                    print("old contour file: ", contourfile)
-                    print("new contour file: ", newcontourfile)
-                    raise
-
+                newcontour.saveContour(newcontourfile)
                 self.d_df.loc[idx, 'contour/path'] = newcontourfile_relpath
+                log.debug("Successfully processed pattern {}".format(patternid))
 
     def run(self):
         # model calibration
@@ -280,8 +288,8 @@ class ContourSelCalStage(MxpStage):
         else:
             # Load model from pickle file
             pkl_filename = os.path.join(self.stageresultabspath, self.pickleName)
-            with open(pkl_filename, 'rb') as file:  
-                model = pickle.load(file)
+            with open(pkl_filename, 'rb') as fin:  
+                model = pickle.load(fin)
 
         # model predict, calculate all pattern SEM point's info
         self.predict(model)
