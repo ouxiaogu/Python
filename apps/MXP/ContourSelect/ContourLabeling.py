@@ -4,7 +4,7 @@ Created: ouxiaogu, 2018-09-20 12:06:57
 
 Tag contour, by drawing outlier bboxes 
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 
 import numpy as np
@@ -207,7 +207,7 @@ class ContourSelLabelStage(MxpStage):
         pattern_selection_mode = getConfigData(self.d_cf, '.select_sample/mode', 'random')
         if pattern_selection_mode == 'explicit':
             selectedpatternids = getConfigData(self.d_cf, '.select_sample/filter', '')
-            selectedpatternids = [c.strip() for c in selectedpatternids.split(",")]
+            selectedpatternids = [c.strip() for c in str(selectedpatternids).split(",")]
         elif pattern_selection_mode == 'regex':
             flt = getConfigData(self.d_cf, '.select_sample/filter', '*')
             selectedpatternids = flt
@@ -222,7 +222,7 @@ class ContourSelLabelStage(MxpStage):
         for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
             if getConfigData(occf, 'costwt') <= 0:
                 continue
-            patternid = getConfigData(occf, '.name')
+            patternid = str(getConfigData(occf, '.name'))
             if isinstance(selectedpatternids, collections.Iterable) and patternid not in selectedpatternids:
                 continue
             elif isinstance(selectedpatternids, str) and not re.match(selectedpatternids, patternid):
@@ -340,7 +340,6 @@ class ContourSelLabelStage(MxpStage):
 
             df.loc[:, 'offsetx'] -= xini
             df.loc[:, 'offsety'] -= yini
-            outcontour = contour.fromDf(df)
             if overlay:
                 contourPointsVec = []
                 grouped = df[['polygonId', 'offsetx', 'offsety']].groupby('polygonId')
@@ -353,9 +352,9 @@ class ContourSelLabelStage(MxpStage):
         elif mode == 'extend':
             df.loc[:, 'offsetx'] += xini
             df.loc[:, 'offsety'] += yini
-            outcontour = contour.fromDf(df)
         else:
             raise ValueError("Only support mode of 'crop' or 'extend', input is {}".format(mode))
+        outcontour = contour.fromDf(df)
 
         return outim, outcontour
 
