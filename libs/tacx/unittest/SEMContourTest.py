@@ -15,8 +15,8 @@ import os.path
 sys.path.insert(0, os.getcwd()+"/..")
 from SEMContour import *
 sys.path.insert(0, os.getcwd()+"/../../common")
-from PlotConfig import *
 from FileUtil import gpfs2WinPath
+from filters import cv_gaussian_kernel
 
 #CWD = '/gpfs/WW/BD/MXP/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/h/cache/dummydb/result/MXP/job1/ContourSelectModelCalibration430result1'
 CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1\ContourExtraction400result1'
@@ -38,7 +38,8 @@ class ContourAnalyzer(object):
         self.contour = contour
         self.df = contour.toDf()
 # get contour data
-contourfile = os.path.join(CWD, '1001_image_contour.txt')
+patternid = '1001'
+contourfile = os.path.join(CWD, patternid+'_image_contour.txt')
 ca = ContourAnalyzer(contourfile)
 df = ca.df
 
@@ -131,7 +132,6 @@ plot_col_filter(ca, patternid='461', colname=colname)
 
 # In[33]:
 
-
 def addNeighborFeatures(df):
     '''
     add Features for the input contour DataFrame, based on the neighbor relationship in the context of segment
@@ -176,9 +176,8 @@ def addNeighborFeatures(df):
                 df.loc[curIdx, colname] = val
     return df
 
-def plot_multi_filters(ca, patternid='', strFlts=None):
-    if strFlts is None:
-        strFlts = []
+def plot_multi_filters(ca, patternid='', filters=None, transform_filter=False):
+    filters = categorizeFilters(filters)
     df = ca.df
     
     fig = plt.figure()
@@ -191,19 +190,283 @@ def plot_multi_filters(ca, patternid='', strFlts=None):
     
     # plot contour
     ax.plot(df.loc[:, 'offsetx'], df.loc[:, 'offsety'], 'k.', markersize=1, label='SEM Contour')
+    # plot angle
+    for _, row in df.iterrows():
+        x, y = row.loc['offsetx'], row.loc['offsety']
+        angle = row.loc['angle']
+        arrow_length = 1
+        dx, dy = arrow_length*np.cos(angle), arrow_length*np.sin(angle)
+        ax.arrow(x, y, dx, dy, width=0.1, fc='y', ec='y') # ,shape='right', overhang=0
 
     # plot filters
-    for strFlt in strFlts:
-        curdf = df.query(strFlt)
-        ax.plot(curdf.loc[:, 'offsetx'], curdf.loc[:, 'offsety'], 'o', markersize=4, label=strFlt, alpha=0.6)
+    if not transform_filter:
+        for strFlt in filters.values():
+            curdf = df.query(strFlt)
+            ax.plot(curdf.loc[:, 'offsetx'], curdf.loc[:, 'offsety'], 'o', markersize=4, label=strFlt, alpha=0.6)
+    else:
+        '''
+        inflection_points = []
+        for strFlt in filters.values():
+            curdf = df.query(strFlt )
+            print(strFlt, len(curdf))
+            if len(curdf) != 0:
+                inflection_points.append(curdf)
+        inflection_df = pd.concat(inflection_points)
+        '''
+        inflection_df = df.query('or '.join(filters.values()))
+        print(inflection_df[['polygonId', 'offsetx', 'offsety'] + allNeighborColNames[2:]])
+        
+        polygonIds = inflection_df.loc[:, 'polygonId'].drop_duplicates().values
+        for polygonId in polygonIds:
+            curdf = inflection_df.loc[inflection_df['polygonId']==polygonId, :]
+            maxNeighborContinuity = curdf.max()['NeighborContinuity']
+            minNeighborContinuity, minNeighborOrientation, minNeighborParalism = curdf.min()[allNeighborColNames]
+
+            if minNeighborParalism < minNeighborOrientation and len(curdf.query(filters['NeighborParalism'])) > 0:
+                idxmin = curdf['NeighborParalism'].idxmin()
+                ax.plot(curdf.loc[idxmin, 'offsetx'], curdf.loc[idxmin, 'offsety'], 'ro', markersize=4, label='minNeighborParalism', alpha=0.6)
+            elif minNeighborOrientation < minNeighborParalism and len(curdf.query(filters['NeighborOrientation'])) > 0:
+                idxmin = curdf['NeighborOrientation'].idxmin()
+                ax.plot(curdf.loc[idxmin, 'offsetx'], curdf.loc[idxmin, 'offsety'], 'rd', markersize=4, label='minNeighborOrientation', alpha=0.6)
+            elif len(curdf.query(filters['NeighborContinuity'])) > 0:
+                if abs(maxNeighborContinuity-1) > abs(minNeighborContinuity-1):
+                    idxmax = curdf['NeighborContinuity'].idxmax()
+                    ax.plot(curdf.loc[idxmax, 'offsetx'], curdf.loc[idxmax, 'offsety'], 'bd', markersize=4, label='maxNeighborContinuity', alpha=0.6)
+                else:
+                    idxmin = curdf['NeighborContinuity'].idxmin()
+                    ax.plot(curdf.loc[idxmin, 'offsetx'], curdf.loc[idxmin, 'offsety'], 'bo', markersize=4, label='minNeighborContinuity', alpha=0.6)
 
     plt.gca().invert_yaxis()
     plt.legend()
     plt.show()
+    
+    #inflection_df.plot.scatter(x=allNeighborColNames[1], y=allNeighborColNames[2])
+    #plt.show()
+
+def categorizeFilters(filters):
+    if filters is None:
+        newfilters = {}
+    elif not isinstance(filters, dict):
+        newfilters = {}
+        for col in allNeighborColNames:
+            for strFlt in filters:
+                if col in strFlt:
+                    newfilters[col] = strFlt
+                    break
+    filters = newfilters
+    # print(filters)
+    return filters
+
+def findDominantNeighborIssue(linedf, filters, maxTailLenth=20):
+    '''
+    find dominate filter in two side, should return
+
+    Returns:
+    --------
+    dominant_issues: list of two cells
+        cell[0] (feature, index) from head
+        cell[1] (feature, index) from tail, index here is negative, this cell is None or empty when no qualified tail issue
+    dominant_issues = [('NeighborParalism', 5), ('NeighborParalism', 2)]
+    '''
+    dominant_issues = []
+    
+    # step 1, search from head
+    headdf = linedf.loc[linedf.index[:maxTailLenth], :]
+    minNeighborOrientation, minNeighborParalism = headdf.min()[allNeighborColNames[1:]]
+    issue_feature, issue_index = None, None
+    if minNeighborParalism < minNeighborOrientation and len(headdf.query(filters['NeighborParalism'])) > 0:
+        issue_feature = 'NeighborParalism'
+        issue_index = np.argmin(headdf[issue_feature].values)
+    elif minNeighborOrientation < minNeighborParalism and len(headdf.query(filters['NeighborOrientation'])) > 0:
+        issue_feature = 'NeighborOrientation'
+        issue_index = np.argmin(headdf[issue_feature].values)
+    dominant_issues.append(None)
+    if issue_feature is not None:
+        dominant_issues[0] = (issue_feature, issue_index)
+
+    # step 2, search from tail, reverse order
+    dominant_issues.append(None)
+    head_index = 0 if issue_index is None else issue_index
+    tailrange = len(linedf) - head_index - 1
+    if tailrange > maxTailLenth:
+        taildf = linedf.loc[linedf.index[-maxTailLenth:], :]
+        minNeighborOrientation, minNeighborParalism = taildf.min()[allNeighborColNames[1:]]
+        issue_feature, issue_index = None, None
+        if minNeighborParalism < minNeighborOrientation and len(taildf.query(filters['NeighborParalism'])) > 0:
+            issue_feature = 'NeighborParalism'
+            issue_index = np.argmin(taildf[issue_feature].values)
+            issue_index = head_index + 1 + issue_index - len(linedf) # use pythonic negative index for tail
+        elif minNeighborOrientation < minNeighborParalism and len(taildf.query(filters['NeighborOrientation'])) > 0:
+            issue_feature = 'NeighborOrientation'
+            issue_index = np.argmin(taildf[issue_feature].values)
+            issue_index = head_index + 1 + issue_index - len(linedf)
+        if issue_feature is not None and issue_index:
+            dominant_issues[1] = (issue_feature, issue_index)
+    return dominant_issues
+
+def smoothSignal(arr, sigma=0.5):
+    # Gaussian kernel
+    flt = cv_gaussian_kernel(3, 0.5)
+
+    # padding replicate mode
+    padArr = np.zeros((arr.shape[0]+2,) )
+    padArr[0] = arr[0]
+    padArr[1:-1] = arr
+    padArr[-1] = arr[-1]
+    
+    # smooth
+    newArr = np.convolve(padArr, flt, 'valid')
+    if len(arr) != len(newArr):
+        raise ValueError("inequal length {} {}".format(len(arr), len(newArr)))
+    return newArr
+
+def calcMeanOfLargestHistBin(arr, bins=10):
+    hist, bin_edges = np.histogram(arr, bins=bins)
+    idxmax = np.argmax(hist)
+    binvals = arr[np.where(np.logical_and(arr>=bin_edges[idxmax], arr<bin_edges[idxmax+1]))]
+    return np.mean(binvals)
+
+def findIndexOfFirstFlat(arr, gradients=None, start_pos=0, thres=None):
+    if gradients is None:
+        gradients = np.gradient(arr, edge_order=2)
+    assert(len(arr) == len(gradients))
+    absGradients = np.abs(gradients)
+    if thres is None:
+        thres = calcMeanOfLargestHistBin(absGradients)
+    for ix in range(start_pos, len(gradients)):
+        if absGradients[ix] < thres:
+            return ix
+    return start_pos
+
+def findIndexOfFirstZeroCrossing(arr, gradients=None, start_pos=0):
+    if gradients is None:
+        gradients = np.gradient(arr, edge_order=2)
+    assert(len(arr) == len(gradients))
+    start = start_pos+1 if start_pos == 0 else start_pos
+    for ix in range(start_pos, len(gradients)):
+        if gradients[ix]*gradients[ix-1] <=0 :
+            return ix
+    return start_pos
+
+def applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth=20, smooth=True):
+    dominant_issues = []
+    linedf.loc[:, 'ClfLabel'] = 1
+
+    # step 1, search and apply from head
+    headdf = linedf.loc[linedf.index[:maxTailLenth], :]
+    minNeighborOrientation, minNeighborParalism = headdf.min()[allNeighborColNames[1:]]
+    issue_feature, issue_index = None, None
+    if minNeighborParalism < minNeighborOrientation and len(headdf.query(filters['NeighborParalism'])) > 0:
+        issue_feature = 'NeighborParalism'
+        issue_index = np.argmin(headdf[issue_feature].values)
+    elif minNeighborOrientation < minNeighborParalism and len(headdf.query(filters['NeighborOrientation'])) > 0:
+        issue_feature = 'NeighborOrientation'
+        issue_index = np.argmin(headdf[issue_feature].values)
+    dominant_issues.append(None)
+    if issue_feature is not None:
+        dominant_issues[0] = [issue_feature, issue_index]
+        arr = linedf[issue_feature].values
+        if smooth:
+            arr = smoothSignal(arr)
+        gradient = np.gradient(arr, edge_order=2)
+        idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=issue_index+1)
+        dominant_issues[0].append(idxFlat)
+        idxFlat = min(maxTailLenth, idxFlat)
+        linedf.loc[linedf.index[:idxFlat], 'ClfLabel'] = 0
+
+    # step 2, search and apply from tail, reverse order
+    dominant_issues.append(None)
+    head_index = 0 if issue_index is None else issue_index
+    tailrange = len(linedf) - (head_index + 1) # exclude the head issue index itself
+    if tailrange > maxTailLenth:
+        taildf = linedf.loc[linedf.index[-maxTailLenth:], :]
+        minNeighborOrientation, minNeighborParalism = taildf.min()[allNeighborColNames[1:]]
+        issue_feature, issue_index = None, None
+        if minNeighborParalism < minNeighborOrientation and len(taildf.query(filters['NeighborParalism'])) > 0:
+            issue_feature = 'NeighborParalism'
+            issue_index = np.argmin(taildf[issue_feature].values)
+            issue_index = maxTailLenth - 1 - issue_index  # use index start from tail
+        elif minNeighborOrientation < minNeighborParalism and len(taildf.query(filters['NeighborOrientation'])) > 0:
+            issue_feature = 'NeighborOrientation'
+            issue_index = np.argmin(taildf[issue_feature].values)
+            issue_index = maxTailLenth - 1 - issue_index
+        if issue_feature is not None and issue_index:
+            dominant_issues[1] = [issue_feature, issue_index]
+            arr = linedf[issue_feature].values[::-1]
+            if smooth:
+                arr = smoothSignal(arr)
+            gradient = np.gradient(arr, edge_order=2)
+            idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=issue_index+1)
+            dominant_issues[1].append(idxFlat)
+            idxFlat = min(maxTailLenth, idxFlat)
+            linedf.loc[linedf.index[-idxFlat:], 'ClfLabel'] = 0
+    return linedf, dominant_issues
+
+def applyNeighborRuleModel(contourdf, filters, smooth=True):
+    '''
+    The step to find rule model in python:
+    1. apply combined filters to find ill contour Vline candidates
+    2. Narrow down the issue Vline candidates into those have dominant neighbor feature issue in its head+20 or tail-20
+    3. remove contour issue head/tail by following rules(default is 3.1):
+        * 3.1: start search from dominant issue position+1, new head=Index[1st flat gradient point]
+        * 3.2: start search from dominant issue position+1, new head=Index[the gradient zero-crossing point]
+
+    '''
+    maxTailLenth = 20
+    contourdf.loc[:, 'ClfLabel'] = 1
+    filters = categorizeFilters(filters)
+
+    inflection_df = contourdf.query('or '.join(filters.values()))
+    # print(inflection_df[['polygonId', 'offsetx', 'offsety'] + allNeighborColNames[1:]])
+    polygonIds = inflection_df.loc[:, 'polygonId'].drop_duplicates().values
+    for polygonId in polygonIds:
+        lineFlt = contourdf['polygonId']==polygonId
+        linedf = contourdf.loc[lineFlt, :]
+        newlinedf, dominant_issues = applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth, smooth)
+        print(int(polygonId), dominant_issues)
+        contourdf.loc[lineFlt, :] = newlinedf
+    return contourdf
+
 
 df = addNeighborFeatures(df)
-plot_multi_filters(ca, patternid='1001', strFlts=['abs(1-NeighborContinuity) > 0.5', 'NeighborParalism<0.98', 'NeighborOrientation<0.98'])
+ca.df = df
+plot_multi_filters(ca, patternid=patternid, filters=['abs(1-NeighborContinuity) > 0.5', 'NeighborOrientation<0.98', 'NeighborParalism<0.98', ], transform_filter=True)
 
+# In []:
+for polygonId in [21, 8, 37,  38]: # 27,
+    print(polygonId)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    curdf = df.loc[df.polygonId==polygonId, :]
+    x = np.arange(len(curdf))
+    arr1 = curdf[allNeighborColNames[1]].values
+    arr2 = curdf[allNeighborColNames[2]].values
+    #arr2 = smoothSignal(arr2)
+    gradient1 = np.gradient(arr1, edge_order=2)
+    gradient2 = np.gradient(arr2, edge_order=2)
+    Paralism_xx = np.gradient(gradient2, edge_order=2)
+    
+    idxmin = np.argmin(arr2)
+    ax.plot(idxmin, arr2[idxmin], 'o', markersize=12, markeredgewidth=2, markerfacecolor='none', label= 'min'+allNeighborColNames[2])
+    idx1 = findIndexOfFirstFlat(arr2, gradient2, start_pos=idxmin+1)
+    idx2 = findIndexOfFirstZeroCrossing(arr2, gradient2, start_pos=idxmin+1)
+    ax.plot(idx1, arr2[idx1], 'o', markersize=12, markeredgewidth=2, markerfacecolor='none', label= allNeighborColNames[2] + ' zero gradient')
+    ax.plot(idx2, arr2[idx2], 'o', markersize=12, markeredgewidth=2, markerfacecolor='none', label= allNeighborColNames[2] + ' zero-crossing gradient')
+    
+    
+    #ax.plot(x, (curdf[allNeighborColNames[0]]-1).abs(), 'g-d', label=allNeighborColNames[0])
+    #ax.plot(x, curdf[allNeighborColNames[1]], '-o', label= allNeighborColNames[1])
+    ax.plot(x, curdf[allNeighborColNames[2]], '--o', label= allNeighborColNames[2], alpha=0.6)
+    ax.plot(x, arr2, '--o', label= allNeighborColNames[2], alpha=0.6)
+    #ax.plot(x, gradient1, '-*', label= allNeighborColNames[1] + ' gradient')
+    #ax.plot(x, gradient2, '--*', label= allNeighborColNames[2] + ' gradient')
+    #ax.plot(x, Paralism_xx, '--d', label= allNeighborColNames[2] + ' 2nd deriative')
+    
+    if idxmin in range(40):
+        ax.set_xlim([0, 40])
+    #plt.yscale('log')    
+    ax.set_title("Pattern {} Vline {}".format(patternid, polygonId))
+    plt.legend()
 
 # In[ ]:
 

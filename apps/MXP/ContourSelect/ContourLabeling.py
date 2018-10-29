@@ -9,6 +9,8 @@ Last Modified by:  ouxiaogu
 
 import numpy as np
 import cv2
+import collections
+import re
 
 import sys
 import os.path
@@ -167,7 +169,7 @@ class ContourSelLabelStage(MxpStage):
     """
     tgtColName = 'UserLabel'
 
-    def getLabelingPatterns(self):
+    def selectLabelingPatternsRandomly(self):
         start_pattern_name = getConfigData(self.d_cf, 'start_pattern_name', 0)
         nsamples = getConfigData(self.d_cf, 'samples', -1)
         allpatternids = []
@@ -201,14 +203,29 @@ class ContourSelLabelStage(MxpStage):
             selectedpatternids = samplepatternids[:nsamples]
         return selectedpatternids
 
+    def selectLabelingPatterns(self):
+        pattern_selection_mode = getConfigData(self.d_cf, '.select_sample/mode', 'random')
+        if pattern_selection_mode == 'explicit':
+            selectedpatternids = getConfigData(self.d_cf, '.select_sample/filter', '')
+            selectedpatternids = [c.strip() for c in selectedpatternids.split(",")]
+        elif pattern_selection_mode == 'regex':
+            flt = getConfigData(self.d_cf, '.select_sample/filter', '*')
+            selectedpatternids = flt
+        else:
+            selectedpatternids = self.selectLabelingPatternsRandomly()
+        return selectedpatternids
+
     def run(self):
-        selectedpatternids = self.getLabelingPatterns()
+        selectedpatternids = self.selectLabelingPatterns()
+        log.info("pattern samples to be labeled: {}".format(selectedpatternids))
 
         for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
             if getConfigData(occf, 'costwt') <= 0:
                 continue
             patternid = getConfigData(occf, '.name')
-            if patternid not in selectedpatternids:
+            if isinstance(selectedpatternids, collections.Iterable) and patternid not in selectedpatternids:
+                continue
+            elif isinstance(selectedpatternids, str) and not re.match(selectedpatternids, patternid):
                 continue
 
             # load image and contour
@@ -254,7 +271,7 @@ class ContourSelLabelStage(MxpStage):
             setConfigData(occf, '.contour/path', newcontourfile_relpath)
 
     def loadPatternData(self, imgfile='', contourfile=''):
-        bSucceedReadCt, bSucceedReadIm = False, False
+        bSucceedReadCt = False
 
         # read contour
         contour = SEMContour()
@@ -262,7 +279,7 @@ class ContourSelLabelStage(MxpStage):
         if not bSucceedReadCt:
             raise OSError("Error, contourfile('{}') cannot be parsed".format(contourfile))
         xini, yini, xend, yend = contour.getBBox()
-        contourPointsVec = []
+        contourPointsVec = [] # depth of 3
         for polygon in contour.getPolygonData():
             contourpoints = []
             for point in polygon['points']:
@@ -274,29 +291,81 @@ class ContourSelLabelStage(MxpStage):
         try:
             im, _ = imread_gray(imgfile)
             im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
-            bSucceedReadIm = True
         except:
-            # raise
-            pass
+            imw, imh = contour.getshape()
+            imw, imh = int(imw), int(imh)
+            im = 255//2 * np.ones((imh, imw, 3), dtype=np.uint8) # gray background
 
         # overlay image & contour
         thickness = 1
-        if bSucceedReadIm:
-            vmax = np.iinfo(im.dtype).max
-            CONTOUR_COLOR = (0, vmax, vmax) # yellow
-            # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
-            im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
-        else:
-            '''
+        vmax = np.iinfo(im.dtype).max
+        CONTOUR_COLOR = (0, vmax, vmax) # yellow
+        # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
+        im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
+
+        return im, contour, (xini, yini)
+
+    @staticmethod
+    def updateContourROI(contour, im=None, mode='crop', overlay=True):
+        '''
+        Update contour ROI, mode could be 'crop' or 'extend'
+
+        Parameters
+        ----------
+        mode:   string
+            * 'crop': crop the image into contour bbox, output `contour point cords -= (xini, yini)`
+            * 'crop': extend the image into full size, output `contour point cords += (xini, yini)`
+        overly: boolean
+            * 'True': output image is the overlay of image + contour
+            * 'False': output image is just image itself
+        
+        Returns
+        -------
+        outim: image object
+            could be overlay of image + contour or image itself
+        outcontour: SEMContour object
+            contour file will different cords
+        '''
+        outim, outcontour = None, None
+        # process image
+        if im is None:
+            log.warning("input image is None, use gray background")
             imw, imh = contour.getshape()
             imw, imh = int(imw), int(imh)
-            '''
-            vmax = 255
-            im = vmax//2 * np.zeros((imh, imw, 3), dtype=np.uint8) # gray background
-            CONTOUR_COLOR = (0, vmax, vmax) # yellow
-            # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
-            im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
-        return im, contour, (xini, yini)
+            im = 255//2 * np.ones((imh, imw, 3), dtype=np.uint8) # gray background
+        else:
+            if len(im.shape) == 2:
+                im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
+            if not np.integer(im):
+                raise TypeError("only support int type images, input image type: {}".format(im.dtype))
+
+        vmax = np.iinfo(im.dtype).max
+        CONTOUR_COLOR = (0, vmax, 0) # green
+
+        # process contour, and overlay image
+        df = contour.toDf()
+        xini, yini, xend, yend = contour.getBBox()
+        if mode == 'crop':
+            outim = im[yini:yend, xini:xend]
+
+            df.loc['offsetx', :] -= xini
+            df.loc['offsety', :] -= yini
+            outcontour = contour.fromDf(df)
+            if overlay:
+                contourPointsVec = []
+                grouped = df[['polygonId', 'offsetx', 'offsety']].groupby('polygonId')
+                for name, group in grouped:
+                    contourPointsVec.append(group.loc[['offsetx', 'offsety']].values)
+                thickness = 1
+                outim = cv2.polylines(outim, contourPointsVec, False, CONTOUR_COLOR, thickness)  
+        elif mode == 'extend':
+            df.loc['offsetx', :] += xini
+            df.loc['offsety', :] += yini
+            outcontour = contour.fromDf(df)
+        else:
+            raise ValueError("Only support mode of 'crop' or 'extend', input is {}".format(mode))
+
+        return outim, outcontour
 
     def labelPatternContour(self, contour, goodContourAreas, outlierAreas):
         columnTitle = contour.getColumnTitle()
@@ -316,3 +385,11 @@ class ContourSelLabelStage(MxpStage):
                 polygon['points'][j].append(label)
         contour.setPolygonData(polygons)
         return contour
+
+
+
+
+
+
+
+

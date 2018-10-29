@@ -7,13 +7,14 @@
 # %matplotlib auto
 import numpy as np
 import pandas as pd
-import matplotlib
 import matplotlib.pyplot as plt
 import cv2
 
 import sys
 import os.path
 print(os.getcwd())
+sys.path.insert(0, os.getcwd()+"/../")
+from ContourTrackbarFilter import ContourTrackbarFilter
 sys.path.insert(0, os.getcwd()+"/../../../../libs/tacx")
 print(os.getcwd()+"/../../../../libs/tacx")
 from SEMContour import *
@@ -21,11 +22,10 @@ from MxpStage import MxpStageXmlParser
 sys.path.insert(0, os.getcwd()+"/../../../../libs/imutil")
 from ImGUI import imread_gray
 sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
-from PlotConfig import *
 from FileUtil import gpfs2WinPath
 
-# CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1'
-CWD = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/h/cache/dummydb/result/MXP/job1/'
+CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1'
+#CWD = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/h/cache/dummydb/result/MXP/job1/'
 CWD = gpfs2WinPath(CWD)
 
 inxml = os.path.join(CWD, r'contourselcal430out.xml') # contourextraction400out.xml contourlabeling410out.xml, contourselcal430out.xml
@@ -38,16 +38,32 @@ def loadPatternData(imgfile='', contourfile=''):
     bSucceedReadCt = contour.parseFile(contourfile)
     if not bSucceedReadCt:
         raise OSError("Error, contourfile('{}') cannot be parsed".format(contourfile))
+    xini, yini, xend, yend = contour.getBBox()
+    contourPointsVec = [] # depth of 3
+    for polygon in contour.getPolygonData():
+        contourpoints = []
+        for point in polygon['points']:
+            contourpoints.append([point[0]-xini, point[1]-yini]) # origin as (xini, yini)
+        contourPointsVec.append(np.around(contourpoints).astype(int))
+    print("contour points shape {} 1st point {}".format(contourPointsVec[0].shape, contourPointsVec[0][0]))
         
-    im = None
-    try:  # read image
+    # read image
+    try:
         im, _ = imread_gray(imgfile)
-        im = (im/65535).astype(np.float32)
         im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
     except:
-        # raise
-        pass
-    return im, contour
+        imw, imh = contour.getshape()
+        imw, imh = int(imw), int(imh)
+        im = 255//2 * np.ones((imh, imw, 3), dtype=np.uint8) # gray background
+
+    # overlay image & contour
+    thickness = 1
+    vmax = np.iinfo(im.dtype).max
+    CONTOUR_COLOR = (0, vmax, vmax) # yellow
+    # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
+    im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
+
+    return im, contour, (xini, yini)
 
 def getContourClassifierData(inxml):
     print(inxml)
@@ -59,8 +75,8 @@ def getContourClassifierData(inxml):
     sr_occf = pd.Series(df_occf.values.flatten(), index=df_occf.columns)
     contourfile = getRealFilePath(sr_occf.loc['contour/path'])
     imgfile = getRealFilePath(sr_occf.loc['image/path'])
-    im, contour = loadPatternData(imgfile, contourfile)
-    return im, contour
+    im, contour, initpnt = loadPatternData(imgfile, contourfile)
+    return im, contour, initpnt
     # TODO, add bbox plot
     # df.filter(regex='bbox/outlier', axis=1)
 
@@ -266,12 +282,15 @@ def getRealFilePath(curfile):
 def main():
     singlePatternPlot = 1
     if singlePatternPlot:
-        im, contour = getContourClassifierData(inxml)
+        im, contour, initpnt = getContourClassifierData(inxml)
         #plot_col_by_label(contour, patternid='461', colname="UserLabel")
         #plot_image_contour_angle(im, contour, '461')
 
-        plotContourClassifier(im, contour, 'Pattern 461')
-        plotContourDiscriminator(im, contour, 'Pattern 461')
+        #plotContourClassifier(im, contour, 'Pattern 461')
+        #plotContourDiscriminator(im, contour, 'Pattern 461')
+        drawer = ContourTrackbarFilter(im, contour, 'Pattern 461')
+        thres = drawer.run()
+        print(thres)
     else:
         plotAllContourClfData(inxml)
 

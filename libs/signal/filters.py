@@ -562,12 +562,8 @@ def isOdd(a):
     return True
 
 if __name__ == '__main__':
-    # arr = np.random.randn(3, 4)
-    # fltG = gaussian_filter(1)
-    # # print(fftconvolve(arr, fltG) )
-    # # print(convolve(arr, fltG) )
-
-    # plot_flt_sz(2)
+    '''test filter'''
+    print(cv_gaussian_kernel(3, 0.9))
 
     # print(gaussian_filter(2))
     # a = cv_gaussian_kernel(11)
@@ -577,8 +573,15 @@ if __name__ == '__main__':
     # import cv2
     # print(cv2.getGaussianKernel(11, -1))
 
+    '''test convolve'''
+    # arr = np.random.randn(3, 4)
+    # fltG = gaussian_filter(1)
+    # # print(fftconvolve(arr, fltG) )
+    # # print(convolve(arr, fltG) )
+
+    # plot_flt_sz(2)
     # plot_rect_func_fft()
 
     '''test dft matrix'''
-    print(dft_1d_matrix(3))
-    U, V = dft_2d_matrix(2, 2)
+    # print(dft_1d_matrix(3))
+    # U, V = dft_2d_matrix(2, 2)

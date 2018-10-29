@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf, indentCf, setConfigData
 import logger
-log = logger.setup("MxpStage", 'debug')
+log = logger.setup("MxpStage", 'info')
 
 __all__ = ['MXP_XML_TAGS', 'MXP_RESULT_OPTIONS',
          'MxpStage', 'MxpStageXmlParser',]
@@ -150,4 +150,4 @@ class MxpStage(object):
         log.debug("Result save path: %s\n" % (path))
         tree = ET.ElementTree(root)
         tree.write(path, encoding="utf-8", xml_declaration=True)
-        log.debug("Result saved at %s\n" % (path))
+        log.info("Result saved at %s\n" % (path))

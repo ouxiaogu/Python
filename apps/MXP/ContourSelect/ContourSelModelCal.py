@@ -44,13 +44,14 @@ class ContourSelCalStage(MxpStage):
     TODO, if without this Contour Labeling Stage, use the MXP_Flag as UserLabel,
     MXP_Flag with filter BitMask to label 'good' & 'bad'.
     """
-    srcColNames = 'slope, intensity, ridge_intensity, contrast, EigenRatio'
+    allSrcColNames = 'slope, intensity, ridge_intensity, contrast, EigenRatio'
+    srcColNames = 'slope, intensity, ridge_intensity, contrast'
     tgtColName = 'UserLabel'
     neighborColNames = ['NeighborOrientation', 'NeighborParalism'] # used neigbor filters
     allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism'] 
     debugOn = True
     pickleName = "pickle_model.pkl"
-    reuseModel = True
+    reuseModel = False
 
     def __init__(self, gcf, cf, stagename, jobpath):
         super(ContourSelCalStage, self).__init__(gcf, cf, stagename, jobpath)
@@ -140,11 +141,14 @@ class ContourSelCalStage(MxpStage):
                         ver_patterns.append(row.loc['name'])
 
         cal_dataset = pd.concat(cal_dataset)
-        if self.debugOn:
-            caldatapath = os.path.join(self.stageresultabspath, 'caldata.txt')
-            cal_dataset.to_csv(caldatapath, index=False, sep='\t')
-            log.debug("training data set saved at "+caldatapath)
         ver_dataset = pd.concat(ver_dataset)
+        if self.debugOn:
+            cal_dataset.loc[:, 'usage'] = 'CAL'
+            ver_dataset.loc[:, 'usage'] = 'VER'
+            calset = pd.concat([cal_dataset, ver_dataset])
+            caldatapath = os.path.join(self.stageresultabspath, 'caldata.txt')
+            calset.to_csv(caldatapath, index=False, sep='\t')
+            log.debug("all CAL&VER data are saved at "+caldatapath)
 
         X_cal, y_cal = cal_dataset[self.srcColNames], cal_dataset[self.tgtColName]
         X_ver, y_ver = ver_dataset[self.srcColNames], ver_dataset[self.tgtColName]
@@ -188,7 +192,7 @@ class ContourSelCalStage(MxpStage):
         for polygonId in polygonIds:
             isPolygonHead = True
             for curIdx, _ in df.loc[df['polygonId']==polygonId, :].iterrows():
-                NeighborContinuity = 0
+                NeighborContinuity = 1
                 NeighborOrientation = 1
                 NeighborParalism = 1
                 if not isPolygonHead:
@@ -201,7 +205,6 @@ class ContourSelCalStage(MxpStage):
                     NeighborContinuity = np.sqrt(neighorvector.dot(neighorvector))
                     NeighborOrientation = eigenvector_n.dot(eigenvector_n_1)
                     NeighborParalism = np.sqrt(crossvector.dot(crossvector))/NeighborContinuity
-                    NeighborContinuity = abs(1-NeighborContinuity)
                 preIdx = curIdx
                 isPolygonHead = False
                 
@@ -290,6 +293,7 @@ class ContourSelCalStage(MxpStage):
             pkl_filename = os.path.join(self.stageresultabspath, self.pickleName)
             with open(pkl_filename, 'rb') as fin:  
                 model = pickle.load(fin)
+        raise ValueError('NotNeedPredict')
 
         # model predict, calculate all pattern SEM point's info
         self.predict(model)
