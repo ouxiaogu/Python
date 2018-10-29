@@ -4,7 +4,7 @@ Created: peyang, 2018-09-19 12:07:08
 
 SEM Contour class definition and IO files
 
-Last Modified by:  ouxiaogu
+Last Modified by: ouxiaogu
 """
 
 import math
@@ -200,6 +200,7 @@ class SEMContour:
         outcontour.setHeadTitle(deepcopy(self.getHeadTitle()))
         outcontour.setColumnTitle(deepcopy(self.getColumnTitle()))
         outcontour.setOffset(deepcopy(self.getOffset()))
+        outcontour.setshape(deepcopy(self.getshape()))
         outcontour.setPixel(self.getPixel())
         outcontour.setBBox(deepcopy(self.getBBox()))
         if not empty:
@@ -214,7 +215,7 @@ class SEMContour:
         -------
         [{'polygonId': 1, 'vertexNum': 10, 'polygon0Hole1': 0, 'points': [[], ...]}, {}, ...]
         '''
-        outcontour = self.clone(True)
+        outcontour = self.clone(empty=True)
         outcontour.setColumnTitle(df.columns[1:])
         grouped = df.groupby('polygonId')
         polygons = []
@@ -222,7 +223,7 @@ class SEMContour:
             polygons.append({})
             polygons[-1]['polygonId'] = polygonId
             polygons[-1]['vertexNum'] = len(group)
-            polygons[-1]['points'] = group.loc[:, self.columnTitle].values.tolist()
+            polygons[-1]['points'] = group.loc[:, df.columns[1:]].values.tolist()
         outcontour.setPolygonData(polygons)
         return outcontour
 
