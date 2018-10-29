@@ -32,38 +32,83 @@ inxml = os.path.join(CWD, r'contourselcal430out.xml') # contourextraction400out.
 
 def loadPatternData(imgfile='', contourfile=''):
     bSucceedReadCt = False
-
     # read contour
     contour = SEMContour()
     bSucceedReadCt = contour.parseFile(contourfile)
     if not bSucceedReadCt:
         raise OSError("Error, contourfile('{}') cannot be parsed".format(contourfile))
-    xini, yini, xend, yend = contour.getBBox()
-    contourPointsVec = [] # depth of 3
-    for polygon in contour.getPolygonData():
-        contourpoints = []
-        for point in polygon['points']:
-            contourpoints.append([point[0]-xini, point[1]-yini]) # origin as (xini, yini)
-        contourPointsVec.append(np.around(contourpoints).astype(int))
-    print("contour points shape {} 1st point {}".format(contourPointsVec[0].shape, contourPointsVec[0][0]))
-        
+
     # read image
     try:
         im, _ = imread_gray(imgfile)
-        im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
     except:
+        im = None
+        print('input image is none')
+    return im, contour
+
+def updateContourROI(contour, im=None, mode='crop', overlay=True):
+    '''
+    Update contour ROI, mode could be 'crop' or 'extend'
+
+    Parameters
+    ----------
+    mode:   string
+        * 'crop': crop the image into contour bbox, output `contour point cords -= (xini, yini)`
+        * 'crop': extend the image into full size, output `contour point cords += (xini, yini)`
+    overly: boolean
+        * 'True': output image is the overlay of image + contour
+        * 'False': output image is just image itself
+    
+    Returns
+    -------
+    outim: image object
+        could be overlay of image + contour or image itself
+    outcontour: SEMContour object
+        contour file will different cords
+    '''
+    outim, outcontour = None, None
+    # process image
+    if im is None:
+        print("input image is None, use gray background")
         imw, imh = contour.getshape()
         imw, imh = int(imw), int(imh)
         im = 255//2 * np.ones((imh, imw, 3), dtype=np.uint8) # gray background
+    else:
+        if len(im.shape) == 2:
+            im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
+        if not np.issubdtype(im.dtype, np.integer):
+            raise TypeError("only support int type images, input image type: {}".format(im.dtype))
 
-    # overlay image & contour
-    thickness = 1
     vmax = np.iinfo(im.dtype).max
     CONTOUR_COLOR = (0, vmax, vmax) # yellow
-    # im = cv2.drawContours(im, contourPointsVec, -1, CONTOUR_COLOR, thickness)
-    im = cv2.polylines(im[yini:yend, xini:xend], contourPointsVec, False, CONTOUR_COLOR, thickness)
+    # CONTOUR_COLOR = (0, vmax, 0) # green
 
-    return im, contour, (xini, yini)
+    # process contour, and overlay image
+    df = contour.toDf()
+    xini, yini, xend, yend = contour.getBBox()
+    if mode == 'crop':
+        outim = im[yini:yend, xini:xend]
+
+        df.loc[:, 'offsetx'] -= xini
+        df.loc[:, 'offsety'] -= yini
+        outcontour = contour.fromDf(df)
+        if overlay:
+            contourPointsVec = []
+            grouped = df[['polygonId', 'offsetx', 'offsety']].groupby('polygonId')
+            for name, group in grouped:
+                contourPointsVec.append(group.loc[:, ['offsetx', 'offsety']].values.astype('int32'))
+            thickness = 1
+            print('contourPointsVec data shape', np.array(contourPointsVec).shape, contourPointsVec[0].shape)
+            outim = cv2.polylines(outim, contourPointsVec, False, CONTOUR_COLOR, thickness)  
+            
+    elif mode == 'extend':
+        df.loc[:, 'offsetx'] += xini
+        df.loc[:, 'offsety'] += yini
+        outcontour = contour.fromDf(df)
+    else:
+        raise ValueError("Only support mode of 'crop' or 'extend', input is {}".format(mode))
+
+    return outim, outcontour
 
 def getContourClassifierData(inxml):
     print(inxml)
@@ -75,8 +120,10 @@ def getContourClassifierData(inxml):
     sr_occf = pd.Series(df_occf.values.flatten(), index=df_occf.columns)
     contourfile = getRealFilePath(sr_occf.loc['contour/path'])
     imgfile = getRealFilePath(sr_occf.loc['image/path'])
-    im, contour, initpnt = loadPatternData(imgfile, contourfile)
-    return im, contour, initpnt
+    print(patternid, contourfile, imgfile)
+    im, contour = loadPatternData(imgfile, contourfile)
+    
+    return im, contour
     # TODO, add bbox plot
     # df.filter(regex='bbox/outlier', axis=1)
 
@@ -282,13 +329,16 @@ def getRealFilePath(curfile):
 def main():
     singlePatternPlot = 1
     if singlePatternPlot:
-        im, contour, initpnt = getContourClassifierData(inxml)
+        im, contour = getContourClassifierData(inxml)
         #plot_col_by_label(contour, patternid='461', colname="UserLabel")
         #plot_image_contour_angle(im, contour, '461')
 
         #plotContourClassifier(im, contour, 'Pattern 461')
         #plotContourDiscriminator(im, contour, 'Pattern 461')
-        drawer = ContourTrackbarFilter(im, contour, 'Pattern 461')
+        
+        overlayim, biasedcontour = updateContourROI(contour, im, mode='crop', overlay=True)
+        drawer = ContourTrackbarFilter(overlayim, biasedcontour, 'Pattern 461')
+        #thres = drawer.run_wi_row()
         thres = drawer.run()
         print(thres)
     else:

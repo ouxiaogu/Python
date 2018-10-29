@@ -12,6 +12,7 @@ import sys
 import re
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 
 g_epslmt  = 1E-9
 
@@ -190,7 +191,20 @@ class SEMContour:
         shape = (len(allpoints), len(header))
         allpoints = np.array(allpoints).reshape(shape)
         df = pd.DataFrame(allpoints, columns=header)
+        df.polygonId = df.polygonId.astype(int)
         return df
+
+    def clone(self, empty=False):
+        outcontour = SEMContour()
+        outcontour.setVersion(self.getVersion())
+        outcontour.setHeadTitle(deepcopy(self.getHeadTitle()))
+        outcontour.setColumnTitle(deepcopy(self.getColumnTitle()))
+        outcontour.setOffset(deepcopy(self.getOffset()))
+        outcontour.setPixel(self.getPixel())
+        outcontour.setBBox(deepcopy(self.getBBox()))
+        if not empty:
+            outcontour.setPolygonData(deepcopy(self.getPolygonData()))
+        return outcontour
 
     def fromDf(self, df):
         '''
@@ -200,16 +214,17 @@ class SEMContour:
         -------
         [{'polygonId': 1, 'vertexNum': 10, 'polygon0Hole1': 0, 'points': [[], ...]}, {}, ...]
         '''
-        self.columnTitle = df.columns[1:]
-        polygonIds = df.loc[:, 'polygonId'].drop_duplicates().values.tolist()
+        outcontour = self.clone(True)
+        outcontour.setColumnTitle(df.columns[1:])
+        grouped = df.groupby('polygonId')
         polygons = []
-        for ix, polygonId in enumerate(polygonIds):
+        for polygonId, group in grouped:
             polygons.append({})
-            polygons[ix]['polygonId'] = polygonId
-            polygons[ix]['vertexNum'] = len(df.loc[df.polygonId==polygonId, :])
-            polygons[ix]['points'] = df.loc[df.polygonId==polygonId, self.columnTitle].values.tolist()
-        self.setPolygonData(polygons)
-        return self
+            polygons[-1]['polygonId'] = polygonId
+            polygons[-1]['vertexNum'] = len(group)
+            polygons[-1]['points'] = group.loc[:, self.columnTitle].values.tolist()
+        outcontour.setPolygonData(polygons)
+        return outcontour
 
 class ContourBBox:
     def __init__(self, xini, yini, xend, yend):
