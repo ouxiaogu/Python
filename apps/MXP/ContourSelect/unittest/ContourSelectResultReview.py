@@ -24,12 +24,12 @@ from ImGUI import imread_gray
 sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
 from FileUtil import gpfs2WinPath
 
-# CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1'
-CWD = r'D:\code\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1\ContourSelectDataLabeling610result'
+CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob1\h\cache\dummydb\result\MXP\job1'
+#CWD = r'D:\code\Python\apps\MXP\ContourSelect\samplejob\h\cache\dummydb\result\MXP\job1'
 #CWD = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/h/cache/dummydb/result/MXP/job1/'
 CWD = gpfs2WinPath(CWD)
 
-inxml = os.path.join(CWD, r'contourlabeling610out.xml') # contourextraction400out.xml contourlabeling410out.xml, contourselcal430out.xml
+inxml = os.path.join(CWD, r'contourlabeling410out.xml') # contourextraction400out.xml contourlabeling410out.xml, contourselcal430out.xml
 
 def loadPatternData(imgfile='', contourfile=''):
     bSucceedReadCt = False
@@ -92,7 +92,6 @@ def updateContourROI(contour, im=None, mode='crop', overlay=True):
 
         df.loc[:, 'offsetx'] -= xini
         df.loc[:, 'offsety'] -= yini
-        outcontour = contour.fromDf(df)
         if overlay:
             contourPointsVec = []
             grouped = df[['polygonId', 'offsetx', 'offsety']].groupby('polygonId')
@@ -105,9 +104,9 @@ def updateContourROI(contour, im=None, mode='crop', overlay=True):
     elif mode == 'extend':
         df.loc[:, 'offsetx'] += xini
         df.loc[:, 'offsety'] += yini
-        outcontour = contour.fromDf(df)
     else:
         raise ValueError("Only support mode of 'crop' or 'extend', input is {}".format(mode))
+    outcontour = contour.fromDf(df)
 
     return outim, outcontour
 
@@ -337,9 +336,10 @@ def main():
         #plotContourClassifier(im, contour, 'Pattern 461')
         #plotContourDiscriminator(im, contour, 'Pattern 461')
         
+        
         overlayim, biasedcontour = updateContourROI(contour, im, mode='crop', overlay=True)
+        
         drawer = ContourTrackbarFilter(overlayim, biasedcontour, 'Pattern 461')
-        #thres = drawer.run_wi_row()
         thres = drawer.run()
         print(thres)
     else:

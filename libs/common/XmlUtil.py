@@ -110,7 +110,10 @@ def setConfigData(cf, key, val='', count=0, suppress_warn=True):
 def getConfigData(cf, key, defaultval=None, count=0):
     p = getChildNode(cf, key, count)
     if p is not None:
-        return getElemText(p)
+        content = getElemText(p)
+        if defaultval is not None:
+            content = type(defaultval)(content)
+        return content
     return defaultval
 
 def getGlobalConfigData(gcf, cf, key, defaultval=None):

@@ -4,7 +4,7 @@ Created: peyang, 2018-09-19 12:07:08
 
 SEM Contour class definition and IO files
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import math
@@ -183,8 +183,9 @@ class SEMContour:
             for point in polygon['points']:
                 if in_bbox_only:
                     coord = list(map(float, [point[0], point[1]]))
-                    if not c_bbox.contains(coord):
-                        continue
+                    # comment this part because of scenario: keep all contour information, just change point origin
+                    # if not c_bbox.contains(coord):
+                        # continue
                 p = [polygonId]
                 p.extend(point)
                 allpoints.append(p)

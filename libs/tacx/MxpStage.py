@@ -142,7 +142,7 @@ class MxpStage(object):
         else:
             ocf = self.d_ocf
         if extraNodes is not None:
-            for key, val in extraNodes.iteritems():
+            for key, val in extraNodes.items():
                 setConfigData(ocf, key, val)
         root = ET.Element('root')
         root.append(ocf)

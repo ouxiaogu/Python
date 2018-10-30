@@ -50,24 +50,24 @@ class ContourTrackbarFilter(object):
             raise ValueError("Only support integer data type, input im dtype is {}".format(self.im.dtype))
         self.FINAL_OUTLIER_COLOR = (0, 0, vmax) # Red
 
-        self.printUsage()
-
     def printUsage(self):
-        print("\nUsage of ContourTrackbarFilter:\n\n"
+
+        print("\n###############################################################\n"
+            "Usage of ContourTrackbarFilter:\n\n"
             "User can tune the contour filter thresh via track-bar\n"
-            "Background:              SEM image\n"
+            "Background:              SEM image and raw contour\n"
             "color Red:               bad contour part(${attribute} < thresh)\n"
-            "color Green:             good contour part(${attribute} >= thresh)\n"
 
             "Trackbar Dragging:       Change the filter's relative threshold\n"
-            "ESC:                     Exit drawing\n")
+            "ESC:                     Exit drawing\n"
+            "###############################################################\n")
 
     def loadFrameData(self):
         frame = self.im.copy()
         
-        absThres = self.colmax[0] * self.thres[0]
+        self.absThres = self.colmax[0] * self.thres[0]
         # absThres = self.thres[0]
-        flt = self.contourdf[self.colname] < absThres
+        flt = self.contourdf[self.colname] < self.absThres
         badpoints = self.contourdf.loc[flt, ['polygonId', 'offsetx', 'offsety']]
 
         thickness = 1
@@ -86,36 +86,6 @@ class ContourTrackbarFilter(object):
         cvui.init(self.window_name)
         frame = np.zeros_like(self.im)
         imh, imw, _ = self.im.shape
-        xini_wnd, yini_wnd = imw*0.04, imh*0.99
-
-        while (True):
-            frame = self.loadFrameData()
-
-            # Render the settings window to house the checkbox
-            # and the trackbars below.
-            # cvui.window(frame, xini_wnd, yini_wnd, 180, 100, 'Settings')
-            
-            # A trackbar to control the filter threshold values
-            cvui.trackbar(frame, xini_wnd+1, yini_wnd-50, 165, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
-
-            cvui.update()
-
-            # Show everything on the screen
-            cv2.imshow(self.window_name, frame)
-
-            # Check if ESC key was pressed
-            if cv2.waitKey(20) == 27:
-                break
-        cv2.destroyAllWindows()
-
-        return self.thres[0]
-
-    def run_wi_row(self):
-
-        # Init cvui and tell it to create a OpenCV window, i.e. cv2.namedWindow(WINDOW_NAME).
-        cvui.init(self.window_name)
-        frame = np.zeros_like(self.im)
-        imh, imw, _ = self.im.shape
         xini_wnd, yini_wnd = imw*0.04, imh*0.05
 
         while (True):
@@ -123,24 +93,26 @@ class ContourTrackbarFilter(object):
 
             # Render the settings window to house the checkbox
             # and the trackbars below.
-            # cvui.window(frame, xini_wnd, yini_wnd, 100, 100, 'Settings')
-            cvui.beginColumn(frame, xini_wnd+1, yini_wnd+10, 180, 100, 6)
+            # cvui.window(frame, xini_wnd, yini_wnd, 100, 200, '{} filter threshold'.format(self.colname)) # 'Settings'
+            cvui.beginColumn(frame, xini_wnd+1, yini_wnd+10, 200, 100, 6)
             
             # A trackbar to control the filter threshold values
             cvui.text('{} filter threshold'.format(self.colname))
-            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 180, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
+            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 200, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
             cvui.space(10)
 
             cvui.endColumn()
 
+            # This function must be called *AFTER* all UI components. It does
+            # all the behind the scenes magic to handle mouse clicks, etc.
             cvui.update()
+
+            # Show everything on the screen
+            cv2.imshow(self.window_name, frame)
 
             # Check if ESC key was pressed
             if cv2.waitKey(20) == 27:
                 break
-
-            # Show everything on the screen
-            cv2.imshow(self.window_name, frame)
         cv2.destroyAllWindows()
 
-        return self.thres[0]
+        return {self.colname: self.absThres}

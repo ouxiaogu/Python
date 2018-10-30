@@ -4,16 +4,20 @@ Created: ouxiaogu, 2018-09-20 12:06:57
 
 Tag contour, by drawing outlier bboxes 
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
 
 import numpy as np
 import cv2
-import collections
 import re
 
 import sys
 import os.path
+WI_CVUI = True
+try:
+    from ContourTrackbarFilter import ContourTrackbarFilter
+except:
+    WI_CVUI = False
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
 from SEMContour import SEMContour, ContourBBox
 from MxpStage import MxpStage
@@ -66,7 +70,8 @@ class RectangleDrawer(object):
         self.WORKING_LINE_COLOR = (vmax//2, vmax//2, vmax//2)
 
     def printUsage(self):
-        print("\nUsage of RectangleDrawer:\n\n"
+        print("\n######################################################################\n"
+            "Usage of RectangleDrawer:\n\n"
             "Rectangle composed by a pair of points:\n"
             "  - To input Good Contour Points area, needs: xini< xend and yini < yend;\n"
             "  - Otherwise, it's Outlier Area\n\n"
@@ -74,7 +79,9 @@ class RectangleDrawer(object):
             "mouse move:              Rectangle bottom right point updating\n"
             "mouse even left click:   Rectangle bottom right point\n"
             "mouse right click:       Stop drawing rectangle\n"
-            "ESC:                     Exit drawing\n")
+            "ESC:                     Exit drawing\n"
+            "######################################################################\n"
+            )
 
     def on_mouse(self, event, x, y, buttons, user_param):
         # Mouse callback that gets called for every mouse event (i.e. moving, clicking, etc.)
@@ -170,8 +177,8 @@ class ContourSelLabelStage(MxpStage):
     tgtColName = 'UserLabel'
 
     def selectLabelingPatternsRandomly(self):
-        start_pattern_name = getConfigData(self.d_cf, 'start_pattern_name', 0)
-        nsamples = getConfigData(self.d_cf, 'samples', -1)
+        start_pattern_name = getConfigData(self.d_cf, '.select_sample/start_pattern_name', 0)
+        nsamples = getConfigData(self.d_cf, '.select_sample/samples', -1)
         allpatternids = []
         validpatternids = []
         
@@ -179,7 +186,7 @@ class ContourSelLabelStage(MxpStage):
         for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
             if getConfigData(occf, 'costwt') <= 0:
                 continue
-            pid = getConfigData(occf, 'name')
+            pid = getConfigData(occf, 'name', '')
             try:
                 if int(pid) > start_pattern_name:
                     validpatternids.append(pid)
@@ -207,7 +214,7 @@ class ContourSelLabelStage(MxpStage):
         pattern_selection_mode = getConfigData(self.d_cf, '.select_sample/mode', 'random')
         if pattern_selection_mode == 'explicit':
             selectedpatternids = getConfigData(self.d_cf, '.select_sample/filter', '')
-            selectedpatternids = [c.strip() for c in str(selectedpatternids).split(",")]
+            selectedpatternids = [c.strip() for c in selectedpatternids.split(",")]
         elif pattern_selection_mode == 'regex':
             flt = getConfigData(self.d_cf, '.select_sample/filter', '*')
             selectedpatternids = flt
@@ -215,59 +222,135 @@ class ContourSelLabelStage(MxpStage):
             selectedpatternids = self.selectLabelingPatternsRandomly()
         return selectedpatternids
 
+    def interativeLabeling(self, rawContour, occf, displayIm, displayContour, patternid=''):
+        mode = getConfigData(self.d_cf, '.label_mode', 'bbox')
+        if mode != 'bbox' and WI_CVUI: # label by cvui trackbar 
+            log.info("interactively decide the threshold by trackbar")
+            thresholds = ContourSelLabelStage.obtainTrackbarFilter(displayIm, displayContour, patternid)
+            ContourSelLabelStage.saveThreshold(occf, thresholds)
+            filters = ContourSelLabelStage.thresToFilter(thresholds)
+            labeledconour = self.labelByFilter(rawContour, filters)
+        else:  # label by draw bbox 
+            rectcoord = ContourSelLabelStage.drawBBox(displayIm, patternid)
+            goodContourAreas, outlierAreas = ContourSelLabelStage.extractBBoxAndSave(rawContour, occf, rectcoord)
+            labeledconour = self.labelByBBox(rawContour, goodContourAreas, outlierAreas)
+        return labeledconour
+            
+    @staticmethod
+    def drawBBox(displayIm, patternid):
+        # draw bbox, return coordinate of bbox
+        drawer = RectangleDrawer(displayIm, "Pattern {} Contour Data Labeling...".format(patternid))
+        drawer.printUsage()
+        drawer.run()
+        rectcoord = drawer.getROICoord()
+        return rectcoord
+
+    @staticmethod
+    def extractBBoxAndSave(rawContour, occf, rectcoord):
+        # origin of the bboxes
+        cbbox = rawContour.getBBox()
+        origin = (cbbox[0], cbbox[1])
+
+        # extract bbox and save bbox into occf
+        bboxcf = addChildNode(occf, 'bbox')
+        goodContourAreas = []
+        outlierAreas = []
+        idxGoodRect, idxOutlierRect = 0, 0
+        for rect in rectcoord:
+            tl, br = rect
+            xini, yini = map(np.add, tl, origin) # compensate the origin
+            xend, yend = map(np.add, br, origin)
+
+            bboxstr = "{}, {}, {}, {}".format(xini, yini, xend, yend)
+            if (xini < xend) and (yini < yend):
+                setConfigData(bboxcf, 'Good', val=bboxstr, count=idxGoodRect)
+                goodContourAreas.append((xini, yini, xend, yend))
+                idxGoodRect += 1
+            else:
+                setConfigData(bboxcf, 'Outlier', val=bboxstr, count=idxOutlierRect)
+                xmin, xmax = min(xini, xend), max(xini, xend)
+                ymin, ymax = min(yini, yend), max(yini, yend)
+                outlierAreas.append((xmin, ymin, xmax, ymax))
+                idxOutlierRect += 1
+        log.debug("#Good contour areas: {}\n{}".format(len(goodContourAreas), goodContourAreas))
+        log.debug("#Outlier contour areas: {}\n{}".format(len(outlierAreas), outlierAreas))
+        return goodContourAreas, outlierAreas
+
+    def labelByBBox(self, contour, goodContourAreas, outlierAreas):
+        newcontour = contour.clone(empty=True)
+        columnTitle = contour.getColumnTitle()
+        columnTitle.append(self.tgtColName) # add 'UserLabel'
+        newcontour.setColumnTitle(columnTitle)
+        
+        polygons = contour.getPolygonData()
+        for polygon in polygons:
+            for j, point in enumerate(polygon['points']):
+                label = np.nan
+
+                coord = [point[0], point[1]]
+                if any([ContourBBox(*rect).contains(coord) for rect in outlierAreas]): # outlierAreas have higher priority than goodContourAreas
+                    label = 0 # 'bad'
+                elif any([ContourBBox(*rect).contains(coord) for rect in goodContourAreas]):
+                    label = 1 # 'good'
+                polygon['points'][j].append(label)
+        newcontour.setPolygonData(polygons)
+        return newcontour
+
+    @staticmethod
+    def thresToFilter(thresholds):
+        filters = {}
+        for kk, vv in thresholds.items():
+            filters[kk] = "{} < {}".format(kk, vv)
+        return filters
+
+    @staticmethod
+    def obtainTrackbarFilter(displayIm, displayContour, patternid):
+        drawer = ContourTrackbarFilter(displayIm, displayContour, "Pattern {} Contour Data Labeling...".format(patternid))
+        drawer.printUsage()
+        thresholds = drawer.run()
+        return thresholds
+    
+    @staticmethod
+    def saveThreshold(occf, thresholds):
+        threscf = addChildNode(occf, 'threshold')
+        for kk, vv in thresholds.items():
+            setConfigData(threscf, kk, val=str(vv))
+        log.debug("thresholds: {}".format(thresholds))
+
+    def labelByFilter(self, contour, filters):
+        df = contour.toDf()
+        df.loc[:, self.tgtColName] = 1
+        outlierIndice = df.query('or '.join(filters.values())).index
+        df.loc[outlierIndice, self.tgtColName] = 0
+        newcontour = contour.fromDf(df)
+        return newcontour 
+
     def run(self):
         selectedpatternids = self.selectLabelingPatterns()
         log.info("pattern samples to be labeled: {}".format(selectedpatternids))
+        pattern_selection_mode = getConfigData(self.d_cf, '.select_sample/mode', 'random')
 
         for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
             if getConfigData(occf, 'costwt') <= 0:
                 continue
-            patternid = str(getConfigData(occf, '.name'))
-            if isinstance(selectedpatternids, collections.Iterable) and patternid not in selectedpatternids:
-                continue
-            elif isinstance(selectedpatternids, str) and not re.match(selectedpatternids, patternid):
+            patternid = getConfigData(occf, '.name', '')
+
+            if pattern_selection_mode == 'regex':
+                if not re.match(selectedpatternids, patternid):
+                    continue
+            elif patternid not in selectedpatternids:
                 continue
 
             # load image and contour
             imgfile = os.path.join(self.jobresultabspath, getConfigData(occf, '.image/path'))
             contourfile = os.path.join(self.jobresultabspath, getConfigData(occf, '.contour/path'))
-            im, rawcontour = self.loadPatternData(imgfile, contourfile)
-            overlayim, biasedcontour = ContourSelLabelStage.updateContourROI(rawcontour, im, mode='crop', overlay=True)
-            cbbox = rawcontour.getBBox()
-            origin = (cbbox[0], cbbox[1])
+            im, rawContour = self.loadPatternData(imgfile, contourfile)
+            overlayim, movedcontour = ContourSelLabelStage.updateContourROI(rawContour, im, mode='crop', overlay=True)
+            
+            # interactively labeling, and apply
+            labeledconour = self.interativeLabeling(rawContour, occf, overlayim, movedcontour, patternid)
 
-            # load image and contour
-            drawer = RectangleDrawer(overlayim, "Pattern {} Contour Data Labeling...".format(patternid))
-            drawer.printUsage()
-            drawer.run()
-            rectcoord = drawer.getROICoord()
-
-            # save bbox into occf
-            bboxcf = addChildNode(occf, 'bbox')
-            goodContourAreas = []
-            outlierAreas = []
-            idxGoodRect, idxOutlierRect = 0, 0
-            for rect in rectcoord:
-                tl, br = rect
-                xini, yini = map(np.add, tl, origin) # compensate the origin
-                xend, yend = map(np.add, br, origin)
-
-                bboxstr = "{}, {}, {}, {}".format(xini, yini, xend, yend)
-                if (xini < xend) and (yini < yend):
-                    setConfigData(bboxcf, 'Good', val=bboxstr, count=idxGoodRect)
-                    goodContourAreas.append((xini, yini, xend, yend))
-                    idxGoodRect += 1
-                else:
-                    setConfigData(bboxcf, 'Outlier', val=bboxstr, count=idxOutlierRect)
-                    xmin, xmax = min(xini, xend), max(xini, xend)
-                    ymin, ymax = min(yini, yend), max(yini, yend)
-                    outlierAreas.append((xmin, ymin, xmax, ymax))
-                    idxOutlierRect += 1
-            log.debug("#Good contour areas: {}\n{}".format(len(goodContourAreas), goodContourAreas))
-            log.debug("#Outlier contour areas: {}\n{}".format(len(outlierAreas), outlierAreas))
-
-            # apply bbox into contour files
-            labeledconour = self.labelPatternContour(rawcontour, goodContourAreas, outlierAreas)
+            # save contour and update path
             newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))
             newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
             labeledconour.saveContour(newcontourfile)
@@ -346,7 +429,6 @@ class ContourSelLabelStage(MxpStage):
                 for name, group in grouped:
                     contourPointsVec.append(group.loc[:, ['offsetx', 'offsety']].values.astype('int32'))
                 thickness = 1
-                print('contourPointsVec data shape', np.array(contourPointsVec).shape, contourPointsVec[0].shape)
                 outim = cv2.polylines(outim, contourPointsVec, False, CONTOUR_COLOR, thickness)  
                 
         elif mode == 'extend':
@@ -358,24 +440,7 @@ class ContourSelLabelStage(MxpStage):
 
         return outim, outcontour
 
-    def labelPatternContour(self, contour, goodContourAreas, outlierAreas):
-        columnTitle = contour.getColumnTitle()
-        columnTitle.append(self.tgtColName) # add 'UserLabel'
-        contour.setColumnTitle(columnTitle)
-        
-        polygons = contour.getPolygonData()
-        for polygon in polygons:
-            for j, point in enumerate(polygon['points']):
-                label = np.nan
 
-                coord = [point[0], point[1]]
-                if any([ContourBBox(*rect).contains(coord) for rect in outlierAreas]): # outlierAreas have higher priority than goodContourAreas
-                    label = 0 # 'bad'
-                elif any([ContourBBox(*rect).contains(coord) for rect in goodContourAreas]):
-                    label = 1 # 'good'
-                polygon['points'][j].append(label)
-        contour.setPolygonData(polygons)
-        return contour
 
 
 

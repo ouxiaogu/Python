@@ -247,7 +247,7 @@ class Result(object):
         params: dict
         errors: dict of pandas.Series'''
         params = dict(zip(params.keys(), [str(x) for x in params.values()]))
-        for k, v in errors.iteritems():
+        for k, v in errors.items():
             errors[k] = dict([(x, [str(y) for y in v.ix[x,:].tolist()]) for x in v.index])
         log.debug('addProcess')
         msg = self._jobresult.addProcess(stage, descr, params, errors)
@@ -255,7 +255,7 @@ class Result(object):
 
     def updateProcess(self, pid, descr, params, errors):
         params = dict(zip(params.keys(), [str(x) for x in params.values()]))
-        for k, v in errors.iteritems():
+        for k, v in errors.items():
             errors[k] = dict([(x, [str(y) for y in v.ix[x,:].tolist()]) for x in v.index])
         log.debug('updateProcess')
         msg = self._jobresult.updateProcess(pid, descr, params, errors)

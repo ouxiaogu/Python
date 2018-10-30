@@ -31,7 +31,7 @@ for line in f:
 for value in gauges:
     #print(value)
     #print(type(value))
-    for key1, val1 in value.iteritems():
+    for key1, val1 in value.items():
         print(key1, val1)
     
     

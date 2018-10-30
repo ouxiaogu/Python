@@ -37,7 +37,7 @@ def str_clean(s):
 
 def group_dict_construct(group, status):
     d = {}
-    for key, value in col_status.iteritems():
+    for key, value in col_status.items():
         if value['flag'] == True:
             d[key] = []
     return d
@@ -52,7 +52,7 @@ for i in range(columns) :
     if name == 'groupname':
         flag_group = True
         idx_group = i
-    for key, value in col_status.iteritems():
+    for key, value in col_status.items():
         if key == name :
             value['flag'] = True
             value['index'] = i
@@ -68,7 +68,7 @@ if flag_group == True:
         group = cols[idx_group]
         if not grouped_gauges.has_key(group):
             grouped_gauges[group] = group_dict_construct(group, col_status)
-        for key, value in col_status.iteritems(): 
+        for key, value in col_status.items(): 
             #print(key, cols)
             if value['flag'] == True:
                 if key == 'gauge':
@@ -116,9 +116,9 @@ def sort_by_key(gauges, sort_key):
     return gauges
 
 count = 0
-for groupname, cur_dict in grouped_gauges.iteritems():
+for groupname, cur_dict in grouped_gauges.items():
     gauges = {} 
-    for key, cur_list in cur_dict.iteritems(): 
+    for key, cur_list in cur_dict.items(): 
         gauges[key] = cur_list
     
     if groupname == 'pitch_2x':
