@@ -234,6 +234,7 @@ class ContourSelLabelStage(MxpStage):
             rectcoord = ContourSelLabelStage.drawBBox(displayIm, patternid)
             goodContourAreas, outlierAreas = ContourSelLabelStage.extractBBoxAndSave(rawContour, occf, rectcoord)
             labeledconour = self.labelByBBox(rawContour, goodContourAreas, outlierAreas)
+        labeledconour = labeledconour.astype({self.tgtColName: int})
         return labeledconour
             
     @staticmethod

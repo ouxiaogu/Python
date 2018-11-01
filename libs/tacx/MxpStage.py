@@ -126,7 +126,7 @@ class MxpStage(object):
         inxmlfile = getConfigData(self.d_cf, MXP_XML_TAGS[0])
         inxmlfile_abspath = os.path.join(self.jobresultabspath, inxmlfile)
         icf_Parser = MxpStageXmlParser(inxmlfile_abspath, option=MXP_XML_TAGS[0])
-        self.d_df = icf_Parser.iccfs2df()
+        self.d_df_patterns = icf_Parser.iccfs2df()
         self.d_icf = icf_Parser.icf
         self.d_ocf = self.d_icf # directly use reference, without copy here
 
@@ -138,7 +138,7 @@ class MxpStage(object):
 
     def save(self, path, viaDf=False, extraNodes=None):
         if viaDf:
-            ocf = dfToMxpOcf(self.d_df)
+            ocf = dfToMxpOcf(self.d_df_patterns)
         else:
             ocf = self.d_ocf
         if extraNodes is not None:

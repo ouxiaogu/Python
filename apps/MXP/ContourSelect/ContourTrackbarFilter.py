@@ -42,6 +42,8 @@ class ContourTrackbarFilter(object):
     def _init_parms(self):
         self.thres_range = [0., 0.2]
         self.thres = [0.]
+        self.numTotal = 0
+        self.numOutlier = 0
         self.colmax = [self.contourdf.max()[self.colname]]
 
         try:
@@ -67,8 +69,10 @@ class ContourTrackbarFilter(object):
         
         self.absThres = self.colmax[0] * self.thres[0]
         # absThres = self.thres[0]
+        self.numTotal = len(self.contourdf)
         flt = self.contourdf[self.colname] < self.absThres
         badpoints = self.contourdf.loc[flt, ['polygonId', 'offsetx', 'offsety']]
+        self.numOutlier = len(badpoints)
 
         thickness = 1
         if len(badpoints) > 0:
@@ -97,9 +101,11 @@ class ContourTrackbarFilter(object):
             cvui.beginColumn(frame, xini_wnd+1, yini_wnd+10, 200, 100, 6)
             
             # A trackbar to control the filter threshold values
-            cvui.text('{} filter threshold'.format(self.colname))
+            cvui.text(frame, xini_wnd+1, yini_wnd+10, '{} filter threshold'.format(self.colname))
             cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 200, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
             cvui.space(10)
+            cvui.text(frame, xini_wnd+1, yini_wnd+100, "{}/{} points is labeled as outlier".format(
+                self.numOutlier, self.numTotal))
 
             cvui.endColumn()
 

@@ -51,7 +51,7 @@ class ContourSelJob(MxpJob):
 def main():
     parser = argparse.ArgumentParser(description='MXP Contour Selection job in python')
     parser.add_argument('jobpath', help='job path')
-    parser.add_argument('--enable', help='job enable range, only run stages in range')
+    #parser.add_argument('--enable', help='job enable range, only run stages in range')
     try:
         args = parser.parse_args()
         jobpath = args.jobpath
@@ -59,8 +59,8 @@ def main():
         parser.print_help()
         # parser.exit()
 
-        args = parser.parse_args(['./samplejob1', '--enable', '1-610'])
-        #args = parser.parse_args(['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns', '--enable', '430-430'])
+        args = parser.parse_args(['./samplejob1'])
+        #args = parser.parse_args(['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns'])
         jobpath = args.jobpath
         from FileUtil import gpfs2WinPath
         jobpath = gpfs2WinPath(jobpath)

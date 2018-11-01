@@ -117,11 +117,11 @@ class InitStage(MxpStage):
         df = df.assign(usage=usages)
 
         # restore df
-        self.d_df = df
+        self.d_df_patterns = df
 
 class CSemCalStage(MxpStage):
     def loadDataSet(self):
-        nsamples = len(self.d_df)
+        nsamples = len(self.d_df_patterns)
         imgsize = getGlobalConfigData(self.d_gcf, self.d_cf, ".imgsize", 128)
 
         shape_order = getConfigData(self.d_cf, ".shape_order", "nchw")
@@ -131,15 +131,15 @@ class CSemCalStage(MxpStage):
         else: # "nhwc"
             self.datashape = (nsamples, self.imgsize, self.imgsize, 1)
 
-        train_flt = (self.d_df.usage==USAGE_TYPES[0])
-        train_input_images_file_name = self.d_df.loc[train_flt, 'srcfile'].values
-        train_target_images_file_name = self.d_df.loc[train_flt, 'tgtfile'].values
+        train_flt = (self.d_df_patterns.usage==USAGE_TYPES[0])
+        train_input_images_file_name = self.d_df_patterns.loc[train_flt, 'srcfile'].values
+        train_target_images_file_name = self.d_df_patterns.loc[train_flt, 'tgtfile'].values
         train_input_images = np.array([load_image(path, self.imgsize) for path in train_input_images_file_name])
         train_target_images = np.array([load_image(path, self.imgsize) for path in train_target_images_file_name])
 
-        valid_flt = (self.d_df.usage==USAGE_TYPES[1])
-        valid_input_images_file_name = self.d_df.loc[valid_flt, 'srcfile'].values
-        valid_target_images_file_name = self.d_df.loc[valid_flt, 'tgtfile'].values
+        valid_flt = (self.d_df_patterns.usage==USAGE_TYPES[1])
+        valid_input_images_file_name = self.d_df_patterns.loc[valid_flt, 'srcfile'].values
+        valid_target_images_file_name = self.d_df_patterns.loc[valid_flt, 'tgtfile'].values
         valid_input_images = np.array([load_image(path, self.imgsize) for path in valid_input_images_file_name])
         valid_target_images = np.array([load_image(path, self.imgsize) for path in valid_target_images_file_name])
 
@@ -179,13 +179,13 @@ class CSemCalStage(MxpStage):
 
         # compute error for all train/validation data
         rmses = []
-        input_flt = (self.d_df.usage!=USAGE_TYPES[2])
-        input_srcfiles = self.d_df.loc[input_flt, 'srcfile'].values
-        input_tgtfiles = self.d_df.loc[input_flt, 'tgtfile'].values
+        input_flt = (self.d_df_patterns.usage!=USAGE_TYPES[2])
+        input_srcfiles = self.d_df_patterns.loc[input_flt, 'srcfile'].values
+        input_tgtfiles = self.d_df_patterns.loc[input_flt, 'tgtfile'].values
         for i in range(len(input_srcfiles)):
             imgs = [[load_image(input_srcfiles[i], self.imgsize)], [load_image(input_tgtfiles[i], self.imgsize)]]
             rmses.append(cnn.model_error(*imgs))
-        self.d_df.loc[input_flt, 'rms'] = rmses
+        self.d_df_patterns.loc[input_flt, 'rms'] = rmses
 
     def save(self, path):
         extraNodes = {'DLSEM_model_path', self.modelpath}
@@ -196,17 +196,17 @@ class CSemApplyStage(MxpStage):
     def loadDataSet(self):
         imgsize = getGlobalConfigData(self.d_gcf, self.d_cf, ".imgsize", 128)
         self.imgsize = imgsize
-        test_flt = (self.d_df.usage==USAGE_TYPES[2])
+        test_flt = (self.d_df_patterns.usage==USAGE_TYPES[2])
         if len(test_flt.nonzero()[0]) == 0:
             frac = 0.2
-            nsamples = len(self.d_df)
+            nsamples = len(self.d_df_patterns)
             testnum = max(1, frac*nsamples)
             log.warning("{} not any pattern labeled as 'test' in the dataset, randomly select data ~frac={}".format(self.stagename, frac))
-            test_flt = self.d_df.usage.isin(USAGE_TYPES).sample(n=testnum, replace=False, random_state=128)
+            test_flt = self.d_df_patterns.usage.isin(USAGE_TYPES).sample(n=testnum, replace=False, random_state=128)
             test_flt = sorted(test_flt.index.values)
         self.test_flt = test_flt
-        test_srcfiles = self.d_df.loc[test_flt, 'srcfile'].values
-        test_tgtfiles = self.d_df.loc[test_flt, 'tgtfile'].values
+        test_srcfiles = self.d_df_patterns.loc[test_flt, 'srcfile'].values
+        test_tgtfiles = self.d_df_patterns.loc[test_flt, 'tgtfile'].values
         test_X = np.array([load_image(path, self.imgsize) for path in test_srcfiles])
         test_y = np.array([load_image(path, self.imgsize) for path in test_tgtfiles])
         doCenteredNorm = getGlobalConfigData(self.d_gcf, self.d_cf, 'centered_normalize_X', 0)
@@ -223,8 +223,8 @@ class CSemApplyStage(MxpStage):
         self.loadDataSet()
 
         test_X = self.test.input_images
-        self.d_df.loc[self.test_flt, 'applyfile'] = self.d_df.loc[self.test_flt, 'name'].apply(lambda x: str(x)+ '_CSemApply.jpg')
-        y_pred_filenames = self.d_df.loc[self.test_flt, 'applyfile'].values
+        self.d_df_patterns.loc[self.test_flt, 'applyfile'] = self.d_df_patterns.loc[self.test_flt, 'name'].apply(lambda x: str(x)+ '_CSemApply.jpg')
+        y_pred_filenames = self.d_df_patterns.loc[self.test_flt, 'applyfile'].values
         applypath = self.stagepath
         cnn = ConvNN(random_seed=random_seed,imgsize=self.imgsize, data_format=dataformat)
         inxmlfile = getConfigData(self.d_cf, MXP_XML_TAGS[0])
