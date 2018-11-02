@@ -9,7 +9,7 @@ Last Modified by:  ouxiaogu
 """
 
 import numpy as np
-import pandas as pd
+import math
 
 from ContourSelBaseModel import ContourSelBaseModel
 
@@ -24,7 +24,15 @@ log = logger.setup("ContourSelRuleModel", 'debug')
 tgtColName = 'UserLabel'
 outColName = 'ClfLabel'
 neighborColNames = ['NeighborOrientation', 'NeighborParalism'] # used neighbor filters
-allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism'] 
+allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism']
+
+SMALL_GAUSSIAN_TAB = [
+    [1.],
+    [0.25, 0.5, 0.25],
+    [0.0625, 0.25, 0.375, 0.25, 0.0625],
+    [0.03125, 0.109375, 0.21875, 0.28125, 0.21875, 0.109375, 0.03125]
+]
+SMALL_GAUSSIAN_SIZE = 7 
 
 def addNeighborFeatures(df):
     '''
@@ -39,7 +47,7 @@ def addNeighborFeatures(df):
             - `NeighborContinuity`:  |X(n) - X(n-1)|^2, usually is to 1 (because of 8-neighbor contour tracing)
             - `NeighborOrientation`:  dot(EigenVector(n), EigenVector(n-1)), closer to 1, the better(may use 1-dot)
             - `NeighborParalism`:  ||cross((X(n) - X(n-1)), EigenVector(n-1))||, closer to 1, the better(may use 1-cross)
-    TODO, the segment neighborhood based features can only be obtained by the whole segment, can't use ROI cropped segment 
+    Note, the segment neighborhood based features can only be obtained by the whole segment, can't use ROI cropped segment 
     '''
     if len(df) <= 0:
         return df
@@ -70,6 +78,9 @@ def addNeighborFeatures(df):
     return df
 
 def categorizeFilters(filters):
+    if isinstance(filters, str):
+        filters = [cc.strip() for cc in filters.split(',')]
+
     if filters is None:
         newfilters = {}
     elif not isinstance(filters, dict):
@@ -137,7 +148,7 @@ def findIndexOfFirstZeroCrossing(arr, gradients=None, start_pos=0):
     if gradients is None:
         gradients = np.gradient(arr, edge_order=2)
     assert(len(arr) == len(gradients))
-    start = start_pos+1 if start_pos == 0 else start_pos
+    start_pos = start_pos+1 if start_pos == 0 else start_pos
     for ix in range(start_pos, len(gradients)):
         if gradients[ix]*gradients[ix-1] <=0 :
             return ix
@@ -155,7 +166,7 @@ def findIndexOfFirstFlat(arr, gradients=None, start_pos=0, thres=None):
             return ix
     return start_pos
 
-def applyNeighborRuleModelPerVLine(linedf, filters='', maxTailLenth=20, smooth=True):
+def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLenth=20, smooth=True):
     dominant_issues = []
     linedf.loc[:, outColName] = 1
 
@@ -232,19 +243,16 @@ def applyNeighborRuleModelPerVContour(contourdf, filters='', maxTailLenth=20, sm
         contourdf.loc[lineFlt, :] = newlinedf
     return contourdf
 
-class ContourSelRuleModel(object):
+class ContourSelRuleModel(ContourSelBaseModel):
     '''
     classification model type here includes {'SVC': 'SVM', 'DT': 'Decision Tree', 'RF': 'Random Forest'}
     '''
+    modeltype = 'rule'
 
     def __init__(self, **kwargs):
         self.filters = kwargs.get('filters', "NeighborParalism<0.98, 'NeighborOrientation<0.98")
         self.maxTailLenth = kwargs.get('maxTailLenth', 20)
         self.smooth = kwargs.get('smooth', 1)
-
-    @staticmethod
-    def getModelType():
-        return "rule"
 
     def getRuleModel(self):
         rule_model = {'filters': self.filters, 'maxTailLenth': self.maxTailLenth, 'smooth': self.smooth}
@@ -252,11 +260,12 @@ class ContourSelRuleModel(object):
 
     def calibrate(self, cal_file_paths, ver_file_paths):
         '''
-        traverse model, loop files to get the calibration performance
+        traverse mode, loop files to get the calibration performance
         '''
 
         # get rule model from user input/default value
         model = self.getRuleModel()
+        log.info("Rule model : {}".format(model))
 
         # calibration performance
         cm_cal = ContourSelRuleModel.checkModel(model, cal_file_paths, usage='CAL')
@@ -269,7 +278,10 @@ class ContourSelRuleModel(object):
     @staticmethod
     def checkModel(model, contourfiles, usage='CAL'):
         cm_final = np.zeros((2,2), dtype=int)
-        for contourfile in cal_file_paths:
+
+        filters = categorizeFilters(model.get('filters', ''))
+
+        for contourfile in contourfiles:
             contour = SEMContour()
             contour.parseFile(contourfile)
             contourdf = contour.toDf()
@@ -279,6 +291,7 @@ class ContourSelRuleModel(object):
 
     @staticmethod
     def predict(rule_model, contourdf):
+        contourdf = addNeighborFeatures(contourdf)
         contourdf = applyNeighborRuleModelPerVContour(contourdf, **rule_model)
         cm = ContourSelRuleModel.computeConfusionMatrix(contourdf)
         return contourdf, cm
@@ -290,7 +303,7 @@ class ContourSelRuleModel(object):
             [FP      TN]
         '''
         cm = np.zeros((2,2), dtype=int)
-        if not (contourdf.empty or any([col not in contourdf.columns for col in [tgtColName, outColName]])):
+        if (not contourdf.empty) and all([col in contourdf.columns for col in [tgtColName, outColName]]):
             TP = (contourdf.loc[:, tgtColName] == 0) & (contourdf.loc[:, outColName] == 0)
             FN = (contourdf.loc[:, tgtColName] == 0) & (contourdf.loc[:, outColName] == 1)
             FP = (contourdf.loc[:, tgtColName] == 1) & (contourdf.loc[:, outColName] == 0)

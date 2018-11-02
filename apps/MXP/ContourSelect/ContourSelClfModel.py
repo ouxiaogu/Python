@@ -25,12 +25,10 @@ class ContourSelClfModel(ContourSelBaseModel):
     '''
     classification model type here includes {'SVC': 'SVM', 'DT': 'Decision Tree', 'RF': 'Random Forest'}
     '''
+    modeltype = 'clf'
+    
     def __init__(self, useNeighborFeatures=True, **kwargs):
         self.useNeighborFeatures = True
-
-    @staticmethod
-    def getModelType():
-        return "clf"
 
     @staticmethod
     def computeFeatureScalar(X_cal):

@@ -36,7 +36,7 @@ class ContourSelBaseModel(object):
         '''calculate RMS by confusion matrix'''
         FN, FP = cm[0, 1], cm[1, 0]
         total = cm.sum().astype(float)
-        rms = np.sqrt(np.sum(FN, FP) / total ) if total != 0 else np.nan
+        rms = np.sqrt((FN + FP) / total ) if total != 0 else np.nan
 
         return rms
 
@@ -44,5 +44,5 @@ class ContourSelBaseModel(object):
     def printModelPerformance(cls, cm, usage='CAL'):
         cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         rms = ContourSelBaseModel.calcRMS(cm)
-        log.info("{} model rms on {} set: {}".format(cls.getModelType(), usage, rms))
-        log.info("{} model confusion matrix on {} set:\n{}\n{}".format(cls.getModelType(), usage, cm, cm_norm))
+        log.info("{} model rms on {} set: {}".format(cls.modeltype, usage, rms))
+        log.info("{} model confusion matrix on {} set:\n{}\n{}".format(cls.modeltype, usage, cm, cm_norm))
