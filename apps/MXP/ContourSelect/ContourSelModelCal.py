@@ -31,11 +31,13 @@ __all__ = ["ContourSelCalStage"]
 
 USAGE_TYPES = ['training', 'validation', 'test']
 
-def validateContourFile(contourfile, contour=SEMContour()):
+def validateContourFile(jobpath, relpath):
+    contourfile = os.path.join(jobpath, relpath)
     if not os.path.exists(contourfile):
-        contourfile = os.path.join(self.jobresultabspath, os.path.join(*row.loc['contour/path'].split('\\')))
+        contourfile = os.path.join(jobpath, os.path.join(*relpath.split('\\')))
     if not os.path.exists(contourfile):
         return None
+    contour = SEMContour()
     if contour.parseFile(contourfile):
         if contour.polygonNum == 0: # in case pattern contour file exists, but it's empty
             return None
@@ -43,22 +45,9 @@ def validateContourFile(contourfile, contour=SEMContour()):
         return None
     return contourfile
 
-def parseContourFileSafely(contourfile):
-    if not os.path.exists(contourfile):
-        contourfile = os.path.join(self.jobresultabspath, os.path.join(*row.loc['contour/path'].split('\\')))
-    if not os.path.exists(contourfile):
-        return None
-    contour = SEMContour()
-    if contour.parseFile(contourfile):
-        if contour.polygonNum == 0: # in case pattern contour file exists, but it's empty
-            return None, None
-    else:
-        return None, None
-    return contour, contourfile
-
 def applySingleContour(modeltype, model, Xminmax, infile, outfile):
-    contour, contourfile = parseContourFileSafely(infile)
-    if contour is None:
+    contourfile = validateContourFile(infile)
+    if contourfile is None:
         return np.nan
     pass
 
@@ -81,7 +70,7 @@ class ContourSelCalStage(MxpStage):
     neighborColNames = ['NeighborOrientation', 'NeighborParalism'] # used neighbor filters
     allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism'] 
     debugOn = True
-    reuseModel = False
+    reuseModel = True
 
     def __init__(self, gcf, cf, stagename, jobpath):
         super(ContourSelCalStage, self).__init__(gcf, cf, stagename, jobpath)
@@ -166,12 +155,12 @@ class ContourSelCalStage(MxpStage):
 
         for _, row in self.d_df_patterns.iterrows(): # loop patterns 
             if row.usage in (USAGE_TYPES[:-1]) :
-                contour = SEMContour()
-                contourfile = os.path.join(self.jobresultabspath, row.loc['contour/path'])
-                contour, contourfile = parseContourFileSafely(contourfile)
-                if contour is None:
+                
+                contourfile = validateContourFile(self.jobresultabspath, row.loc['contour/path'])
+                if contourfile is None:
                     continue
-
+                contour = SEMContour()
+                contour.parseFile(contourfile)
                 curdf = contour.toDf()
                 if self.useNeighborFeatures and modeltype != 'rule':
                     curdf = addNeighborFeatures(curdf)
@@ -262,13 +251,15 @@ class ContourSelCalStage(MxpStage):
         for idx, row in self.d_df_patterns.iterrows():
             if row.loc['costwt'] <= 0:
                 continue
-            contour = SEMContour()
-            contour, contourfile = parseContourFileSafely(contourfile)
-            if contour is None:
+            contourfile = validateContourFile(self.jobresultabspath, row.loc['contour/path'])
+            if contourfile is None:
                 continue
+            contour = SEMContour()
+            contour.parseFile(contourfile)
+            curdf = contour.toDf()
+
             patternid = row.loc['name']
             log.debug("Start processing pattern {} ...".format(patternid))
-            curdf = contour.toDf()
             if modeltype != 'rule':
                 if self.useNeighborFeatures:
                     curdf = addNeighborFeatures(curdf)
