@@ -29,9 +29,9 @@ from MxpJob import MxpJob
 from MxpStage import *
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import setConfigData
-import logger
+from logger import logger
 
-log = logger.setup("MxpJob", "debug")
+log = logger.getLogger(__name__)
 
 
 ###############################################################################

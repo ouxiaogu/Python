@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: hshi & peyang, 2018-01-25 12:02:59
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 TachyonJob: Base Class to hold tachyon job
 Since GUI don't provide the base TAC job api, use own xml parser instead
@@ -19,10 +19,10 @@ import time
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import JobInfoXml
-import logger
+from logger import logger
 from StrUtil import parseKW, buildKW
 
-log = logger.setup('TachyonJob', 'info')
+log = logger.getLogger(__name__)
 
 NEWSTATUS = frozenset(['New'])
 TERMINATESTATUS = frozenset(['Aborted', 'Cancelled', 'Failed', 'Exited', 'Terminated'])

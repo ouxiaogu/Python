@@ -6,16 +6,14 @@ ContourSelect job
 
 Last Modified by:  ouxiaogu
 """
-import argparse
-
 import sys
 import os.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../../libs/tacx")
 from MxpJob import MxpJob
 from MxpStage import MXP_XML_TAGS
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../../libs/common")
-import logger
-log = logger.setup("ContourSelectJob", 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 ###############################################################################
 # MXP Contour Select Job Stage Register Area
@@ -47,26 +45,3 @@ class ContourSelJob(MxpJob):
             outxmlfile = self.getStageIOFile(stage, option=MXP_XML_TAGS[1])
             curstage.save(outxmlfile)
             log.info("Stage %s%d successfully finished\n" % (stagename, enablenum))
-
-def main():
-    parser = argparse.ArgumentParser(description='MXP Contour Selection job in python')
-    parser.add_argument('jobpath', help='job path')
-    #parser.add_argument('--enable', help='job enable range, only run stages in range')
-    try:
-        args = parser.parse_args()
-        jobpath = args.jobpath
-    except:
-        parser.print_help()
-        # parser.exit()
-
-        args = parser.parse_args(['./samplejob1'])
-        #args = parser.parse_args(['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns'])
-        jobpath = args.jobpath
-        from FileUtil import gpfs2WinPath
-        jobpath = gpfs2WinPath(jobpath)
-    print(str(vars(args)))
-    myjob = ContourSelJob(jobpath)
-    myjob.run()
-
-if __name__ == '__main__':
-    main()

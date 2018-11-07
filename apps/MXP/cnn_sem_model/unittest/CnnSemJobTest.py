@@ -24,7 +24,7 @@ class TestCNNJob(unittest.TestCase):
 
     @unittest.skip("only enable init")
     def test_mxpjob_enable_range_Disabled(self):
-        np.testing.assert_equal(np.array([1, 2000]), np.array(self.myjob.getEnableRange()))
+        np.testing.assert_equal(np.array([1, 2000]), np.array(self.myjob.getEnableRangeList()))
 
     def test_mxpjob_all_stages(self):
         stagenames, enables = zip(*self.myjob.getAllMxpStages(enabled=False))

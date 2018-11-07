@@ -16,11 +16,11 @@ XmlUtil: Xml handling module
 import xml.etree.ElementTree as ET
 import re
 import pandas as pd
-import logger
+from logger import logger
 from StrUtil import parseText
 from collections import deque
 
-log = logger.setup("XmlUtil")
+log = logger.getLogger(__name__)
 
 __all__ = ['JobInfoXml', 'addChildNode', 'getChildNode', 
             'setConfigData', 'getConfigData', 
@@ -87,10 +87,10 @@ def addChildNode(cf, key='', val=None):
     cf.append(child)
     return child
 
-def getChildNode(cf, key, count=0, suppress_warn=False):
+def getChildNode(cf, key, count=0, suppress_warn=True):
     if not key.startswith("."): # depth=1
         key = "."+key
-        log.debug("add '.' before key to only search depth=1: %s", key)
+        # log.debug("add '.' before key to only search depth=1: %s", key)
     if '/' in key and not suppress_warn:
         log.warning("Warning, please avoid ambiguous by removing '/' in key")
     for i, inode in enumerate(cf.findall(key)):

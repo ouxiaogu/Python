@@ -5,8 +5,8 @@ from sympy import Matrix, symbols, pprint
 import sys
 import os.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-import logger
-log = logger.setup('NL_LSQ', level='debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 """
 Consider a set of m data points, and a curve (model function) y=f(x),

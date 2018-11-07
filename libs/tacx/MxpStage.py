@@ -14,8 +14,8 @@ from subprocess import call
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf, indentCf, setConfigData
-import logger
-log = logger.setup("MxpStage", 'info')
+from logger import logger
+log = logger.getLogger(__name__)
 
 __all__ = ['MXP_XML_TAGS', 'MXP_RESULT_OPTIONS',
          'MxpStage', 'MxpStageXmlParser',]

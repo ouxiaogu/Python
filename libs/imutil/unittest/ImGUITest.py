@@ -15,8 +15,9 @@ import os.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../")
 from ImGUI import *
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../common")
-import logger
-log = logger.setup(level='debug')
+from logger import logger
+logger.initlogging('test', 'debug')
+log = logger.getLogger(__name__)
 
 
 IMFILE = r'C:\Localdata\D\Note\Python\misc\SEM\samples\Calaveras_v3_1001_averaged.pgm'
@@ -34,7 +35,7 @@ class TestImGUI(unittest.TestCase):
 
     def test_getBBox(self):
         bbox = readBBox(IMFILE)
-        print('bbox: {}'.format(bbox))
+        log.debug('bbox: {}'.format(bbox))
 
 if __name__ == '__main__':
     unittest.main()

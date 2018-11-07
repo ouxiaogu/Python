@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: hshi & peyang, 2018-01-25 11:26:37
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 StrUtil: String handling utility module
 """
@@ -13,6 +13,7 @@ def parseKW(content, outer_sep=',', inner_sep='='):
     """parser for string kwargs"""
     kw = [c.strip() for c in content.split(outer_sep)]
     kw = [[v.strip() for v in c.split(inner_sep)] for c in kw ]
+    kw = [c if len(c)>1 else c+c  for c in kw]
     try:
         rst = OrderedDict(kw)
     except ValueError:
@@ -64,3 +65,7 @@ if __name__ == '__main__':
     print (buildKW({"x": 2}))
     # print buildKW([1,2,3])
     print (parseText("324.2"))
+
+    enable = '100-300 + 410 + 490-700'
+    print(parseKW(enable, '+', '-'))
+    

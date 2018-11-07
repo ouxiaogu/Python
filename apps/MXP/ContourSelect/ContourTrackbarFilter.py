@@ -16,8 +16,8 @@ import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
 from SEMContour import SEMContour, ContourBBox
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
-import logger
-log = logger.setup("ContourTrackbarFilter", 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 class ContourTrackbarFilter(object):
     """
@@ -40,7 +40,7 @@ class ContourTrackbarFilter(object):
         self._init_parms()
 
     def _init_parms(self):
-        self.thres_range = [0., 0.2]
+        self.thres_range = [0., 0.3]
         self.thres = [0.]
         self.numTotal = 0
         self.numOutlier = 0
@@ -102,7 +102,7 @@ class ContourTrackbarFilter(object):
             
             # A trackbar to control the filter threshold values
             cvui.text(frame, xini_wnd+1, yini_wnd+10, '{} filter threshold'.format(self.colname))
-            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 200, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
+            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 250, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
             cvui.space(10)
             cvui.text(frame, xini_wnd+1, yini_wnd+100, "{}/{} points is labeled as outlier".format(
                 self.numOutlier, self.numTotal))

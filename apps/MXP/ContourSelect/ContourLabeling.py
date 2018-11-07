@@ -26,8 +26,8 @@ from ImGUI import imread_gray
 
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
 from XmlUtil import addChildNode, getConfigData, setConfigData
-import logger
-log = logger.setup("ContourLabeling", 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 class RectangleDrawer(object):
     """
@@ -59,7 +59,7 @@ class RectangleDrawer(object):
 
     def _init_parms(self):
         self.final = self.im.copy()
-        self.done = False # Flag signalling we're done
+        self.done = False # Flag signaling we're done
         self.current = (0, 0) # Current position, so we can draw the line-in-progress
         self.points = [] # List of points defining our polygon
         self.pairs = []  # List of point pairs
@@ -222,7 +222,7 @@ class ContourSelLabelStage(MxpStage):
             selectedpatternids = self.selectLabelingPatternsRandomly()
         return selectedpatternids
 
-    def interativeLabeling(self, rawContour, occf, displayIm, displayContour, patternid=''):
+    def labelSingleContour(self, rawContour, occf, displayIm, displayContour, patternid=''):
         mode = getConfigData(self.d_cf, '.label_mode', 'bbox')
         if mode != 'bbox' and WI_CVUI: # label by cvui trackbar 
             log.info("interactively decide the threshold by trackbar")
@@ -234,7 +234,6 @@ class ContourSelLabelStage(MxpStage):
             rectcoord = ContourSelLabelStage.drawBBox(displayIm, patternid)
             goodContourAreas, outlierAreas = ContourSelLabelStage.extractBBoxAndSave(rawContour, occf, rectcoord)
             labeledconour = self.labelByBBox(rawContour, goodContourAreas, outlierAreas)
-        labeledconour = labeledconour.astype({self.tgtColName: int})
         return labeledconour
             
     @staticmethod
@@ -323,6 +322,7 @@ class ContourSelLabelStage(MxpStage):
         df.loc[:, self.tgtColName] = 1
         outlierIndice = df.query('or '.join(filters.values())).index
         df.loc[outlierIndice, self.tgtColName] = 0
+        df = df.astype({self.tgtColName: int})
         newcontour = contour.fromDf(df)
         return newcontour 
 
@@ -349,7 +349,7 @@ class ContourSelLabelStage(MxpStage):
             overlayim, movedcontour = ContourSelLabelStage.updateContourROI(rawContour, im, mode='crop', overlay=True)
             
             # interactively labeling, and apply
-            labeledconour = self.interativeLabeling(rawContour, occf, overlayim, movedcontour, patternid)
+            labeledconour = self.labelSingleContour(rawContour, occf, overlayim, movedcontour, patternid)
 
             # save contour and update path
             newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))

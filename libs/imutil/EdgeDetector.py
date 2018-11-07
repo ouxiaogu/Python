@@ -23,8 +23,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, gaussian_filter, applySepFilter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-import logger
-log = logger.setup('EdgeDetector', 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 __all__ = ['decideAngleType', 'EdgeDetector']
 

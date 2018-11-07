@@ -11,45 +11,27 @@ import numpy as np
 import pandas as pd
 import io
 import pickle
+import time
+import multiprocessing
 
 from ContourSelBaseModel import ContourSelBaseModel
 from ContourSelClfModel import ContourSelClfModel
 from ContourSelRuleModel import ContourSelRuleModel, addNeighborFeatures
 
 import sys
-import os.path
+import os, os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
 from SEMContour import SEMContour
 from MxpStage import MxpStage
 
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
-from XmlUtil import getConfigData, getChildNode
-import logger
-log = logger.setup("ContourModelCal", 'debug')
+from XmlUtil import getConfigData
+from logger import logger
+log = logger.getLogger(__name__)
 
 __all__ = ["ContourSelCalStage"]
 
 USAGE_TYPES = ['training', 'validation', 'test']
-
-def validateContourFile(jobpath, relpath):
-    contourfile = os.path.join(jobpath, relpath)
-    if not os.path.exists(contourfile):
-        contourfile = os.path.join(jobpath, os.path.join(*relpath.split('\\')))
-    if not os.path.exists(contourfile):
-        return None
-    contour = SEMContour()
-    if contour.parseFile(contourfile):
-        if contour.polygonNum == 0: # in case pattern contour file exists, but it's empty
-            return None
-    else:
-        return None
-    return contourfile
-
-def applySingleContour(modeltype, model, Xminmax, infile, outfile):
-    contourfile = validateContourFile(infile)
-    if contourfile is None:
-        return np.nan
-    pass
 
 class ContourSelCalStage(MxpStage):
     """
@@ -70,11 +52,14 @@ class ContourSelCalStage(MxpStage):
     neighborColNames = ['NeighborOrientation', 'NeighborParalism'] # used neighbor filters
     allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism'] 
     debugOn = True
-    reuseModel = True
 
     def __init__(self, gcf, cf, stagename, jobpath):
         super(ContourSelCalStage, self).__init__(gcf, cf, stagename, jobpath)
         self.__getXTrainCols()
+        
+        self.reuseModel = getConfigData(self.d_cf, '.reuse_model', 1) > 0
+        self.useMultiprocess = getConfigData(self.d_cf, '.multiprocess', 0) > 0
+        self.applyModel = getConfigData(self.d_cf, '.apply_model', 0) > 0
 
     def __getXTrainCols(self):
         self.srcColNames = getConfigData(self.d_cf, ".X_train_columns", self.srcColNames)
@@ -90,7 +75,7 @@ class ContourSelCalStage(MxpStage):
     def getRuleModelSetting(cf, prefix='.'):
         rule_model = {}
         rule_model['filters'] = getConfigData(cf, prefix+"/filters", "NeighborParalism<0.98, NeighborOrientation<0.98")
-        rule_model['maxTailLenth'] = getConfigData(cf, prefix+"/max_tail_lenth", 20)
+        rule_model['maxTailLength'] = getConfigData(cf, prefix+"/max_tail_length", 20)
         rule_model['smooth'] = getConfigData(cf, prefix+"/smooth", 1) > 0
         return rule_model
 
@@ -111,6 +96,20 @@ class ContourSelCalStage(MxpStage):
         divides = np.cumsum(divides)
         assert(divides[-1]==nsamples)
         return divides
+
+    def validateContourFile(self, relpath):
+        contourfile = os.path.join(self.jobresultabspath, relpath)
+        if not os.path.exists(contourfile):
+            contourfile = os.path.join(self.jobresultabspath, os.path.join(*relpath.split('\\')))
+        if not os.path.exists(contourfile):
+            return None
+        contour = SEMContour()
+        if contour.parseFile(contourfile):
+            if contour.polygonNum == 0: # in case pattern contour file exists, but it's empty
+                return None
+        else:
+            return None
+        return contourfile
 
     def splitDataSet(self):
         # filter 1: costwt 
@@ -156,7 +155,7 @@ class ContourSelCalStage(MxpStage):
         for _, row in self.d_df_patterns.iterrows(): # loop patterns 
             if row.usage in (USAGE_TYPES[:-1]) :
                 
-                contourfile = validateContourFile(self.jobresultabspath, row.loc['contour/path'])
+                contourfile = self.validateContourFile(row.loc['contour/path'])
                 if contourfile is None:
                     continue
                 contour = SEMContour()
@@ -245,43 +244,85 @@ class ContourSelCalStage(MxpStage):
         {stage1: [model1, model2], stage2: [model1, ..]}
         '''
         pass
-    
+
     def apply(self, modeltype, model, Xminmax=None):
+        start = time.time()
+        if self.useMultiprocess:
+            self.applyMultiprocess(modeltype, model, Xminmax)
+        else:
+            self.applyTranverse(modeltype, model, Xminmax)
+        endtime = time.time()
+        log.info('Total apply time(useMultiprocess={}): {}s'.format(self.useMultiprocess, endtime-start))
+    
+    def applyTranverse(self, modeltype, model, Xminmax=None):
         ## traverse mode model apply, loop each pattern to get the model apply result
         for idx, row in self.d_df_patterns.iterrows():
             if row.loc['costwt'] <= 0:
                 continue
-            contourfile = validateContourFile(self.jobresultabspath, row.loc['contour/path'])
+            contourfile = self.validateContourFile(row.loc['contour/path'])
             if contourfile is None:
                 continue
-            contour = SEMContour()
-            contour.parseFile(contourfile)
-            curdf = contour.toDf()
+            self.applySingleContour(modeltype, model, Xminmax, contourfile, idx)
 
-            patternid = row.loc['name']
-            log.debug("Start processing pattern {} ...".format(patternid))
-            if modeltype != 'rule':
-                if self.useNeighborFeatures:
-                    curdf = addNeighborFeatures(curdf)
-                X = curdf[self.srcColNames]
-                if Xminmax is not None:
-                    X = ContourSelClfModel.applyFeatureScalar(X, Xminmax)
+    def applySingleContourWraper(self, argv):
+        self.applySingleContour(*argv)
 
-                y_pred, cm = ContourSelClfModel.predict(model, X)
-                curdf.loc[:, self.outColName] = y_pred
-            else: # rule model
-                curdf, cm = ContourSelRuleModel.predict(model, curdf)
-            curdf = curdf.astype({self.outColName: int})
+    def applySingleContour(self, modeltype, model, Xminmax, contourfile, idx):
+        if contourfile is None:
+            return
+        patternid = os.path.basename(contourfile).strip('_image_contour.txt')
+        
+        # apply model into contour
+        log.debug("Start processing pattern {} ...".format(patternid))
+        contour = SEMContour()
+        contour.parseFile(contourfile)
+        curdf = contour.toDf()
+        if modeltype != 'rule':
+            if self.useNeighborFeatures:
+                curdf = addNeighborFeatures(curdf)
+            X = curdf[self.srcColNames]
+            if Xminmax is not None:
+                X = ContourSelClfModel.applyFeatureScalar(X, Xminmax)
 
-            rms = ContourSelBaseModel.calcRMS(cm)
-            self.d_df_patterns.loc[idx, 'ClfRms'] = rms
+            y_pred, cm = ContourSelClfModel.predict(model, X)
+            curdf.loc[:, self.outColName] = y_pred
+        else: # rule model
+            curdf, cm = ContourSelRuleModel.predict(model, curdf)
+        curdf = curdf.astype({self.outColName: int})
+        FNr, FPr = ContourSelBaseModel.calcFpFnRate(cm)
 
-            newcontour = contour.fromDf(curdf)
-            newcontourfile_relpath = os.path.join(self.stageresultrelpath, '{}_image_contour.txt'.format(patternid))
-            newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
-            newcontour.saveContour(newcontourfile)
-            self.d_df_patterns.loc[idx, 'contour/path'] = newcontourfile_relpath
-            log.debug("Successfully processed pattern {}".format(patternid))
+        # write new contour
+        newcontour = contour.fromDf(curdf)
+        newcontourfile = os.path.join(self.stageresultabspath, '{}_image_contour.txt'.format(patternid))
+        newcontour.saveContour(newcontourfile)
+        newcontourfile_relpath = os.path.join(self.stageresultrelpath, os.path.basename(contourfile))
+        self.d_df_patterns.loc[idx, 'contour/path'] = newcontourfile_relpath
+        self.d_df_patterns.loc[idx, 'missing'] = FNr
+        self.d_df_patterns.loc[idx, 'false_alarm'] = FPr
+        log.debug("Successfully processed pattern {}".format(patternid))
+
+    def applyMultiprocess(self, modeltype, model, Xminmax=None):
+        argvs = []
+        for idx, row in self.d_df_patterns.iterrows():
+            if row.loc['costwt'] <= 0:
+                continue
+            contourfile = self.validateContourFile(row.loc['contour/path'])
+            if contourfile is None:
+                continue
+            argvs.append((modeltype, model, Xminmax, contourfile, idx))
+
+        try:
+            cpu_used = len(os.sched_getaffinity(0))
+        except AttributeError:
+            cpu_used = 0
+        cpu_num = multiprocessing.cpu_count() - cpu_used
+        cpu_num = int(0.6 * cpu_num)
+
+        log.info('Using {} processes'.format(cpu_num))
+        pool = multiprocessing.pool.ThreadPool(processes=cpu_num)
+        pool.imap(self.applySingleContourWraper, argvs)
+        pool.close()
+        pool.join()
 
     def applyAssembleModel(self):
         pass
@@ -291,12 +332,12 @@ class ContourSelCalStage(MxpStage):
         self.splitDataSet()
 
         # model calibration
-        modeltype = 'rule'
+        modeltype = getConfigData(self.d_cf, '.modeltype', 'rule')
         modeltype, model, Xminmax, _, _ = self.calibrate(modeltype)
-        #raise ValueError('NotNeedPredict')
 
         # model apply, calculate all pattern SEM point's info
-        self.apply(modeltype, model, Xminmax)
+        if self.applyModel:
+            self.apply(modeltype, model, Xminmax)
 
     def save(self, path, viaDf=True): # override the base save() method, to save via DataFrame
         super(ContourSelCalStage, self).save(path, viaDf=True)

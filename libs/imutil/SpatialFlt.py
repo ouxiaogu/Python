@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, correlate, kernelPreProc, fltGenPreProc, applySepFilter, applyKernelOperator, padding, sync_dtype
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-import logger
-log = logger.setup('SpatialFlt', level='info')
+from logger import logger
+log = logger.getLogger(__name__)
 
 __all__ = ['GaussianFilter', 'BoxFilter',
         'SobelFilter', 'PrewittFilter',

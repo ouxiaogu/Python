@@ -9,12 +9,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
+import glob
 
 import sys
 import os.path
 print(os.getcwd())
-sys.path.insert(0, os.getcwd()+"/../")
-from ContourTrackbarFilter import ContourTrackbarFilter
+WI_CVUI = True
+try:
+    sys.path.insert(0, os.getcwd()+"/../")
+    from ContourTrackbarFilter import ContourTrackbarFilter
+except:
+    WI_CVUI = False
+
 sys.path.insert(0, os.getcwd()+"/../../../../libs/tacx")
 print(os.getcwd()+"/../../../../libs/tacx")
 from SEMContour import *
@@ -244,16 +250,21 @@ def plotContourClassifier(im, contour, wndname=''):
     plt.legend(loc=1)
     plt.show()
     return True
+
+
     
 # SEM Contour Selection resulst plot: by classifer Positive 0, & Negative 1
-def plotContourDiscriminator(im, contour, wndname=''):
+def plotContourDiscriminator(contour, im=None, fig=None, subidx=111, wndname=''):
     # plot image and classified contour point
     df = contour.toDf()
     if any([col not in df.columns for col in ['ClfLabel']]):
         return False
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+    # fig = plt.figure()
+    if subidx >= 111:
+        ax = fig.add_subplot(subidx)
+    else:
+        ax = fig.add_subplot(2, 4, subidx)
     
     imw, imh = contour.getshape()
     '''
@@ -273,13 +284,16 @@ def plotContourDiscriminator(im, contour, wndname=''):
     cm = np.array([len(df.loc[flt, :]) for flt in [Positive, Negative]])
     cm_norm = cm.astype('float') / cm.sum()
     
-    ax.imshow(im)
+    if im is not None:
+        if len(im.shape) == 2:
+            im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
+        ax.imshow(im)
     ax.plot(df.loc[Positive ,'offsetx'], df.loc[Positive, 'offsety'], #'b.', markersize=1, 
-            linestyle='None', marker= 'o', markersize=2, markeredgewidth=1, markerfacecolor='none', 
-            label='Discriminator Positive, ClfLabel=0: {}({:.3f}%)'.format(cm[0], cm_norm[0]*100 ))
+        linestyle='None', marker= 'o', markeredgecolor='r', markersize=2, markeredgewidth=1, markerfacecolor='none',
+        label='remove: {}({:.3f}%)'.format(cm[0], cm_norm[0]*100 )) #Discriminator Positive, ClfLabel=0
     ax.plot(df.loc[Negative ,'offsetx'], df.loc[Negative, 'offsety'], #'r*', markersize=2,
-            linestyle='None', marker= 'o', markersize=2, markeredgewidth=1, markerfacecolor='none', 
-            label='Discriminator Negative, ClfLabel=1: {}({:.3f}%)'.format(cm[1], cm_norm[1]*100 ))
+        linestyle='None', marker= '.', markeredgecolor='b', markersize=2, markeredgewidth=1, markerfacecolor='none', 
+        label='Keep: {}({:.3f}%)'.format(cm[1], cm_norm[1]*100 )) #Discriminator Negative, ClfLabel=1:
     
     #ax = plt.gca() # gca() function returns the current Axes instance
     #ax.set_ylim(ax.get_ylim()[::-1]) # reverse Y
@@ -314,7 +328,7 @@ def plotAllContourClfData(inxml):
         contourfile = getRealFilePath(row.loc['contour/path'])
         imgfile = getRealFilePath(row.loc['image/path'])
         im, contour = loadPatternData(imgfile, contourfile)
-        if plotContourClassifier(im, contour, "Pattern "+str(patternid)) or plotContourDiscriminator(im, contour, "Pattern "+str(patternid)):
+        if plotContourClassifier(im, contour, "Pattern "+str(patternid)) or plotContourDiscriminator(contour, im, "Pattern "+str(patternid)):
             print("Successfully processed pattern {}".format(patternid))
         else:
             print("Can't plot pattern {}".format(patternid))
@@ -326,24 +340,88 @@ def getRealFilePath(curfile):
         ossep = '\\'
     return os.path.join(CWD, os.sep.join(curfile.split(ossep)))
 
+def plotComparedContourResults():
+
+    sys.path.insert(0, os.getcwd()+"/../../../../libs/tacx")
+    print(os.getcwd()+"/../../../../libs/tacx")
+    sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
+    
+    jobpath = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/'
+    resultpaths = [
+          'h/cache/dummydb/result/MXP/job1/ContourSelectModelCalibration430result1', # clf 
+          'h/cache/dummydb/result/MXP/job1/ContourSelectModelCalibration431result1', # rule
+          ]
+    modeltypes = ['clf', 'rule']
+    CWDs = [''.join([jobpath, path]) for path in resultpaths]
+    
+    ''' # comment block 1 starts
+    #################
+    # type 1, review model apply image by random permutation
+    #################
+    pathfilter = '*_image_contour.txt'
+    pathex = gpfs2WinPath(os.path.join(CWD, pathfilter))
+    contourfiles = glob.glob(pathex)
+    contourindice = np.random.permutation(np.arange(len(contourfiles)))
+    for ii in range(0*8, 1*8):
+        fig = plt.figure()
+        for jj, idx in enumerate(contourindice[ii*8:(ii+1)*8]):
+            contourfile = contourfiles[idx]
+            patternid = os.path.basename(contourfile).strip('_image_contour.txt')
+            ################# end of type 1
+    ''' # comment block 1 ends
+            
+    #################
+    # type 2, review model apply image by giving list
+    #################
+    #patternids = [461, 1001]
+    patternids = [118, 430, 432, 437, 442, 449, 461, 530, 536, 539, 542, 833, 1593, 1785, 1793, 1801, 1809, 2163, 2196, 2284, 2405, 2427, 2438, 2543, 2585, 2655, 2697, 2767, 3223, 3418, 3463, 3553, 3583, 3613, 3628]
+
+    
+    psteps = 4 # pattern steps in the same outxml file
+    for ii in range(int(np.ceil(len(patternids)/float(psteps)))):
+        fig = plt.figure()
+        for jj, idx in enumerate(range(ii*psteps, (ii+1)*psteps)):
+            if idx > len(patternids):
+                return
+            for kk, CWD in enumerate(CWDs):
+                try:
+                    patternid = str(patternids[idx])
+                except IndexError:
+                    raise IndexError(patternid)
+                contourfile = gpfs2WinPath(os.path.join(CWD, patternid+'_image_contour.txt'))
+                ################# end of type 2        
+                
+                if not os.path.exists(contourfile):
+                    print(patternid+' not exist')
+                    continue
+        
+                # get contour data
+                contour = SEMContour()
+                if not contour.parseFile(contourfile):
+                    continue
+                
+                plotContourDiscriminator(contour, fig=fig, subidx=kk*psteps+jj+1, wndname=modeltypes[kk]+' model Pattern '+ patternid)
+        
+
+
 def main():
-    singlePatternPlot = 1
+    singlePatternPlot = 0
     if singlePatternPlot:
         im, contour = getContourClassifierData(inxml)
         #plot_col_by_label(contour, patternid='461', colname="UserLabel")
         #plot_image_contour_angle(im, contour, '461')
 
-        #plotContourClassifier(im, contour, 'Pattern 461')
-        #plotContourDiscriminator(im, contour, 'Pattern 461')
-        
+        #plotContourClassifier(contour, im, 'Pattern 461')
+        #plotContourDiscriminator(contour, im, 'Pattern 461')
         
         overlayim, biasedcontour = updateContourROI(contour, im, mode='crop', overlay=True)
-        
-        drawer = ContourTrackbarFilter(overlayim, biasedcontour, 'Pattern 461')
-        thres = drawer.run()
-        print(thres)
+        if WI_CVUI:
+            drawer = ContourTrackbarFilter(overlayim, biasedcontour, 'Pattern 461')
+            thres = drawer.run()
+            print(thres)
     else:
-        plotAllContourClfData(inxml)
+        # plotAllContourClfData(inxml)
+        plotComparedContourResults()
 
 # In[ ]:
 

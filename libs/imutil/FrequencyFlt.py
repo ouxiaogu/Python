@@ -16,8 +16,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import padding, padding_backward, nearest_power, centered, fltGenPreProc
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-import logger
-log = logger.setup('FrequencyFlt', 'info')
+from logger import logger
+log = logger.getLogger(__name__)
 
 __all__ = [ 'ILPF', 'IHPF', 'IBRF', 'IBPF',
             'BLPF', 'BHPF', 'BBRF', 'BBPF', 'BNRF', 'BNPF',

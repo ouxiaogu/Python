@@ -10,7 +10,7 @@ Last Modified by:  ouxiaogu
 import numpy as np
 import pandas as pd
 from sklearn import svm, tree, ensemble
-from sklearn.metrics import confusion_matrix
+# from sklearn.metrics import confusion_matrix
 
 from ContourSelBaseModel import ContourSelBaseModel
 
@@ -18,8 +18,8 @@ import sys
 import os.path
 
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
-import logger
-log = logger.setup("ContourSelClfModel", 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 class ContourSelClfModel(ContourSelBaseModel):
     '''
@@ -69,7 +69,8 @@ class ContourSelClfModel(ContourSelBaseModel):
 
     @staticmethod
     def calSVCModel(X_cal, y_cal):
-        clf = svm.SVC(kernel='linear', class_weight='balanced') # {0: 10, 1: 1}
+        ContourSelClfModel.modeltype = 'SVM'
+        clf = svm.SVC(kernel='linear', class_weight='balanced', random_state=0) # {0: 10, 1: 1}
         model = clf.fit(X_cal, y_cal)
 
         log.debug("SVC model parameter setting:\n{}".format(model.get_params()))
@@ -80,6 +81,7 @@ class ContourSelClfModel(ContourSelBaseModel):
 
     @staticmethod
     def calDTModel(X_cal, y_cal):
+        ContourSelClfModel.modeltype = 'DT'
         clf = tree.DecisionTreeClassifier(random_state=0, max_depth=len(X_cal.columns)+1, min_samples_split=3)
         model = clf.fit(X_cal, y_cal)
 
@@ -90,6 +92,7 @@ class ContourSelClfModel(ContourSelBaseModel):
 
     @staticmethod
     def calRFModel(X_cal, y_cal):
+        ContourSelClfModel.modeltype = 'RF'
         clf = ensemble.RandomForestClassifier(n_estimators=10, random_state=0)
         model = clf.fit(X_cal, y_cal)
         log.debug("Random Forest model parameter setting:\n{}".format(model.get_params()))
@@ -102,5 +105,7 @@ class ContourSelClfModel(ContourSelBaseModel):
 
         cm = np.zeros((2,2), dtype=int)
         if y_true is not None:
-            cm = confusion_matrix(y_true, y_pred)
+            df = pd.DataFrame(data= np.array([y_true.values, y_pred]).T, 
+                columns=[ContourSelBaseModel.tgtColName, ContourSelBaseModel.outColName])
+            cm = ContourSelBaseModel.computeConfusionMatrix(df)
         return y_pred, cm

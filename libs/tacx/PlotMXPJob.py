@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-30 14:24:25
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 MXPJobPlot: some frequently used plot for MXP job
 """
@@ -17,8 +17,8 @@ import cv2
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from PlotConfig import *
-import logger
-log = logger.setup('MXPJobPlot', 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImDescriptors import calcHistSeries, hist_rect

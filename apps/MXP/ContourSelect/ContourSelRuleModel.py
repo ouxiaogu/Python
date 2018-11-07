@@ -18,8 +18,8 @@ import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
 from SEMContour import SEMContour
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
-import logger
-log = logger.setup("ContourSelRuleModel", 'debug')
+from logger import logger
+log = logger.getLogger(__name__)
 
 tgtColName = 'UserLabel'
 outColName = 'ClfLabel'
@@ -54,8 +54,10 @@ def addNeighborFeatures(df):
     polygonIds = df.loc[:, 'polygonId'].drop_duplicates().values
     preIdx = df.index[0]
     for polygonId in polygonIds:
+        # search forward 
+        neighborFeatureValForward = []
         isPolygonHead = True
-        for curIdx, _ in df.loc[df['polygonId']==polygonId, :].iterrows():
+        for curIdx in df.loc[df['polygonId']==polygonId, :].index:
             NeighborContinuity = 1
             NeighborOrientation = 1
             NeighborParalism = 1
@@ -69,11 +71,48 @@ def addNeighborFeatures(df):
                 NeighborContinuity = np.sqrt(neighorvector.dot(neighorvector))
                 NeighborOrientation = eigenvector_n.dot(eigenvector_n_1)
                 NeighborParalism = np.sqrt(crossvector.dot(crossvector))/NeighborContinuity
-                NeighborContinuity = NeighborContinuity
             preIdx = curIdx
             isPolygonHead = False
-            for ii, val in enumerate([NeighborContinuity, NeighborOrientation, NeighborParalism]):
-                colname = allNeighborColNames[ii]
+            neighborFeatureValForward.append((NeighborContinuity, NeighborOrientation, NeighborParalism))
+
+        # search backward
+        neighborFeatureValBackward = []
+        isPolygonHead = True
+        for curIdx in df.loc[df['polygonId']==polygonId, :].index[::-1]:
+            NeighborContinuity = 1
+            NeighborOrientation = 1
+            NeighborParalism = 1
+            if not isPolygonHead:
+                eigenvector_n_1 = np.array([np.cos(df.loc[preIdx, 'angle']), np.sin(df.loc[preIdx, 'angle'])])
+                eigenvector_n = np.array([np.cos(df.loc[curIdx, 'angle']), np.sin(df.loc[curIdx, 'angle'])])
+                neighorvector = np.array([df.loc[curIdx, 'offsetx'] - df.loc[preIdx, 'offsetx'],
+                                        df.loc[curIdx, 'offsety'] - df.loc[preIdx, 'offsety']])
+                crossvector = np.cross(neighorvector, eigenvector_n_1)
+
+                NeighborContinuity = np.sqrt(neighorvector.dot(neighorvector))
+                NeighborOrientation = eigenvector_n.dot(eigenvector_n_1)
+                NeighborParalism = np.sqrt(crossvector.dot(crossvector))/NeighborContinuity
+            preIdx = curIdx
+            isPolygonHead = False
+            neighborFeatureValBackward.append((NeighborContinuity, NeighborOrientation, NeighborParalism))
+
+        # merge results
+        neighborFeatureValBackward = neighborFeatureValBackward[::-1]
+        for ii, curIdx in enumerate(df.loc[df['polygonId']==polygonId, :].index):
+            for jj, colname in enumerate(allNeighborColNames):
+                ''' # average of forward & backward
+                if ii == 0 or ii == len(neighborFeatureValForward)-1:
+                    if abs(neighborFeatureValForward[ii][jj] - 1) >= abs(neighborFeatureValBackward[ii][jj] - 1):
+                        val = neighborFeatureValForward[ii][jj]
+                    else:
+                        val = neighborFeatureValBackward[ii][jj]
+                else:
+                    val = 0.5*(neighborFeatureValForward[ii][jj] + neighborFeatureValBackward[ii][jj])
+                ''' # max variance of forward & backward
+                if abs(neighborFeatureValForward[ii][jj] - 1) >= abs(neighborFeatureValBackward[ii][jj] - 1):
+                    val = neighborFeatureValForward[ii][jj]
+                else:
+                    val = neighborFeatureValBackward[ii][jj]
                 df.loc[curIdx, colname] = val
     return df
 
@@ -166,12 +205,13 @@ def findIndexOfFirstFlat(arr, gradients=None, start_pos=0, thres=None):
             return ix
     return start_pos
 
-def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLenth=20, smooth=True):
+def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLength=20, smooth=True):
     dominant_issues = []
     linedf.loc[:, outColName] = 1
 
     # step 1, search and apply from head
-    headdf = linedf.loc[linedf.index[:maxTailLenth], :]
+    headLength = min(len(linedf), maxTailLength)
+    headdf = linedf.loc[linedf.index[:headLength], :]
     minNeighborOrientation, minNeighborParalism = headdf.min()[allNeighborColNames[1:]]
     issue_feature, issue_index = None, None
     if minNeighborParalism < minNeighborOrientation and len(headdf.query(filters['NeighborParalism'])) > 0:
@@ -183,44 +223,45 @@ def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLenth=20, smooth
     dominant_issues.append(None)
     if issue_feature is not None:
         dominant_issues[0] = [issue_feature, issue_index]
-        arr = linedf[issue_feature].values
+        arr = linedf.loc[:, issue_feature].values
         if smooth:
             arr = smoothSignal(arr)
         gradient = np.gradient(arr, edge_order=2)
-        idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=issue_index+1)
+        start_pos = min(issue_index+1, len(arr)-1)
+        idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=start_pos)
         dominant_issues[0].append(idxFlat)
-        idxFlat = min(maxTailLenth, idxFlat)
         linedf.loc[linedf.index[:idxFlat], outColName] = 0
 
     # step 2, search and apply from tail, reverse order
     dominant_issues.append(None)
     head_index = 0 if issue_index is None else issue_index
     tailrange = len(linedf) - (head_index + 1) # exclude the head issue index itself
-    if tailrange > maxTailLenth:
-        taildf = linedf.loc[linedf.index[-maxTailLenth:], :]
+    if tailrange > 0:
+        tailLength = min(tailrange, maxTailLength)
+        taildf = linedf.loc[linedf.index[-tailLength:], :]
         minNeighborOrientation, minNeighborParalism = taildf.min()[allNeighborColNames[1:]]
         issue_feature, issue_index = None, None
         if minNeighborParalism < minNeighborOrientation and len(taildf.query(filters['NeighborParalism'])) > 0:
             issue_feature = 'NeighborParalism'
             issue_index = np.argmin(taildf[issue_feature].values)
-            issue_index = maxTailLenth - 1 - issue_index  # use index start from tail
+            issue_index = tailLength - 1 - issue_index  # use index start from tail
         elif minNeighborOrientation < minNeighborParalism and len(taildf.query(filters['NeighborOrientation'])) > 0:
             issue_feature = 'NeighborOrientation'
             issue_index = np.argmin(taildf[issue_feature].values)
-            issue_index = maxTailLenth - 1 - issue_index
-        if issue_feature is not None and issue_index:
+            issue_index = tailLength - 1 - issue_index
+        if issue_feature is not None:
             dominant_issues[1] = [issue_feature, issue_index]
-            arr = linedf[issue_feature].values[::-1]
+            arr = linedf.loc[:, issue_feature].values[::-1]
             if smooth:
                 arr = smoothSignal(arr)
             gradient = np.gradient(arr, edge_order=2)
-            idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=issue_index+1)
+            start_pos = min(issue_index+1, len(arr)-1)
+            idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=start_pos)
             dominant_issues[1].append(idxFlat)
-            idxFlat = min(maxTailLenth, idxFlat)
             linedf.loc[linedf.index[-idxFlat:], outColName] = 0
     return linedf, dominant_issues
 
-def applyNeighborRuleModelPerVContour(contourdf, filters='', maxTailLenth=20, smooth=True):
+def applyNeighborRuleModelPerVContour(contourdf, filters='', maxTailLength=20, smooth=True):
     '''
     The step to find rule model in python:
     1. apply combined filters to find ill contour Vline candidates
@@ -238,7 +279,7 @@ def applyNeighborRuleModelPerVContour(contourdf, filters='', maxTailLenth=20, sm
     for polygonId in polygonIds:
         lineFlt = contourdf['polygonId']==polygonId
         linedf = contourdf.loc[lineFlt, :]
-        newlinedf, dominant_issues = applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth, smooth)
+        newlinedf, dominant_issues = applyNeighborRuleModelPerVLine(linedf, filters, maxTailLength, smooth)
         # print(int(polygonId), dominant_issues)
         contourdf.loc[lineFlt, :] = newlinedf
     return contourdf
@@ -251,11 +292,11 @@ class ContourSelRuleModel(ContourSelBaseModel):
 
     def __init__(self, **kwargs):
         self.filters = kwargs.get('filters', "NeighborParalism<0.98, 'NeighborOrientation<0.98")
-        self.maxTailLenth = kwargs.get('maxTailLenth', 20)
+        self.maxTailLength = kwargs.get('maxTailLength', 20)
         self.smooth = kwargs.get('smooth', 1)
 
     def getRuleModel(self):
-        rule_model = {'filters': self.filters, 'maxTailLenth': self.maxTailLenth, 'smooth': self.smooth}
+        rule_model = {'filters': self.filters, 'maxTailLength': self.maxTailLength, 'smooth': self.smooth}
         return rule_model
 
     def calibrate(self, cal_file_paths, ver_file_paths):
@@ -278,9 +319,6 @@ class ContourSelRuleModel(ContourSelBaseModel):
     @staticmethod
     def checkModel(model, contourfiles, usage='CAL'):
         cm_final = np.zeros((2,2), dtype=int)
-
-        filters = categorizeFilters(model.get('filters', ''))
-
         for contourfile in contourfiles:
             contour = SEMContour()
             contour.parseFile(contourfile)
@@ -293,24 +331,5 @@ class ContourSelRuleModel(ContourSelBaseModel):
     def predict(rule_model, contourdf):
         contourdf = addNeighborFeatures(contourdf)
         contourdf = applyNeighborRuleModelPerVContour(contourdf, **rule_model)
-        cm = ContourSelRuleModel.computeConfusionMatrix(contourdf)
+        cm = ContourSelBaseModel.computeConfusionMatrix(contourdf)
         return contourdf, cm
-
-    @staticmethod
-    def computeConfusionMatrix(contourdf):
-        ''' compute the confusion matrix in below format
-            [TP      FN]
-            [FP      TN]
-        '''
-        cm = np.zeros((2,2), dtype=int)
-        if (not contourdf.empty) and all([col in contourdf.columns for col in [tgtColName, outColName]]):
-            TP = (contourdf.loc[:, tgtColName] == 0) & (contourdf.loc[:, outColName] == 0)
-            FN = (contourdf.loc[:, tgtColName] == 0) & (contourdf.loc[:, outColName] == 1)
-            FP = (contourdf.loc[:, tgtColName] == 1) & (contourdf.loc[:, outColName] == 0)
-            TN = (contourdf.loc[:, tgtColName] == 1) & (contourdf.loc[:, outColName] == 1)
-
-            cm[0, 0] = len(contourdf.loc[TP, :])
-            cm[0, 1] = len(contourdf.loc[FN, :])
-            cm[1, 0] = len(contourdf.loc[FP, :])
-            cm[1, 1] = len(contourdf.loc[TN, :])
-        return cm

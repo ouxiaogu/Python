@@ -23,7 +23,7 @@ import FEMReview
 import ControlCenter
 
 logger.initlogging(debug=False)
-import logger
+from logger import logger
 log = logger.getLogger(__name__)
 
 """global keys"""

@@ -16,8 +16,9 @@ import sys
 import os.path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../common")
-import logger
-log = logger.setup(name='SpatialTest', level='debug')
+from logger import logger
+logger.initlogging('test', 'debug')
+log = logger.getLogger(__name__)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/..")
 from SpatialFlt import *

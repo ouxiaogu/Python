@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-26 13:20:55
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 MxpJob: Class to hold tachyon MXP job, derived from class TachyonJob
 """
@@ -16,8 +16,9 @@ import sys
 import os.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import getSonConfigMap, getElemText
-import logger
-log = logger.setup("MxpJob")
+from StrUtil import parseKW
+from logger import logger
+log = logger.getLogger(__name__)
 
 ###############################################################################
 # MXP Job Stage Register Area
@@ -61,37 +62,42 @@ class MxpJob(Job):
     def dataAbsPath(self, basename):
         return os.path.join(self.jobpath, self.datarelpath, basename)
 
-    def getEnableRange(self):
+    def getEnableRangeList(self):
         """
-        Enable range in MXP job option
+        Enable range list in MXP job option
 
-        Returns
+        Example
         -------
-        range_: list of len=2
+        Follow the MXP convention
+        input: enable = '100-300 + 410 + 490-700'
+        output: [(100, 300), (410, 410), (490, 700)]
+        explain output: list of len=3, each item is a tuple of (start, end)
             [-1, -1]: means all the stages are enabled
             [min, max]:stage between [min max] are enabled
         """
-        range_ = [-1, -1]
+        range_list = []
+        default_range = (-1, -1)
         try:
             options = self.getOption()
             range_ = options["enable"]
             # range_ = self.mxproot.find('./global/options/enable').text
-            range_ = list(map(int, range_.split('-')))
+            range_ = parseKW(range_, '+', '-')
+            range_list = [tuple(map(int, (k, v))) for k, v in range_.items()]
         except:
-            pass
-        return range_
+            range_list.append(default_range)
+        return range_list
 
     def getmxpCfgMap(self):
         """OrderedDict {(stagename, enable): dict }"""
         mxpCfgMap = OrderedDict()
-        for item in list(self.mxproot):
-            stagename = item.tag
+        for stagecf in list(self.mxproot):
+            stagename = stagecf.tag
             enable = ""
             try:
-                enable = getElemText(item.find(".enable"))
+                enable = getElemText(stagecf.find(".enable"))
             except:
-                pass
-            cfgMap = getSonConfigMap(item)
+                continue
+            cfgMap = getSonConfigMap(stagecf)
             mxpCfgMap[(stagename, enable)] = cfgMap
         self.mxpCfgMap = mxpCfgMap
         return mxpCfgMap
@@ -110,10 +116,11 @@ class MxpJob(Job):
             [('D2DBAlignment', 500), ('ResistModelCheck', 510),
              ('ImageD2DBAlignment', 600), ('ResistModelCheck', 610)]
         """
-        range_ = self.getEnableRange()
-        if set(range_) == set([-1, -1]):
+        range_list = self.getEnableRangeList()
+        if (-1, -1) in range_list:
             enabled_only = False
-        inRange = lambda x: True if x >= range_[0] and x <= range_[1] else False
+        log.debug('enable range list: {}'.format(range_list))
+        inRange = lambda x: any([True if x >= range_[0] and x <= range_[1] else False for range_ in range_list]) 
         stages = []
         for key, stagectx in self.mxpCfgMap.items():
             stagename, enable_ = key
@@ -302,18 +309,14 @@ class MxpJob(Job):
             log.info("Stage %s%d successfully finished\n" % (stagename, enablenum))
 
 def test_mxpjob():
-    jobpath = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/8GF02/Case3E_GF_EP5_study_c2c_id2db_v1'
+    jobpath = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob'
     from FileUtil import gpfs2WinPath
     jobpath = gpfs2WinPath(jobpath)
     m_job = MxpJob(jobpath)
-    m_stages =  m_job.getAllMxpStages()
+    m_stages =  m_job.getAllMxpStages(enabled_only=False)
     print(m_stages)
-    print(m_job.getEnableRange())
-
-    print (m_job.getAllStageXmlFiles())
-    print (m_job.getStageOut("Average300"))
-    print (m_job.getStageSummary("ImageD2DBAlignment600"))
-    print (m_job.getStageSummaryKpi("ResistModelCheck610"))
+    print(m_job.getEnableRangeList())
+    print (m_job.getStageOut("ContourExtraction400"))
 
 def main():
     parser = argparse.ArgumentParser(description='xml-driving MXP job')

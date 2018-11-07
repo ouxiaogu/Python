@@ -257,7 +257,7 @@ def categorizeFilters(filters):
     # print(filters)
     return filters
 
-def findDominantNeighborIssue(linedf, filters, maxTailLenth=20):
+def findDominantNeighborIssue(linedf, filters, maxTailLength=20):
     '''
     find dominate filter in two side, should return
 
@@ -271,7 +271,7 @@ def findDominantNeighborIssue(linedf, filters, maxTailLenth=20):
     dominant_issues = []
     
     # step 1, search from head
-    headdf = linedf.loc[linedf.index[:maxTailLenth], :]
+    headdf = linedf.loc[linedf.index[:maxTailLength], :]
     minNeighborOrientation, minNeighborParalism = headdf.min()[allNeighborColNames[1:]]
     issue_feature, issue_index = None, None
     if minNeighborParalism < minNeighborOrientation and len(headdf.query(filters['NeighborParalism'])) > 0:
@@ -288,8 +288,8 @@ def findDominantNeighborIssue(linedf, filters, maxTailLenth=20):
     dominant_issues.append(None)
     head_index = 0 if issue_index is None else issue_index
     tailrange = len(linedf) - head_index - 1
-    if tailrange > maxTailLenth:
-        taildf = linedf.loc[linedf.index[-maxTailLenth:], :]
+    if tailrange > maxTailLength:
+        taildf = linedf.loc[linedf.index[-maxTailLength:], :]
         minNeighborOrientation, minNeighborParalism = taildf.min()[allNeighborColNames[1:]]
         issue_feature, issue_index = None, None
         if minNeighborParalism < minNeighborOrientation and len(taildf.query(filters['NeighborParalism'])) > 0:
@@ -348,12 +348,12 @@ def findIndexOfFirstZeroCrossing(arr, gradients=None, start_pos=0):
             return ix
     return start_pos
 
-def applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth=20, smooth=True):
+def applyNeighborRuleModelPerVLine(linedf, filters, maxTailLength=20, smooth=True):
     dominant_issues = []
     linedf.loc[:, 'ClfLabel'] = 1
 
     # step 1, search and apply from head
-    headdf = linedf.loc[linedf.index[:maxTailLenth], :]
+    headdf = linedf.loc[linedf.index[:maxTailLength], :]
     minNeighborOrientation, minNeighborParalism = headdf.min()[allNeighborColNames[1:]]
     issue_feature, issue_index = None, None
     if minNeighborParalism < minNeighborOrientation and len(headdf.query(filters['NeighborParalism'])) > 0:
@@ -371,25 +371,25 @@ def applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth=20, smooth=True
         gradient = np.gradient(arr, edge_order=2)
         idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=issue_index+1)
         dominant_issues[0].append(idxFlat)
-        idxFlat = min(maxTailLenth, idxFlat)
+        idxFlat = min(maxTailLength, idxFlat)
         linedf.loc[linedf.index[:idxFlat], 'ClfLabel'] = 0
 
     # step 2, search and apply from tail, reverse order
     dominant_issues.append(None)
     head_index = 0 if issue_index is None else issue_index
     tailrange = len(linedf) - (head_index + 1) # exclude the head issue index itself
-    if tailrange > maxTailLenth:
-        taildf = linedf.loc[linedf.index[-maxTailLenth:], :]
+    if tailrange > maxTailLength:
+        taildf = linedf.loc[linedf.index[-maxTailLength:], :]
         minNeighborOrientation, minNeighborParalism = taildf.min()[allNeighborColNames[1:]]
         issue_feature, issue_index = None, None
         if minNeighborParalism < minNeighborOrientation and len(taildf.query(filters['NeighborParalism'])) > 0:
             issue_feature = 'NeighborParalism'
             issue_index = np.argmin(taildf[issue_feature].values)
-            issue_index = maxTailLenth - 1 - issue_index  # use index start from tail
+            issue_index = maxTailLength - 1 - issue_index  # use index start from tail
         elif minNeighborOrientation < minNeighborParalism and len(taildf.query(filters['NeighborOrientation'])) > 0:
             issue_feature = 'NeighborOrientation'
             issue_index = np.argmin(taildf[issue_feature].values)
-            issue_index = maxTailLenth - 1 - issue_index
+            issue_index = maxTailLength - 1 - issue_index
         if issue_feature is not None and issue_index:
             dominant_issues[1] = [issue_feature, issue_index]
             arr = linedf[issue_feature].values[::-1]
@@ -398,7 +398,7 @@ def applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth=20, smooth=True
             gradient = np.gradient(arr, edge_order=2)
             idxFlat = findIndexOfFirstFlat(arr, gradient, start_pos=issue_index+1)
             dominant_issues[1].append(idxFlat)
-            idxFlat = min(maxTailLenth, idxFlat)
+            idxFlat = min(maxTailLength, idxFlat)
             linedf.loc[linedf.index[-idxFlat:], 'ClfLabel'] = 0
     return linedf, dominant_issues
 
@@ -412,7 +412,7 @@ def applyNeighborRuleModel(contourdf, filters, smooth=True):
         * 3.2: start search from dominant issue position+1, new head=Index[the gradient zero-crossing point]
 
     '''
-    maxTailLenth = 20
+    maxTailLength = 20
     contourdf.loc[:, 'ClfLabel'] = 1
     filters = categorizeFilters(filters)
 
@@ -422,7 +422,7 @@ def applyNeighborRuleModel(contourdf, filters, smooth=True):
     for polygonId in polygonIds:
         lineFlt = contourdf['polygonId']==polygonId
         linedf = contourdf.loc[lineFlt, :]
-        newlinedf, dominant_issues = applyNeighborRuleModelPerVLine(linedf, filters, maxTailLenth, smooth)
+        newlinedf, dominant_issues = applyNeighborRuleModelPerVLine(linedf, filters, maxTailLength, smooth)
         print(int(polygonId), dominant_issues)
         contourdf.loc[lineFlt, :] = newlinedf
     return contourdf

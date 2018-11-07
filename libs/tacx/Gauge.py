@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-24 21:06:48
 
-Last Modified by: peyang
+Last Modified by:  ouxiaogu
 
 Gauge: Gauge Utility module and Gauge Class(will add when necessary)
 """
@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import math
 
-import logger
+from logger import logger
 logger.initlogging(debug=False)
 log = logger.getLogger("Gauge")
 

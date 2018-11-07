@@ -21,8 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../signal")
 from filters import cv_gaussian_kernel, applySepFilter, fftconvolve
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from PlotConfig import getRGBColor
-import logger
-log = logger.setup(level='info')
+from logger import logger
+log = logger.getLogger(__name__)
 
 __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
             'printImageInfo', 'getImageInfo',
