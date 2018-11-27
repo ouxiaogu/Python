@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-24 15:17:55
 
-Last Modified by:  ouxiaogu
+Last Modified by:  peyang
 
 XmlUtil: Xml handling module
 
@@ -66,19 +66,19 @@ class JobInfoXml(object):
         child.append(grandchild)
         self.root.append(child)
 
-    def setConfigData(self, key, intext=''):
+    def setConfigData(self, key, intext='', tag='value'):
         p = self.root.find(key)
-        child = p.find('value')
+        child = p.find(tag)
         child.text = intext
 
-    def getConfigData(self, key):
+    def getConfigData(self, key, tag='value'):
         try:
             p = self.root.find(key)
-            child = p.find('value')
-            return child.text
+            child = p.find(tag)
         except:
             log.error("Cannot find the value of key %s in root" % key)
             return ''
+        return child.text
 
 def addChildNode(cf, key='', val=None):
     child = ET.Element(key)
@@ -365,8 +365,8 @@ if __name__ == '__main__':
     # print(getConfigMapList(root, '.test'))
     df = dfFromConfigMapList(root, '.test')
     print(df)
-    ocf = dfToMxpOcf(df)
     root = ET.Element('root')
+    ocf = dfToMxpOcf(df)
     root.append(ocf)
     indentCf(root)
     tree = ET.ElementTree(root)

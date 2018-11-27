@@ -121,7 +121,7 @@ class SimpleNN(object):
         
     def train(self, training_set, 
               validation_set=None,
-              initialize=True):
+              initialize=True, **kwargs):
         
         self.train_cost_ = []
         X_data = np.array(training_set[0])
@@ -134,8 +134,10 @@ class SimpleNN(object):
                     "tf_y:0": y_data,
                    }
             self.sess.run(self.init_op, feed_dict=feed)
+            stagepath = kwargs.get('stagepath', '.')
+            logdir = os.path.join(stagepath, 'logs')
             file_writer = tf.summary.FileWriter(
-                                    logdir='./logs/',graph = self.sess.graph)
+                                    logdir=logdir,graph = self.sess.graph)
             #self.sess.run(tf.global_variables_initializer())
 
 
@@ -178,6 +180,15 @@ class SimpleNN(object):
                 
         self.is_train = False 
         return self.sess.run('rms_loss:0',
+                                 feed_dict=feed)
+
+    def model_error(self, X_test, y_test):
+        feed = {'tf_x:0': X_test,
+                'tf_y:0': y_test
+               }
+
+        self.is_train = False
+        return self.sess.run('mse_loss:0',
                                  feed_dict=feed)
         
     def model_apply(self, X_data, X_data_file_name, path='./model-apply/'):

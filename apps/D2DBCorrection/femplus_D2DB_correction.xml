@@ -1,0 +1,11 @@
+<root>
+  <tool>
+    <arguments>[${jobpath type="job" default=${CUR_JOB_ROOT}]  [-I ${Input SEM spec file type="file" tooltip="Input SEM spec file"}] [-O ${Output SEM Spec file tooltip="Output SEM Spec file, if path is empty, then write out spec file under job path"}] [-r ${reuse FEM+ pattern align correction job results? type="char_cb" option="yes|no" default="yes" tooltip="Whether to reuse the FEM+ pattern align correction job results"}]  [-u ${reuse FEM+ pattern align correction job lua?  type="char_cb" option="yes|no" default="yes" tooltip="Whether to reuse the FEM+ pattern align correction job lua"}]</arguments>
+    <command>${TFLEX_PYTHON} ${TFLEX_APP_PYTHON_DIR}/fem+/apps/D2DBCorrection/main.pyo</command>
+    <geometry></geometry>
+    <initial_dir></initial_dir>
+    <name>FEM+ D2DB correction</name>
+    <run_mode>1</run_mode>
+    <type>tool</type>
+  </tool>
+</root>

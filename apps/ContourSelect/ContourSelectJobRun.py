@@ -11,8 +11,8 @@ import argparse
 from ContourSelectJob import ContourSelJob
 
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../../libs/common")
-from logger import logger 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/common")
+from logger import logger
 
 def main():
 

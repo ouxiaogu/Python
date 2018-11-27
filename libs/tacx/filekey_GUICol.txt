@@ -1,0 +1,21 @@
+filekey	GUI Col
+average_result	History: average
+median_result	History: median
+std_result	History: stdev
+min_result	History: min
+max_result	History: max
+min_abs_process_result	History: Min Abs Error Process
+min_abs_error_result	History: Min Abs Error
+adi_cd_result	ADI Model CD
+ils_result	ILS Result (1/um)
+ai_cd_result	AI_CD
+result	Model Error
+defocus_result	Process: defocus
+focusBlur_result	Process: focusBlur
+aiBlur_result	Process: aiBlur
+SWA_result	Process: SWA
+MaskBias_result	Process: MaskBias
+InnerCorner_result	Process: InnerCorner
+OuterCorner_result	Process: OuterCorner
+UNCERTAINTY_MSE_result	Process: Uncertainty_MSE
+UNCERTAINTY_Spec_Ratio_result	Process: Uncertainty_Spec_Ratio

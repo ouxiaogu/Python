@@ -6,12 +6,11 @@ ContourSelect job
 
 Last Modified by:  ouxiaogu
 """
-import sys
-import os.path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../../libs/tacx")
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/tacx")
 from MxpJob import MxpJob
 from MxpStage import MXP_XML_TAGS
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../../libs/common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/common")
 from logger import logger
 log = logger.getLogger(__name__)
 
@@ -24,7 +23,7 @@ from ContourSelModelCal import ContourSelCalStage
 STAGE_REGISTER_TABLE = {
     'ContourSelectDataLabeling': 'ContourSelLabelStage',
     'ContourSelectModelCalibration': 'ContourSelCalStage',
-    'ContourSelectModelApply': 'ContourSelApplyStage'
+    'ContourSelection': 'ContourSelStage'
 }
 ###############################################################################
 

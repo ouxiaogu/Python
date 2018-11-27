@@ -12,6 +12,18 @@ The tensorflow model graph and variables will be saved at "tflayers-model" folde
 
 example see: /gpfs/DEV/FEM/SHARED/MXP_ModelDB/MXP_toolbox/cnn_sem_model
 
+
+## Preprare data
+
+First user need run mxp2 DLSEMModelDataPrepare stage. After finish this job use perl script to create the image folder
+
+>  tachyon_perl outputPatternResult.pl -d /gpfs2/scratch/yuguo/jobs/MOD11473_dump_mi_all -stage DLSEMModelDataPrepare -enable 570 -result dl570.txt
+
+>  tachyon_perl createDLTrainingImageFolder.pl -file dl570.txt -result $MXP_ModelDB/MXP_toolbox/cnn_sem_model/training_data_mask/ -prefix /gpfs2/scratch/yuguo/jobs/MOD11473_dump_mi_all/h/cache/dummydb/result/MXP/job1 -debug 2
+
+(check the lns_
+use debug = 2 to test it. If everything is correct, remove this option to do copy job)
+
 ## Run training session
 
 After user put all good and bad images into training_data and testing_data folder, run python command
@@ -271,7 +283,6 @@ One requirement for inxml in current design, the DL model path should be in its 
   MXPJob   INFO    : Stage init1800 starts
   ...
   ```
-  
 * Need user to set: 
   
   1. prepare a job path, with **job.xml** under it

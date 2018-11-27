@@ -21,13 +21,13 @@ try:
 except:
     WI_CVUI = False
 
-sys.path.insert(0, os.getcwd()+"/../../../../libs/tacx")
-print(os.getcwd()+"/../../../../libs/tacx")
+sys.path.insert(0, os.getcwd()+"/../../../libs/tacx")
+print(os.getcwd()+"/../../../libs/tacx")
 from SEMContour import *
 from MxpStage import MxpStageXmlParser
-sys.path.insert(0, os.getcwd()+"/../../../../libs/imutil")
+sys.path.insert(0, os.getcwd()+"/../../../libs/imutil")
 from ImGUI import imread_gray
-sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
+sys.path.insert(0, os.getcwd()+"/../../../libs/common")
 from FileUtil import gpfs2WinPath
 
 CWD = r'C:\Localdata\D\Note\Python\apps\MXP\ContourSelect\samplejob1\h\cache\dummydb\result\MXP\job1'
@@ -61,7 +61,7 @@ def updateContourROI(contour, im=None, mode='crop', overlay=True):
     ----------
     mode:   string
         * 'crop': crop the image into contour bbox, output `contour point cords -= (xini, yini)`
-        * 'crop': extend the image into full size, output `contour point cords += (xini, yini)`
+        * 'extend': extend the image into full size, output `contour point cords += (xini, yini)`
     overly: boolean
         * 'True': output image is the overlay of image + contour
         * 'False': output image is just image itself
@@ -156,6 +156,27 @@ def plot_col_by_label(contour, patternid='', colname=''):
             flt_eq = df.loc[:, colname].isna()
         ax.plot(df.loc[flt_eq, 'offsetx'], df.loc[flt_eq, 'offsety'], '.', 
                 linestyle='None',  markersize=2, label=colname+'=={}'.format(label))
+
+    plt.gca().invert_yaxis()
+    plt.legend()
+    plt.show()
+
+# plot by column inequality filter
+def plot_col_by_filter(contour, patternid='', filter='weight<=0'):
+    df = contour.toDf()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_aspect('equal')
+    xini, yini, xend, yend = contour.getBBox()
+    ax.set_xlim([xini, xend])
+    ax.set_ylim([yini, yend])
+    ax.set_title("Pattern "+patternid)
+    
+    uniqVals = df.loc[:, colname].drop_duplicates().values
+    print(uniqVals)
+    ax.plot(df.loc[:, 'offsetx'], df.loc[:, 'offsety'], '.', linestyle='None',  markersize=2)
+    df_lt0 = df.query(filter)
+    ax.plot(df_lt0.loc[:, 'offsetx'], df_lt0.loc[:, 'offsety'], '.', linestyle='None',  markersize=2, label=colname+'=={}'.format(label))
 
     plt.gca().invert_yaxis()
     plt.legend()
@@ -342,9 +363,9 @@ def getRealFilePath(curfile):
 
 def plotComparedContourResults():
 
-    sys.path.insert(0, os.getcwd()+"/../../../../libs/tacx")
-    print(os.getcwd()+"/../../../../libs/tacx")
-    sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
+    sys.path.insert(0, os.getcwd()+"/../../../libs/tacx")
+    print(os.getcwd()+"/../../../libs/tacx")
+    sys.path.insert(0, os.getcwd()+"/../../../libs/common")
     
     jobpath = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/'
     resultpaths = [

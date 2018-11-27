@@ -137,6 +137,8 @@ class MxpStage(object):
             self.__loadCfg()
 
     def save(self, path, viaDf=False, extraNodes=None):
+        if "init" in self.stagename.lower():
+            viaDf = True
         if viaDf:
             ocf = dfToMxpOcf(self.d_df_patterns)
         else:

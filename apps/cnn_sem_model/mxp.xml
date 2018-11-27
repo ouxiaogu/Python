@@ -1,0 +1,31 @@
+<root>
+  <MXP>
+    <global>
+      <modeltype>convNN</modeltype>
+      <centered_normalize_X>1</centered_normalize_X>
+      <device>cpu</device>
+    </global>
+    <init>
+      <data_dir></data_dir>
+      <divide_rule>60:20:20</divide_rule>
+      <filter>
+        <folder>*</folder>
+        <srcfile>*_simulatedSEMImage.pgm</srcfile>
+        <tgtfile>*_image.pgm</tgtfile>
+      </filter>
+      <outxml>mxp_input.xml</outxml>
+      <enable>1800</enable>
+    </init>
+    <DLSEMCalibration>
+      <learning_rate>0.001</learning_rate>
+      <inxml>mxp_input.xml</inxml>
+      <outxml>dlsemcal2000out.xml</outxml>
+      <enable>2000</enable>
+    </DLSEMCalibration>
+    <DLSEMApply>
+      <inxml>dlsemcal2000out.xml</inxml>
+      <outxml>dlsemapply2100out.xml</outxml>
+      <enable>2100</enable>
+    </DLSEMApply>
+  </MXP>
+</root>

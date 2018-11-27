@@ -10,14 +10,13 @@ Last Modified by:  ouxiaogu
 import numpy as np
 import pandas as pd
 from sklearn import svm, tree, ensemble
-# from sklearn.metrics import confusion_matrix
 
 from ContourSelBaseModel import ContourSelBaseModel
 
 import sys
 import os.path
 
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from logger import logger
 log = logger.getLogger(__name__)
 
@@ -53,9 +52,9 @@ class ContourSelClfModel(ContourSelBaseModel):
         X_ver = ContourSelClfModel.applyFeatureScalar(X_ver, Xminmax)
 
         # calibrate classification model
-        if model_type == 'SVM':
+        if model_type.upper() == 'SVM':
             model = ContourSelClfModel.calSVCModel(X_cal, y_cal)
-        elif model_type == 'RF':
+        elif model_type.upper() == 'RF':
             model = ContourSelClfModel.calRFModel(X_cal, y_cal)
         else:
             model = ContourSelClfModel.calDTModel(X_cal, y_cal)
@@ -63,8 +62,6 @@ class ContourSelClfModel(ContourSelBaseModel):
         # calibration performance
         _, cm_cal = ContourSelClfModel.predict(model, X_cal, y_cal, 'CAL')
         _, cm_ver = ContourSelClfModel.predict(model, X_ver, y_ver, 'VER')
-        self.printModelPerformance(cm_cal, usage='CAL')
-        self.printModelPerformance(cm_ver, usage='VER')
         return model, Xminmax, cm_cal, cm_ver
 
     @staticmethod

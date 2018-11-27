@@ -15,9 +15,9 @@ from ContourSelBaseModel import ContourSelBaseModel
 
 import sys
 import os.path
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
 from SEMContour import SEMContour
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from logger import logger
 log = logger.getLogger(__name__)
 
@@ -163,7 +163,7 @@ def cv_gaussian_kernel(ksize, sigma=0, dtype=None):
 
 def smoothSignal(arr, sigma=0.5):
     # Gaussian kernel
-    flt = cv_gaussian_kernel(3, 0.5)
+    flt = cv_gaussian_kernel(3, sigma)
 
     # padding replicate mode
     padArr = np.zeros((arr.shape[0]+2,) )
@@ -210,6 +210,7 @@ def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLength=20, smoot
     linedf.loc[:, outColName] = 1
 
     # step 1, search and apply from head
+    dominant_issues.append(None)
     headLength = min(len(linedf), maxTailLength)
     headdf = linedf.loc[linedf.index[:headLength], :]
     minNeighborOrientation, minNeighborParalism = headdf.min()[allNeighborColNames[1:]]
@@ -220,7 +221,6 @@ def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLength=20, smoot
     elif minNeighborOrientation < minNeighborParalism and len(headdf.query(filters['NeighborOrientation'])) > 0:
         issue_feature = 'NeighborOrientation'
         issue_index = np.argmin(headdf[issue_feature].values)
-    dominant_issues.append(None)
     if issue_feature is not None:
         dominant_issues[0] = [issue_feature, issue_index]
         arr = linedf.loc[:, issue_feature].values
@@ -244,7 +244,7 @@ def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLength=20, smoot
         if minNeighborParalism < minNeighborOrientation and len(taildf.query(filters['NeighborParalism'])) > 0:
             issue_feature = 'NeighborParalism'
             issue_index = np.argmin(taildf[issue_feature].values)
-            issue_index = tailLength - 1 - issue_index  # use index start from tail
+            issue_index = tailLength - 1 - issue_index  # re-index by using tail as index 0 
         elif minNeighborOrientation < minNeighborParalism and len(taildf.query(filters['NeighborOrientation'])) > 0:
             issue_feature = 'NeighborOrientation'
             issue_index = np.argmin(taildf[issue_feature].values)
@@ -261,7 +261,7 @@ def applyNeighborRuleModelPerVLine(linedf, filters=None, maxTailLength=20, smoot
             linedf.loc[linedf.index[-idxFlat:], outColName] = 0
     return linedf, dominant_issues
 
-def applyNeighborRuleModelPerVContour(contourdf, filters='', maxTailLength=20, smooth=True):
+def applyNeighborRuleModelPerContour(contourdf, filters='', maxTailLength=20, smooth=True):
     '''
     The step to find rule model in python:
     1. apply combined filters to find ill contour Vline candidates
@@ -311,8 +311,6 @@ class ContourSelRuleModel(ContourSelBaseModel):
         # calibration performance
         cm_cal = ContourSelRuleModel.checkModel(model, cal_file_paths, usage='CAL')
         cm_ver = ContourSelRuleModel.checkModel(model, ver_file_paths, usage='VER')
-        self.printModelPerformance(cm_cal, usage='CAL')
-        self.printModelPerformance(cm_ver, usage='VER')
 
         return cm_cal, cm_ver
 
@@ -330,6 +328,6 @@ class ContourSelRuleModel(ContourSelBaseModel):
     @staticmethod
     def predict(rule_model, contourdf):
         contourdf = addNeighborFeatures(contourdf)
-        contourdf = applyNeighborRuleModelPerVContour(contourdf, **rule_model)
+        contourdf = applyNeighborRuleModelPerContour(contourdf, **rule_model)
         cm = ContourSelBaseModel.computeConfusionMatrix(contourdf)
         return contourdf, cm

@@ -15,14 +15,14 @@ class logger(object):
     LOGNAME = 'MXP'
 
     # configure once only in main module
-    @classmethod
-    def initlogging(cls, appname='MXP', level=logging.INFO, logpath=None): 
-        cls.LOGNAME = appname
+    @staticmethod
+    def initlogging(level=logging.INFO, logpath=None):
 
         if type(level) == str:
             types = ['info', 'debug', 'error']
             if level.lower() not in types:
-                raise ValueError("log level should be in: {}\n".format(', '.join(types) ) )
+                raise ValueError("log level should be in: {}\n".format(
+                    ', '.join(types)))
             else:
                 if level.lower() == 'info':
                     level = logging.INFO
@@ -30,13 +30,14 @@ class logger(object):
                     level = logging.DEBUG
 
         LOGLEVEL = level
-        log = logging.getLogger(cls.LOGNAME)
-        # Why are there two setLevel() methods? 
-        # The level set in the logger determines which severity of messages it will pass to its handlers. 
+        log = logging.getLogger(logger.LOGNAME)
+        # Why are there two setLevel() methods?
+        # The level set in the logger determines which severity of messages it will pass to its handlers.
         # The level set in each handler determines which messages that handler will send on.
         log.setLevel(logging.DEBUG)
 
-        DEBUGFORMAT = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        DEBUGFORMAT = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         FORMAT = logging.Formatter('%(name)s - %(message)s')
 
         if logpath is not None:
@@ -44,12 +45,12 @@ class logger(object):
             fh.setLevel(logging.DEBUG)
             fh.setFormatter(DEBUGFORMAT)
             log.addHandler(fh)
-            
+
         shstd = logging.StreamHandler(sys.stdout)
         shstd.setLevel(LOGLEVEL)
         shstd.setFormatter(FORMAT)
         log.addHandler(shstd)
-        
+
         sherror = logging.StreamHandler(sys.stderr)
         sherror.setLevel(logging.WARNING)
         sherror.setFormatter(DEBUGFORMAT)
@@ -57,25 +58,27 @@ class logger(object):
 
     # create (but not configure) a child logger in a separate module
     @staticmethod
-    def getLogger(name): 
-        return logging.getLogger(logger.LOGNAME+'.'+name)
-    
+    def getLogger(name):
+        return logging.getLogger(logger.LOGNAME + '.' + name)
+
     @staticmethod
     def closelogging(name):
-        log = logger.getLogger(name)
+        log = logger.getLogger(logger.LOGNAME + '.' + name)
         for i, fh in enumerate(log.handlers):
             print(i)
             fh.close()
 
-if __name__ == '__main__':
-    logger.initlogging('FEM', 'debug')
-    log = logger.getLogger('D2DB')
-    log.info('info test')
-    log.debug('debug')
-    logger.closelogging('D2DB')
 
+if __name__ == '__main__':
     logger.initlogging(level='debug')
     log = logger.getLogger('D2DB')
     log.info('info test')
-    log.debug('debug')
+    log.debug('debug test')
+    logger.closelogging('D2DB')
+
+    logger.LOGNAME = "MXP"
+    logger.initlogging(level='debug')
+    log = logger.getLogger('D2DB')
+    log.info('info test')
+    log.debug('debug test')
     logger.closelogging('D2DB')

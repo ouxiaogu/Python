@@ -2,7 +2,7 @@
 -*- coding: utf-8 -*-
 Created: peyang, 2018-01-24 21:07:29
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 
 SEM: class to hold SEM Spec Table
 
@@ -16,12 +16,12 @@ Generate SEM spec table from:
 from StringIO import StringIO
 import pandas as pd
 from MxpStage import MxpStageXmlParser
-import os.path
-from TachyonJob import Job
 from StrUtil import parseKW
 from subprocess import check_output
 import string
 import re
+
+from TachyonJob import Job
 
 DEFAULT_SPEC =\
 '''SEM FILE    PIXEL   CENTER_X    CENTER_Y    COST_WT EDGE_FILE   DETECT_EDGE XAXIS_SWAP  YAXIS_SWAP  ROTATION    THETA   ALIGN_EDGE  V_REGION    GAUGE_TABLE GEOM_MAP    SCALE_XY_RATIO

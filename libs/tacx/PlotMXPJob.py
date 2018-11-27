@@ -13,46 +13,49 @@ import os.path
 import pandas as pd
 import numpy as np
 import cv2
+import itertools
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-from PlotConfig import *
 from logger import logger
 log = logger.getLogger(__name__)
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
-from ImDescriptors import calcHistSeries, hist_rect
+#sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
+#from ImDescriptors import calcHistSeries, hist_rect
 
-#fig = plt.figure()
-#AX = fig.add_subplot(111)
+fig = plt.figure()
+AX = fig.add_subplot(111)
 
 # JOBPATHS = [r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare_yunbo', 
 #             r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare']
 
-JOBPATHS = [r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare_yunbo/h/cache/dummydb/result/MXP/job1/DLSEMModelDataPrepare570result1/1',
-            r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare/h/cache/dummydb/result/MXP/job1/DLSEMModelDataPrepare570result1/1']
+# JOBPATHS = [r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare_yunbo/h/cache/dummydb/result/MXP/job1/DLSEMModelDataPrepare570result1/1',
+#             r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare/h/cache/dummydb/result/MXP/job1/DLSEMModelDataPrepare570result1/1']
+
+JOBPATHS = ['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/ContourSelection/003_D2DB_AIO_from_400_contourSel_452_453']
+ENABLES = [500, 503]
 
 from FileUtil import gpfs2WinPath
-JOBPATHS = map(gpfs2WinPath, JOBPATHS)
+JOBPATHS = list(map(gpfs2WinPath, JOBPATHS))
 
 class MXPStageData(object):
     """docstring for MXPStageData"""
-    def __init__(self, jobpaths, stage=None, stagename=None, enable=None, result_option=None):
-        self.jobpaths = jobpaths
+    def __init__(self, jobpaths, stage=None, stagename=None, enables=None, result_option=None):
+        self.jobpaths = jobpaths if isinstance(jobpaths, list) else [jobpaths]
         self.stage = stage
         self.stagename = stagename
-        self.enable = enable
+        self.enables = enables
         self.result_option = result_option
         self.__readDataSet()
 
     def __readDataSet(self):
         '''only parse costwt>0 patterns, and use pattern name as index'''
         dataset = []
-        for jobpath in self.jobpaths:
+        for jobpath, enable in itertools.product(self.jobpaths, self.enables):
             job = MxpJob(jobpath)
-            df = job.getStageResultFactory(stage=self.stage, stagename=self.stagename, enable=self.enable, 
+            df = job.getStageResultFactory(stage=self.stage, stagename=self.stagename, enable=enable, 
                 result_option=self.result_option)
-            df = df.loc[df.costwt>0, :].set_index('name')
+            #df = df.loc[df.costwt>0, :].set_index('name')
             dataset.append(df)
         self.dataset = dataset
 
@@ -74,7 +77,7 @@ class MXPStageData(object):
 
 def plot_scatter_xy():
     columns = ['offset_x', 'offset_y']
-    stagedata = MXPStageData(JOBPATHS, enable=570)
+    stagedata = MXPStageData(JOBPATHS, enables=ENABLES)
     diffdata = stagedata.getTwoStageDiff(columns=columns)
     diffcols = [col+'_diff' for col in columns]
     print(diffdata.describe())
@@ -82,7 +85,7 @@ def plot_scatter_xy():
 
 def plot_pattern_rms():
     columns = ['pattern_rms']
-    stagedata = MXPStageData(JOBPATHS, enable=570)
+    stagedata = MXPStageData(JOBPATHS, enable=ENABLES)
     diffdata = stagedata.getTwoStageDiff(columns=columns)
     print(diffdata.describe())
     x = np.arange(1, len(diffdata.index)+1)
@@ -158,9 +161,9 @@ def histplot_rstChkResults(jobs):
     if isinstance(jobs, MxpJob):
         jobs = [jobs]
     hists = pd.DataFrame()
-    lsuffix_ = os.path.basename(os.path.normpath(jobs[0].jobpath))
+    lsuffix_ = '_'+os.path.basename(os.path.normpath(jobs[0].jobpath))
     for ix, job_ in enumerate(jobs):
-        rsuffix_ = os.path.basename(os.path.normpath(job_.jobpath))
+        rsuffix_ = '_'+os.path.basename(os.path.normpath(job_.jobpath))
         dfs_ = []
         stages_ = job_.getAllMxpStages()
         m_stages = [ ''.join(map(str, stg)) for stg in stages_ if stg[0] == STGNAME]
@@ -174,18 +177,56 @@ def histplot_rstChkResults(jobs):
         if(ix == 0):
             hists = histDF
         else:
-            hists = hists.join(histDF, lsuffix='_'+lsuffix_, rsuffix='_'+rsuffix_)
+            hists = hists.join(histDF, lsuffix=lsuffix_, rsuffix=rsuffix_)
+            lsuffix_ = ""
     barplot(hists)
     AX.set_title("{} Result comparison".format(STGNAME))
     AX.set_xlabel("{} Ranges".format(COLNAME))
     AX.set_ylabel("Counts")
     plt.show()
 
+
+def plot_scatter_xys():
+    columns = ['offset_x', 'offset_y']
+    enables = [500, 502, 503]
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for i, enable in enumerate(enables):
+        stagedata = MXPStageData(JOBPATHS, enable=enable)
+        dataset = stagedata.dataset[0].loc[:, columns].astype(np.float32)
+        #print(dataset.columns, dataset.shape, dataset.head(2), sep='\n')
+        #raise ValueError('-')
+        dataset.plot.scatter(x='offset_x', y='offset_y', c=COLORS[i], label='D2DB '+str(enable), ax=ax, )
+    plt.show()
+
+
+def compareHist():
+    #df.loc[:, 'slope'] = df.loc[:, 'slope'].abs()
+    stagedata = MXPStageData(JOBPATHS, enables=ENABLES, result_option='osumccfs')
+    dataset = stagedata.dataset
+    allColNames = ['similarity', 'center_shift', 'final_cost']
+    print(dataset[0].columns)
+    for num, alpha in enumerate(allColNames):
+        plt.subplot(1, 3, num+1)
+
+        Type0, Type1 = dataset[0][alpha], dataset[1][alpha]
+        print(Type0.describe(), Type1.describe(), sep='\n')
+        plt.hist((Type0, Type1), bins=25, alpha=0.5, color=['b', 'g'], label=['Normal D2DB 500', 'Rule Model D2DB 503'])
+        plt.legend(loc='upper right')
+        plt.title(alpha)
+        plt.yscale('log')
+    #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+    plt.show()
+
 if __name__ == '__main__':
-    # plot_scatter_xy()
+    #plot_scatter_xy()
 
     # plot_pattern_rms()
 
     # plot_src_tgt_images()
 
-    match_src_tgt_images()
+    # match_src_tgt_images()
+
+    #plot_scatter_xys()
+    
+    compareHist()

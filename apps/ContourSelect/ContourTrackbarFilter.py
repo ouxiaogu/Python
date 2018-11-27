@@ -13,9 +13,9 @@ import cvui
 
 import sys
 import os.path
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
 from SEMContour import SEMContour, ContourBBox
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from logger import logger
 log = logger.getLogger(__name__)
 

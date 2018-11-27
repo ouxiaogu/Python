@@ -11,7 +11,7 @@ import numpy as np
 import sys
 import os.path
 
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from logger import logger
 log = logger.getLogger(__name__)
 
@@ -34,9 +34,9 @@ class ContourSelBaseModel(object):
     @staticmethod
     def calcRMS(cm):
         '''calculate RMS by confusion matrix'''
-        FN, FP = cm[0, 1], cm[1, 0]
+        wrong = cm[0, 1] + cm[1, 0]
         total = cm.sum().astype(float)
-        rms = np.sqrt((FN + FP) / total ) if total != 0 else np.nan
+        rms = np.sqrt(wrong / total ) if total != 0 else np.nan
         return rms
 
     @staticmethod
@@ -49,10 +49,22 @@ class ContourSelBaseModel(object):
         return FP, FN
 
     @classmethod
-    def printModelPerformance(cls, cm, usage='CAL'):
-        cm_norm = cm.astype('float') / cm.sum(axis=1).reshape((2, 1))
+    def printModelPerformance(cls, cm, usage='CAL', from_sklearn=False, use_total=True):
+        if not use_total:
+            if from_sklearn: # if cm from sklearn.metrics import confusion_matrix
+                #               Truth
+                # Predict:  [TP      FP] 
+                #           [FN      TN]
+                cm_norm = cm.astype('float') / cm.sum(axis=0).reshape((1, 2))
+            else: # if cm by using ContourSelBaseModel.computeConfusionMatrix
+                #               Predict
+                # Truth:    [TP      FN] 
+                #           [FP      TN]
+                cm_norm = cm.astype('float') / cm.sum(axis=1).reshape((2, 1))
+        else:
+            cm_norm = cm.astype('float') / cm.sum()
         log.info("{} model on {} set, FN(missing) rate = {:.3f}%, FP(false alarm) rate = {:.3f}%".format(cls.modeltype, usage, cm_norm[0, 1]*100, cm_norm[1, 0]*100))
-        log.info("{} model confusion matrix on {} set:\n{}\n{}".format(cls.modeltype, usage, cm, 100*cm_norm))
+        log.info("{} model confusion matrix on {} set:\n{}\n{}".format(cls.modeltype, usage, cm, np.round(100*cm_norm, 3)))
 
     @staticmethod
     def computeConfusionMatrix(contourdf):

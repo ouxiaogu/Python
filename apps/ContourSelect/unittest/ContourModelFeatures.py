@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os, os.path
 import sys
-sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
+sys.path.insert(0, os.getcwd()+"/../../../libs/common")
 from FileUtil import gpfs2WinPath
 
 caldatafile = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/h/cache/dummydb/result/MXP/job1/ContourSelectModelCalibration430result1/caldata.txt'
@@ -180,10 +180,10 @@ predict(X_ver, y_ver, 'VER')
 get_ipython().magic('matplotlib auto')
 import sys
 import os.path
-sys.path.insert(0, os.getcwd()+"/../../../../libs/tacx")
-print(os.getcwd()+"/../../../../libs/tacx")
+sys.path.insert(0, os.getcwd()+"/../../../libs/tacx")
+print(os.getcwd()+"/../../../libs/tacx")
 from SEMContour import *
-sys.path.insert(0, os.getcwd()+"/../../../../libs/common")
+sys.path.insert(0, os.getcwd()+"/../../../libs/common")
 from FileUtil import gpfs2WinPath
 
 import glob

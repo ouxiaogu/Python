@@ -67,13 +67,14 @@ class ConvNN(object):
             tf_x = tf.transpose(tf_x, [0, 2, 3, 1])
             tf_y = tf.transpose(tf_y, [0, 2, 3, 1])
         ## 1st layer: Conv_1
-        h1_filters_size = 128
+        h1_filters_size = 32
         h1 = tf.layers.conv2d(tf_x,
                               kernel_size=(5, 5),
                               filters=h1_filters_size,
                               activation=tf.nn.relu,
                               padding = 'same',
                               data_format = self.data_format)
+        '''
         ## MaxPooling
         h1_pool = tf.layers.max_pooling2d(h1,
                               pool_size=(2, 2),
@@ -104,11 +105,7 @@ class ConvNN(object):
                               activation=tf.nn.relu)
 
         ## Dropout (comments it till opencv 3.4.3)
-        '''
-        h3_drop = tf.layers.dropout(h3,
-                              rate=self.dropout_rate,
-                              training=self.is_train)
-        '''
+        #h3_drop = tf.layers.dropout(h3, rate=self.dropout_rate, training=self.is_train)
 
         ## 4th layer: Fully Connected (linear activation)
         h4 = tf.layers.dense(h3, self.imgsize * self.imgsize,
@@ -117,24 +114,40 @@ class ConvNN(object):
         s = tf_y.get_shape().as_list()
         y_pred = tf.reshape(h4, [-1,s[1], s[2], s[3]], name= "y_pred")
 
-        '''
-        h4 = tf.layers.dense(tf_x, self.imgsize * self.imgsize,
+        #h4 = tf.layers.dense(tf_x, self.imgsize * self.imgsize,
                               activation=None)
-        s = tf_y.get_shape().as_list()
-        y_pred = tf.reshape(h4, [-1, s[1], s[2], s[3]], name = "y_pred")
+        #s = tf_y.get_shape().as_list()
+        #y_pred = tf.reshape(h4, [-1, s[1], s[2], s[3]], name = "y_pred")
         '''
+
+        h2_filters_size = 64
+        h2 = tf.layers.conv2d(h1, kernel_size=(5, 5), filters=h2_filters_size, activation=tf.nn.relu, padding = 'same', data_format = self.data_format)
+        h3_filters_size = 128
+        h3 = tf.layers.conv2d(h2, kernel_size=(5, 5), filters=h3_filters_size, activation=tf.nn.relu, padding = 'same', data_format = self.data_format)
+        h4_filters_size = 256
+        h4 = tf.layers.conv2d(h3, kernel_size=(5, 5), filters=h4_filters_size, activation=tf.nn.relu, padding = 'same', data_format = self.data_format)
+        h5_filters_size = 1
+        h5 = tf.layers.conv2d(h4, kernel_size=(5, 5), filters=h5_filters_size, activation=tf.nn.relu, padding = 'same', data_format = self.data_format)
+
+        y_pred = tf.identity(h5, name = 'y_pred')
+
+        sizes = [self.imgsize] + list(map(lambda xx: xx.shape, [tf_x, tf_y, h1, h2, h3, h4, h5, y_pred]))
+        names = "self.imgsize, tf_x, tf_y, h1, h2, h3, h4, h5, y_pred".split(', ')
+        for ii, jj in zip(names, sizes):
+            print("{}: {}".format(ii, jj))
+
+        ## Loss Function
+        mse_loss = tf.reduce_mean(tf.pow(tf.subtract(y_pred, tf_y), 2),name="mse_loss")
 
         ## Predictition
         predictions = {
-            'rms': tf.cast(tf.reduce_mean(tf.pow(tf.subtract(y_pred, tf_y), 2)),
-                              tf.float32, name='rms')}
+            'mse': tf.cast(mse_loss, tf.float32, name='mse'),
+            'rms': tf.cast(tf.sqrt(mse_loss), tf.float32, name='rms')}
 
-        ## Loss Function and Optimization
-        rms_loss = tf.reduce_mean(tf.pow(tf.subtract(y_pred, tf_y), 2),name="rms_loss")
 
         ## Optimizer:
         optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        optimizer = optimizer.minimize(rms_loss, name='train_op')
+        optimizer = optimizer.minimize(mse_loss, name='train_op')
 
     def save(self, epoch=20, path='./tflayers-model/'):
         if not os.path.isdir(path):
@@ -157,7 +170,7 @@ class ConvNN(object):
              os.path.join(path, 'model.ckpt-%d' % epoch))
 
         # freeze the graph
-        output_node_names = ["y_pred", "rms_loss"]
+        output_node_names = ["y_pred", "mse_loss"]
         frozen_graph_def = tf.graph_util.convert_variables_to_constants(
             self.sess,
             self.sess.graph_def,
@@ -198,6 +211,7 @@ class ConvNN(object):
                dataset.batch_generator(X_data, y_data, batchsize=self.batchsize,
                                  shuffle=self.shuffle)
             avg_loss = 0.0
+            cnt = 0
             for i, (batch_x,batch_y) in \
                 enumerate(batch_gen):
                 #print("batch_x shape: ", batch_x.shape)
@@ -207,22 +221,24 @@ class ConvNN(object):
                        }
                 self.is_train = True
                 loss, y_pred, _ = self.sess.run(
-                        ['rms_loss:0', 'y_pred:0', 'train_op'],
+                        ['mse_loss:0', 'y_pred:0', 'train_op'],
                         feed_dict=feed)
                 if(debug ==1):
                     print("Train function: min and max of y_pred: %f, %f \n" %(y_pred.min(), y_pred.max()))
                     print("Train function: min and max of y_train: %f, %f \n" %(batch_y.min(), batch_y.max()))
-                avg_loss += loss
+                avg_loss += loss * batch_x.shape[0]
+                cnt += batch_x.shape[0]
+            avg_loss /= cnt
 
-            print('Epoch %02d: Training rms: '
+            print('Epoch %02d: Training mse: '
                   '%7.7f' % (epoch, avg_loss), end=' ')
             if validation_set is not None:
                 feed = {'tf_x:0': batch_x,
                         'tf_y:0': batch_y}
                 self.is_train = False
-                valid_rms = self.sess.run('rms_loss:0',
+                valid_mse = self.sess.run('mse_loss:0',
                                           feed_dict=feed)
-                print('Validation rms: %7.7f' % valid_rms)
+                print('Validation mse: %7.7f' % valid_mse)
             else:
                 print()
 
@@ -231,7 +247,7 @@ class ConvNN(object):
                }
 
         self.is_train = False
-        return self.sess.run('rms_loss:0',
+        return self.sess.run('mse_loss:0',
                                  feed_dict=feed)
 
     def model_error(self, X_test, y_test):
@@ -240,7 +256,7 @@ class ConvNN(object):
                }
 
         self.is_train = False
-        return self.sess.run('rms_loss:0',
+        return self.sess.run('mse_loss:0',
                                  feed_dict=feed)
 
     def model_apply(self, X_data, X_data_file_name, path='./model-apply/'):

@@ -1,19 +1,20 @@
+# -*- coding: utf-8 -*-
 """
--*- coding: utf-8 -*-
 Created: peyang, 2018-01-26 13:20:55
 
-Last Modified by:  ouxiaogu
-
 MxpJob: Class to hold tachyon MXP job, derived from class TachyonJob
+Independent to TACX FEM+ python api now, no need tachyon_python
+
+Last Modified by:  ouxiaogu
 """
-from TachyonJob import Job
 from collections import OrderedDict
 import xml.etree.ElementTree as ET
 import re
 import argparse
 
-import sys
-import os.path
+from TachyonJob import Job
+
+import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
 from XmlUtil import getSonConfigMap, getElemText
 from StrUtil import parseKW

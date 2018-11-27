@@ -18,13 +18,13 @@ try:
     from ContourTrackbarFilter import ContourTrackbarFilter
 except:
     WI_CVUI = False
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/tacx/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
 from SEMContour import SEMContour, ContourBBox
 from MxpStage import MxpStage
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/imutil/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/imutil/")
 from ImGUI import imread_gray
 
-sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../../libs/common/")
+sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from XmlUtil import addChildNode, getConfigData, setConfigData
 from logger import logger
 log = logger.getLogger(__name__)

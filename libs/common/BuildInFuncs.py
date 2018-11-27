@@ -4,8 +4,11 @@ Created: ouxiaogu, 2018-07-05 10:12:38
 
 Example code for python Build-in functions
 
-Last Modified by: ouxiaogu
+Last Modified by:  ouxiaogu
 """
+
+import logging
+logger = logging.getLogger(__name__)
 
 def zip(*iterables):
     '''pick one elem from all the input iterables, pack into one elem for output, only terminate when one iterables come to its tail'''
@@ -156,7 +159,25 @@ def slice(start, stop, step=None):
     pass
 
 
+def addlogger(cls: type):
+    aname = '_{}__log'.format(cls.__name__)
+    setattr(cls, aname, logging.getLogger(cls.__module__ + '.' + cls.__name__))
+    return cls
+
+
+@addlogger
+class Foo(object):
+    def foo(self):
+        self.__log.info('foo called')
+
+
+@addlogger
+class Bar(Foo):
+    def bar(self):
+        self.__log.info('bar called')
+
 if __name__ == '__main__':
+    """
     import argparse
     parser = argparse.ArgumentParser(description='Test')
     parser.add_argument('BAR', help='BAR help')
@@ -181,6 +202,7 @@ if __name__ == '__main__':
     date1 = Date.from_string1("05-07-2018")
     print(date1.tostr() )
 
+
     date2 = Date.from_string2("05-07-2018")
     print(date2.tostr() )
     date3 = DateTime.from_string2("05-07-2018")
@@ -189,3 +211,12 @@ if __name__ == '__main__':
     '''test 4, property'''
     print("\ntest 4, property:\n")
     test_Celsius()
+    """
+
+    '''test 5, logging decorator'''
+    bar = Bar()
+    bar.foo()
+    bar.bar()
+
+    # >>> INFO:__main__.Foo:foo called
+    # >>> INFO:__main__.Bar:bar called

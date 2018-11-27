@@ -1,0 +1,243 @@
+<root>
+ <MXP>
+    <global>
+     <model>
+        <dir type="char_cb">/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/1Data/Regular_run/models_fromYZ/Resist_model_20180629</dir>
+        <option type="char_cb"/>
+   </model>
+     <postret gui="postRET layermap" type="char_cb">layermap/merge_layermap.xml</postret>
+     <preret gui="preRET layermap" type="char_cb">layermap/Calaveras_target.xml</preret>
+     <spec gui="sem spec file" type="char_cb">data/sem_position_file.txt</spec>
+     <sempix gui="sem pixel (nm)" type="dbl">1</sempix>
+     <gauge gui="Cutline File" type="char_cb">data/cutline_file.txt</gauge>
+     <spec_original>/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/1Data/Regular_run/sem_spec_CalaV3_reg_corrected.txt</spec_original>
+     <gauge_original>/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/1Data/Regular_run/HMI_gauge_cleaned_001.txt</gauge_original>
+  </global>
+    <init>
+     <command>MXP_GENINPUT /gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/1Data/Regular_run/Images init.xml mxp_input.xml</command>
+     <filter>
+        <folder/>
+        <file>*.bmp</file>
+   </filter>
+     <xml>init.xml</xml>
+  </init>
+    <RawImageProcess>
+     <inxml>mxp_input.xml</inxml>
+     <outxml>rawimageprocess100out.xml</outxml>
+     <enable>-1</enable>
+  </RawImageProcess>
+    <D2DAlignment gui="D2DAlignment - Coarse">
+     <half_range>200</half_range>
+     <inxml>rawimageprocess100out.xml</inxml>
+     <outxml>d2dalignment200out.xml</outxml>
+     <enable>-1</enable>
+  </D2DAlignment>
+    <D2DAlignment gui="D2DAlignment - Fine">
+     <half_range>200</half_range>
+     <inxml>d2dalignment200out.xml</inxml>
+     <outxml>d2dalignment210out.xml</outxml>
+     <enable>-1</enable>
+  </D2DAlignment>
+    <ImageSelection>
+     <inxml>d2dalignment210out.xml</inxml>
+     <outxml>imageselection211out.xml</outxml>
+     <enable>-1</enable>
+  </ImageSelection>
+    <Average>
+     <inxml>imageselection211out.xml</inxml>
+     <outxml>average301out.xml</outxml>
+     <enable>301</enable>
+  </Average>
+    <ContourExtraction>
+     <sigma gui="Gaussian filter sigma" type="dbl">2</sigma>
+     <inxml>average301out.xml</inxml>
+     <outxml>contourextraction400out.xml</outxml>
+     <enable>400</enable>
+  </ContourExtraction>
+  <ContourSelectDataLabeling> <!-- label_mode=bbox, input both good/bad bbox -->
+    <select_sample>
+        <mode>random</mode> <!-- random, explicit, regex -->
+        <start_pattern_name>324</start_pattern_name>
+        <samples>50</samples>
+        <!-- <filter>[4-9]{1}[0-9]{2}|[1-9]{1}[0-9]{3}</filter> -->
+    </select_sample>
+    <label_mode>bbox</label_mode> <!-- bbox, trackbar -->
+    <inxml>contourextraction400out.xml</inxml>
+    <outxml>contourlabelingbbox410out.xml</outxml>
+    <enable>410</enable>
+  </ContourSelectDataLabeling>
+  <ContourSelectDataLabeling> <!-- label_mode=trackbar  -->
+    <select_sample>
+        <mode>explicit</mode> <!-- explicit, regex -->
+        <filter>118, 430, 432, 437, 442, 449, 461, 530, 536, 539, 542, 833, 1593, 1785, 1793, 1801, 1809, 2163, 2196, 2284, 2405, 2427, 2438, 2543, 2585, 2655, 2697, 2767, 3223, 3418, 3463, 3553, 3583, 3613, 3628</filter>
+        <!-- <filter>[4-9]{1}[0-9]{2}|[1-9]{1}[0-9]{3}</filter> -->
+        <!-- <start_pattern_name>324</start_pattern_name> -->
+        <!-- <samples>50</samples> -->
+    </select_sample>
+    <label_mode>trackbar</label_mode> <!-- bbox, trackbar -->
+    <inxml>contourextraction400out.xml</inxml>
+    <outxml>contourlabelingtrackbar411out.xml</outxml>
+    <enable>411</enable>
+  </ContourSelectDataLabeling>
+  <ContourSelectDataLabeling> <!-- label_mode=trackbar  -->
+    <select_sample>
+        <mode>explicit</mode> <!-- explicit, regex -->
+        <filter>118, 430, 432, 437, 442, 449, 461, 530, 536, 539, 542, 833, 1593, 1785, 1793, 1801, 1809, 2163, 2196, 2284, 2405, 2427, 2438, 2543, 2585, 2655, 2697, 2767, 3223, 3418, 3463, 3553, 3583, 3613, 3628</filter>
+    </select_sample>
+    <label_mode>bbox</label_mode> <!-- bbox, trackbar -->
+    <inxml>contourextraction400out.xml</inxml>
+    <outxml>contourlabelingbbox412out.xml</outxml>
+    <enable>412</enable>
+  </ContourSelectDataLabeling>
+  <ContourSelectModelCalibration> <!-- clf model using bbox data -->
+    <divide_rule>80:20:0</divide_rule>
+    <modeltype>clf</modeltype>
+    <reuse_model>0</reuse_model>
+    <multiprocess>1</multiprocess>
+    <models>clf</models>
+    <X_train_columns>intensity, slope, ridge_intensity</X_train_columns>
+    <!-- slope, intensity, ridge_intensity, contrast, EigenRatio -->
+    <inxml>contourlabelingbbox410out.xml</inxml>
+    <outxml>contourselcalbbox430out.xml</outxml>
+    <enable>430</enable>
+  </ContourSelectModelCalibration>
+  <ContourSelectModelCalibration> <!-- rule model using bbox data -->
+    <divide_rule>80:20:0</divide_rule>
+    <modeltype>rule</modeltype>
+    <reuse_model>0</reuse_model>
+    <multiprocess>1</multiprocess>
+    <inxml>contourlabelingbbox410out.xml</inxml>
+    <outxml>contourselcalbbox431out.xml</outxml>
+    <enable>431</enable>
+  </ContourSelectModelCalibration>
+  <!--     <models>
+        <model>
+            <modeltype>rule</modeltype>
+            <X_train_xml>d2dbalignment500out.xml</X_train_xml>
+            <form>
+              <filters>NeighborParalism<0.98, NeighborOrientation<0.98</filters>
+              <max_tail_length>20</max_tail_length>
+              <smooth>1</smooth>
+            </form>
+        </model>
+        <model>
+            <modeltype>DT</modeltype>
+            <X_train_xml>d2dbalignment500out.xml</X_train_xml>
+            <X_train_columns>intensity, slope, ridge_intensity</X_train_columns>
+        </model>
+    </models> -->
+  <ContourSelectModelCalibration> <!-- clf model using trackbar data -->
+    <divide_rule>80:20:0</divide_rule>
+    <modeltype>clf</modeltype>
+    <reuse_model>0</reuse_model>
+    <multiprocess>1</multiprocess>
+    <X_train_columns>intensity, slope, ridge_intensity</X_train_columns>
+    <!-- slope, intensity, ridge_intensity, contrast, EigenRatio -->
+    <inxml>contourlabelingtrackbar411out.xml</inxml>
+    <outxml>contourselcaltrackbar450out.xml</outxml>
+    <enable>450</enable>
+  </ContourSelectModelCalibration>
+  <ContourSelectModelCalibration> <!-- rule model using trackbar data -->
+    <divide_rule>80:20:0</divide_rule>
+    <modeltype>rule</modeltype>
+    <reuse_model>0</reuse_model>
+    <multiprocess>1</multiprocess>
+    <inxml>contourlabelingtrackbar411out.xml</inxml>
+    <outxml>contourselcaltrackbar451out.xml</outxml>
+    <enable>451</enable>
+  </ContourSelectModelCalibration>
+    <ContourSelectModelCalibration> <!-- clf model using trackbar data -->
+    <divide_rule>80:20:0</divide_rule>
+    <modeltype>clf</modeltype>
+    <reuse_model>0</reuse_model>
+    <multiprocess>1</multiprocess>
+    <X_train_columns>intensity, slope, ridge_intensity</X_train_columns>
+    <!-- slope, intensity, ridge_intensity, contrast, EigenRatio -->
+    <inxml>contourlabelingtrackbar411out.xml</inxml>
+    <outxml>contourselcaltrackbar452out.xml</outxml>
+    <enable>452</enable>
+  </ContourSelectModelCalibration>
+  <ContourSelectModelCalibration> <!-- rule model using trackbar data -->
+    <divide_rule>80:20:0</divide_rule>
+    <modeltype>rule</modeltype>
+    <reuse_model>0</reuse_model>
+    <multiprocess>1</multiprocess>
+    <inxml>contourlabelingtrackbar411out.xml</inxml>
+    <outxml>contourselcaltrackbar453out.xml</outxml>
+    <enable>453</enable>
+  </ContourSelectModelCalibration>
+  <ContourSelectModelCalibration> <!-- clf model using bbox data -->
+      <divide_rule>80:20:0</divide_rule>
+      <modeltype>clf</modeltype>
+      <reuse_model>0</reuse_model>
+      <multiprocess>1</multiprocess>
+      <models>clf</models>
+      <X_train_columns>intensity, slope, ridge_intensity</X_train_columns>
+      <!-- slope, intensity, ridge_intensity, contrast, EigenRatio -->
+      <inxml>contourlabelingbbox412out.xml</inxml>
+      <outxml>contourselcalbbox460out.xml</outxml>
+      <enable>460</enable>
+    </ContourSelectModelCalibration>
+    <ContourSelectModelCalibration> <!-- rule model using bbox data -->
+      <divide_rule>80:20:0</divide_rule>
+      <modeltype>rule</modeltype>
+      <reuse_model>0</reuse_model>
+      <multiprocess>1</multiprocess>
+      <inxml>contourlabelingbbox412out.xml</inxml>
+      <outxml>contourselcalbbox461out.xml</outxml>
+      <enable>461</enable>
+    </ContourSelectModelCalibration>
+<!--   <ContourSelect>
+    <inxml>contourselcal430out.xml</inxml>
+    <outxml>contourselect450out.xml</outxml>
+    <enable>490</enable>
+  </ContourSelect> -->
+  <D2DBAlignment>
+     <cD2DB>
+        <image_tag>resist</image_tag>
+        <shift_limit>-1</shift_limit>
+   </cD2DB>
+     <inxml>contourselect450out.xml</inxml>
+     <outxml>d2dbalignment500out.xml</outxml>
+     <enable>500</enable>
+  </D2DBAlignment>
+    <ContourAdjustment>
+     <sigma gui="Gaussian filter sigma" type="dbl">2.0</sigma>
+     <outward option="0|1">0</outward>
+     <edge_thres type="dbl">0.63</edge_thres>
+     <inxml>d2dbalignmentkpi550out.xml</inxml>
+     <outxml>contouradjustment600out.xml</outxml>
+     <enable>600</enable>
+  </ContourAdjustment>
+    <GaugeGeneration>
+     <params>
+        <image_size gui="image size (nm)" type="dbl">1000</image_size>
+    <!--Geometry Parameters-->
+        <inner_corner_distance>50</inner_corner_distance>
+        <outer_corner_distance>50</outer_corner_distance>
+        <line_end_max_width>60</line_end_max_width>
+        <line_end_min_length>100</line_end_min_length>
+        <line_end_distance>70</line_end_distance>
+    <!--Gauge Placement Parameters-->
+        <gauge_step_run_segment gui="run step (nm)" type="dbl">100</gauge_step_run_segment>
+        <gauge_step_corner_segment gui="corner step (nm)" type="dbl">30</gauge_step_corner_segment>
+        <gauge_step_project_segment gui="project step (nm)" type="dbl">25</gauge_step_project_segment>
+        <projection_extend_dist>60</projection_extend_dist>
+        <max_projection_width>200</max_projection_width>
+        <max_projection_space>200</max_projection_space>
+    <!--PRO Parameters-->
+        <pattern_match_range gui="pattern match range (nm)" type="dbl">1350</pattern_match_range>
+     </params>
+     <user_input_gauges>0</user_input_gauges>
+     <inxml>contouradjustment600out.xml</inxml>
+     <outxml>gaugegeneration700out.xml</outxml>
+     <enable>700</enable>
+    </GaugeGeneration>
+    <GaugeMeasurement>
+     <gauge_extension gui="gauge extension (nm)" type="dbl">0</gauge_extension>
+     <inxml>gaugegeneration700out.xml</inxml>
+     <outxml>gaugemeasurement800out.xml</outxml>
+     <enable>800</enable>
+  </GaugeMeasurement>
+ </MXP>
+</root>

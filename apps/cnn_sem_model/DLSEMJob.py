@@ -8,7 +8,6 @@ Last Modified by:  ouxiaogu
 """
 
 import time
-import xml.etree.ElementTree as ET
 import re
 from collections import OrderedDict
 import numpy as np
@@ -20,53 +19,49 @@ except ImportError:
 import pandas as pd
 from dataset import DataSet, load_image, centered_norm
 from convNN import ConvNN
-import argparse
+from simpleNN import SimpleNN
 
-import os, os.path
-import sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../tacx")
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/tacx")
 from MxpJob import MxpJob
-from MxpStage import *
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
-from XmlUtil import setConfigData
+from MxpStage import MxpStage, MXP_XML_TAGS
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/common")
 from logger import logger
-
+from XmlUtil import getConfigData, getGlobalConfigData
 log = logger.getLogger(__name__)
 
-
 ###############################################################################
-# MXP DL SEM model Job Stage Register Area
+# DLSEMJob Stage Register Area
 
 STAGE_REGISTER_TABLE = {
-    'DLSEMInit': 'DLSemInitStage',
+    'init': 'InitStage',
     'DLSEMCalibration': 'CSemCalStage',
     'DLSEMApply': 'CSemApplyStage'
 }
 ###############################################################################
+
 
 USAGE_TYPES = ['training', 'validation', 'test']
 PATTERN_DEFAULT_ATTR =\
 '''name costwt    usage   srcfile    tgtfile  imgpixel   offset_x    offset_y
 1   1 training   1_se.bmp    1_image.bmp    1   0   0'''
 
-class CnnSemJob(MxpJob):
-    """docstring for MxpJob"""
+
+class DLSEMJob(MxpJob):
+    """
+    DLSEMJob: Deep learning SEM model job
+    """
     def run(self):
-        allstages = self.getAllMxpStages()
+        allstages = self.getAllMxpStages(enabled_only=True)
         gcf = self.mxproot.find('.global')
         for stage in allstages:
             stagename, enablenum = stage
             log.info("Stage %s%d starts\n" % (stagename, enablenum))
-            df = None
-            if stagename != "init":
-                inxmlfile = self.getStageIOFile(stage, option=MXP_XML_TAGS[0])
-                stagexml = MxpStageXmlParser(inxmlfile, option=MXP_XML_TAGS[0])
-                df = stagexml.iccfs2df()
             cf = self.getStageConfig(stage)
-            stagepath = self.resultAbsPath('{}{}'.format(stagename, enablenum))
-            curstage = eval(STAGE_REGISTER_TABLE[stagename])(gcf, cf, df, stagename, self.jobpath)
+            stagestr = '{}{}'.format(stagename, enablenum)
+            curstage = eval(STAGE_REGISTER_TABLE[stagename])(gcf, cf, stagestr, self.jobpath) # MxpStage
             curstage.run()
-            outxmlfile = self.getStageIOFile(stage, option="outxml")
+            outxmlfile = self.getStageIOFile(stage, option=MXP_XML_TAGS[1])
             curstage.save(outxmlfile)
             log.info("Stage %s%d successfully finished\n" % (stagename, enablenum))
 
@@ -78,9 +73,7 @@ class InitStage(MxpStage):
         tgtfileflt = getConfigData(self.d_cf, ".filter/tgtfile", "*")
         doshuffle = getConfigData(self.d_cf, ".shuffle", 0)
         divide_rule = getConfigData(self.d_cf, ".divide_rule", "70:20:10")
-        divide_rule = list(map(int, divide_rule.split(":")))
-        if sum(divide_rule) != 100:
-            log.warn("Warning, sum of training set, validation set and test set should be 100, input is %s, use [70, 20, 10] instead." % ':'.join(divide_rule))
+        divide_rule = list(map(double, divide_rule.split(":")))
 
         if not os.path.exists(dataDir):
             raise IOError("data_dir not exists at: {}".format(dataDir))
@@ -105,10 +98,7 @@ class InitStage(MxpStage):
             df = df.sample(frac=1).reset_index(drop=True) # shuffle
 
         # assign usage
-        divides = [max(1, int(d/100.*nsamples)) for d in divide_rule]
-        divides[-1] = nsamples - sum(divides[:-1])
-        assert(all(np.array(divides)>=0))
-        divides = np.cumsum(divides)
+        divides = InitStage.divideSample(nsamples, divide_rule)
         log.debug("divides: {}".format(divides))
         usages = df.loc[:, 'usage'].values
         usages[:divides[0]] = USAGE_TYPES[0]
@@ -118,6 +108,24 @@ class InitStage(MxpStage):
 
         # restore df
         self.d_df_patterns = df
+
+    @staticmethod
+    def divideSample(nsamples, divide_rule):
+        totSlices = sum(divide_rule)
+        divides = [max(0, int(d/totSlices*nsamples)) for d in divide_rule]
+        while sum(divides) < nsamples:
+            gap = nsamples - sum(divides)
+            curGap = gap
+            for i, d in enumerate(divide_rule):
+                if sum(divides) >= nsamples:
+                    break
+                increment = min(curGap, int(gap * d/totSlices + 0.5))
+                divides[i] += increment
+                curGap -= increment
+        assert(all(np.array(divides)>=0))
+        divides = np.cumsum(divides)
+        assert(divides[-1]==nsamples)
+        return divides
 
 class CSemCalStage(MxpStage):
     def loadDataSet(self):
@@ -168,13 +176,17 @@ class CSemCalStage(MxpStage):
         X_valid, y_valid = self.valid.input_images, self.valid.target_images
         log.info('Training:\t{}\t{}'.format(str(X_train.shape), str(y_train.shape)))
         log.info('Validation:\t{}\t{}'.format(str(X_valid.shape), str(y_valid.shape)))
-        cnn = ConvNN(batchsize=batchsize, epochs=epochs, learning_rate=learning_rate, random_seed=123, imgsize=self.imgsize, data_format = dataformat)
-        kwargs = {'stagepath': self.stagepath}
+
+        clstype = getGlobalConfigData(self.d_gcf, self.d_cf, 'modeltype', 'simpleNN')
+        clstype = SimpleNN if clstype.lower() == 'simplenn' else ConvNN
+
+        cnn = clstype(batchsize=batchsize, epochs=epochs, learning_rate=learning_rate, random_seed=random_seed, imgsize=self.imgsize, data_format = dataformat)
+        kwargs = {'stagepath': self.stageresultabspath}
         cnn.train(training_set=(X_train, y_train),
                   validation_set=(X_valid, y_valid), **kwargs)
 
         # save cnn model
-        self.modelpath= os.path.join(self.stagepath, 'tflayers-model')
+        self.modelpath= os.path.join(self.stageresultabspath, 'tflayers-model')
         cnn.save(path=self.modelpath, epoch=epochs)
 
         # compute error for all train/validation data
@@ -187,9 +199,9 @@ class CSemCalStage(MxpStage):
             rmses.append(cnn.model_error(*imgs))
         self.d_df_patterns.loc[input_flt, 'rms'] = rmses
 
-    def save(self, path):
-        extraNodes = {'DLSEM_model_path', self.modelpath}
-        log.debug("DLSEM model path {} saved in outxml%s\n" % (self.modelpath))
+    def save(self, path, viaDf=True): # override the base save() method, to save via DataFrame
+        extraNodes = {}
+        extraNodes['model'] = self.modelpath
         super(ContourSelCalStage, self).save(path, viaDf=True, extraNodes=extraNodes)
 
 class CSemApplyStage(MxpStage):
@@ -225,27 +237,14 @@ class CSemApplyStage(MxpStage):
         test_X = self.test.input_images
         self.d_df_patterns.loc[self.test_flt, 'applyfile'] = self.d_df_patterns.loc[self.test_flt, 'name'].apply(lambda x: str(x)+ '_CSemApply.jpg')
         y_pred_filenames = self.d_df_patterns.loc[self.test_flt, 'applyfile'].values
-        applypath = self.stagepath
-        cnn = ConvNN(random_seed=random_seed,imgsize=self.imgsize, data_format=dataformat)
-        inxmlfile = getConfigData(self.d_cf, MXP_XML_TAGS[0])
-        inxmlfile = os.path.join(self.jobresultpath, inxmlfile)
-        parser = MxpStageXmlParser(inxmlfile, option=MXP_XML_TAGS[0])
-        modelpath = getConfigData(parser.loadicf(), '.model')
+        applypath = self.stageresultabspath
+
+        clstype = getGlobalConfigData(self.d_gcf, self.d_cf, 'modeltype', 'simpleNN')
+        clstype = SimpleNN if clstype.lower() == 'simplenn' else ConvNN
+
+        cnn = clstype(random_seed=random_seed,imgsize=self.imgsize, data_format=dataformat)
+        modelpath = getConfigData(self.d_icf, '.model')
         if not os.path.exists(modelpath):
             raise ValueError("%s, Error, does not exists model path: %s" % (self.stagename, modelpath))
         cnn.load(epoch=epoch, path=modelpath)
         cnn.model_apply(test_X, y_pred_filenames, path=applypath)
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='xml-driving CNN sem job')
-    parser.add_argument('jobpath', help='cnn sem job path')
-    args = parser.parse_args()
-    jobpath = args.jobpath
-    if jobpath is None:
-        parser.print_help()
-        parser.exit()
-        # jobpath = './samplejob'
-        # print('No jobpath is inputed, use sample job path: %s' % jobpath)
-    print(str(vars(args)))
-    myjob = CnnSemJob(jobpath)
-    myjob.run()

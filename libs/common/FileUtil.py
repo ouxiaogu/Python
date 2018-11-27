@@ -107,7 +107,7 @@ class FileScanner(object):
 
 if __name__ == '__main__':
     # '''test 1'''
-    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/CT_KPI_test/Calaveras_v3_regular_CT_KPI_003_slope_modified_revert_all_patterns/h/cache/dummydb/result/MXP/job1/ContourSelectModelCalibration430result1/caldata.txt'
+    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case01_calaveras_v2/3tmp/peyang/jobs/8GF02/04_callgrind_c2c_job1_leaf/h/work/tachyonjob/fnode445/callgrind_0.out'
     INDIR = gpfs2WinPath(INDIR)
     print(INDIR)
 
