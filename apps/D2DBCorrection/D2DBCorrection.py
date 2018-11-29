@@ -4,7 +4,7 @@ Created: peyang, 2018-11-22 10:47:20
 
 FEM+ D2DB residual error correction task
 
-Last Modified by:  ouxiaogu
+Last Modified by:  peyang
 """
 
 import glob
@@ -13,16 +13,16 @@ import numpy as np
 import pandas as pd
 
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/tacx")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../libs/tacx")
 from femplusAPI import openJob, isCheckJob, FEMJob, TacJob
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../libs/common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../libs/common")
 from FileUtil import splitFileName
 from logger import logger
 log = logger.getLogger(__name__)
 
 class D2DBCorrection(object):
-    LUAFILE = os.path.dirname(os.path.abspath(__file__))+"/../../../../lua/customized/PatternAlignCorrection.lua"
+    LUAFILE = os.path.dirname(os.path.abspath(__file__))+"/../../../lua/customized/PatternAlignCorrection.lua"
     ERR_FILE_PREFIX = 'cluster_shiftd_error_result'
     Used_Spec_Cols = ['SEM', 'CENTER_X', 'CENTER_Y']
     Used_Gauge_Cols = ['GaugeClusterId', 'cluster_shift_x', 'cluster_shift_y']
@@ -112,12 +112,15 @@ class D2DBCorrection(object):
     def updateProcesses(self):
         processtable = self.job.result.getProcessTable()
         filekey_GUICol = pd.read_csv(FEMJob.filekey_GUICol_path, sep='\t')
-        extra_cols = ['cost_wt', 'GaugeClusterId']
 
         minRms = (float("inf"), '')
         for _, row in processtable.iterrows():
             processid = row.loc['Process']
             condtable = self.job.result.conditiontable(processid)
+            ggheader = self.job.result.gaugeset(condtable).columns
+            weightName = [col for col in ggheader if 'cost_wt' == col.lower()][0]
+            extra_cols = [weightName, 'GaugeClusterId']
+            log.debug("extra cols into resultSet: {}".format(extra_cols))
             resultSet = self.job.result.gaugesetWResCondId(processid, condtable, True, extra_cols)
             
             oriErrKey = 'Model Error'
@@ -127,8 +130,8 @@ class D2DBCorrection(object):
                 sys.exit(-1)
             newErrFunc = lambda s: s[oriErrKey] if np.isnan(s[newErrKey]) or s[newErrKey] == 0 else s[newErrKey]
             resultSet.loc[:, newErrKey] = resultSet.apply(newErrFunc, axis=1)
-            oriRms = FEMJob.rms(resultSet.loc[:, oriErrKey].values, resultSet.loc[:, 'cost_wt'].values)
-            newRms = FEMJob.rms(resultSet.loc[:, newErrKey].values, resultSet.loc[:, 'cost_wt'].values)
+            oriRms = FEMJob.rms(resultSet.loc[:, oriErrKey].values, resultSet.loc[:, weightName].values)
+            newRms = FEMJob.rms(resultSet.loc[:, newErrKey].values, resultSet.loc[:, weightName].values)
             
             descr = "original RMS {:.4f} cluster shifted RMS {:.4f}".format(oriRms, newRms)
             log.info("Process {}, {}".format(processid, descr))

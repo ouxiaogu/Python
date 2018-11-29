@@ -63,6 +63,9 @@ __status__ = "Development"
 # Job Class Registration, please found `FLOW2CLASS` dict in the middle
 '''
 
+DF = 'Delta_Focus(nm)'
+DD = 'Delta_Dose(%)'
+
 def getFlow(jobpath):
     log.debug('openJob')
     basejob = FEMPlusJob.openJob(jobpath)
@@ -119,6 +122,9 @@ class Illumination(JobCompoent):
 
 
 class Condition(JobCompoent):
+    DF = DF
+    DD = DD
+
     @property
     def table(self):
         ''' pandas.DataFrame
@@ -731,8 +737,8 @@ def dropNAinDict(mydict):
 
 
 class Result(object):
-    DF = 'Delta_Focus(nm)'
-    DD = 'Delta_Dose(%)'
+    DF = DF
+    DD = DD
 
     def __init__(self, jobpath):
         self._jobpath = jobpath

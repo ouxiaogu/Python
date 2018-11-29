@@ -4,14 +4,14 @@ Created: peyang, 2018-11-22 09:41:24
 
 FEM+ D2DB correction main function
 
-Last Modified by:  ouxiaogu
+Last Modified by:  peyang
 """
 
 import argparse
 from D2DBCorrection import D2DBCorrection
 
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/../../libs/common")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/../libs/common")
 from logger import logger
 
 def main():
@@ -41,14 +41,7 @@ def main():
         reuse_lua = True if args.reuse_lua.strip() == 'yes' else False
     except:
         parser.print_help()
-        # parser.exit()
-        
-        args = parser.parse_args(['/gpfs/DEV/FEM/peyang/release/E8.0/MOD9944/job2_2D_CD+EP_align_correction_GN_clone'])
-        jobpath = args.jobpath
-        from FileUtil import gpfs2WinPath
-        jobpath = gpfs2WinPath(jobpath)
-        print('No jobpath is inputed, use sample job path: %s' % jobpath)
-        semspec, outspec, reuse_result, reuse_result = 4*[None]
+        parser.exit()
 
     logger.initlogging(
         level='debug',
