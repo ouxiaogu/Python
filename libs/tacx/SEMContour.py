@@ -16,7 +16,7 @@ from copy import deepcopy
 
 g_epslmt  = 1E-9
 
-__all__ = ['SEMContour', 'plot_contour']
+__all__ = ['SEMContour', 'plot_contour', 'ContourBBox']
 
 class SEMContour:
     def __init__(self):
@@ -119,7 +119,7 @@ class SEMContour:
             self.offset[1] = float(head[0][4])
             self.bbox = list(map(int, [head[0][5], head[0][6], head[0][7], head[0][8]]))
         else:
-            print ('ERROR: Fail to get contour version')
+            sys.stderr.write('ERROR: Fail to get contour version!\n')
             return False
 
         lines=self.readlines(1, '\s+')
@@ -130,7 +130,7 @@ class SEMContour:
             vertexNum = int(lines[0][0])
             polygonId = int(lines[0][1])
             if(vertexNum<=0):
-                print ("ERROR: PolygonId=",polygonId," has vertex number smaller than 0.")
+                sys.stderr.write("ERROR: PolygonId={} has vertex number smaller than 0.\n".format(polygonId))
                 return -1
             self.polygonData.append([])
             self.polygonData[i] = {}
@@ -200,9 +200,9 @@ class SEMContour:
         outcontour.setVersion(self.getVersion())
         outcontour.setHeadTitle(deepcopy(self.getHeadTitle()))
         outcontour.setColumnTitle(deepcopy(self.getColumnTitle()))
-        outcontour.setOffset(deepcopy(self.getOffset()))
         outcontour.setshape(deepcopy(self.getshape()))
         outcontour.setPixel(self.getPixel())
+        outcontour.setOffset(deepcopy(self.getOffset()))
         outcontour.setBBox(deepcopy(self.getBBox()))
         if not empty:
             outcontour.setPolygonData(deepcopy(self.getPolygonData()))

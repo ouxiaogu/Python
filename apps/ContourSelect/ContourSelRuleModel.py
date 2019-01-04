@@ -16,7 +16,7 @@ from ContourSelBaseModel import ContourSelBaseModel
 import sys
 import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
-from SEMContour import SEMContour
+from SEMContourEncrypted import parseContourWrapper
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from logger import logger
 log = logger.getLogger(__name__)
@@ -318,8 +318,7 @@ class ContourSelRuleModel(ContourSelBaseModel):
     def checkModel(model, contourfiles, usage='CAL'):
         cm_final = np.zeros((2,2), dtype=int)
         for contourfile in contourfiles:
-            contour = SEMContour()
-            contour.parseFile(contourfile)
+            contour = parseContourWrapper(contourfile)
             contourdf = contour.toDf()
             _, cm = ContourSelRuleModel.predict(model, contourdf)
             cm_final += cm

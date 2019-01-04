@@ -13,6 +13,7 @@ from subprocess import call
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
+from FileUtil import consolidatePathSep
 from XmlUtil import dfFromConfigMapList, getConfigData, getGlobalConfigData, dfToMxpOcf, indentCf, setConfigData
 from logger import logger
 log = logger.getLogger(__name__)
@@ -89,6 +90,20 @@ class MxpStageXmlParser(object):
             all the pattern's KPIsummary in xmlfile"""
         return dfFromConfigMapList(self.osumcf, ".pattern/KPI")
 
+    @staticmethod
+    def save(df, path, extraNodes=None):
+        ocf = dfToMxpOcf(df)
+        if extraNodes is not None:
+            for key, val in extraNodes.items():
+                setConfigData(ocf, key, val)
+        root = ET.Element('root')
+        root.append(ocf)
+        indentCf(root)
+        log.debug("Result save path: %s\n" % (path))
+        tree = ET.ElementTree(root)
+        tree.write(path, encoding="utf-8", xml_declaration=True)
+        log.info("Result saved at %s\n" % (path))
+
 class MxpStage(object):
     """docstring for MxpStage"""
     datarelpath = os.sep.join(['h', 'data', 'dummydb', 'MXP', 'job1']) # r"h/data/dummydb/MXP/job1"
@@ -125,6 +140,8 @@ class MxpStage(object):
     def __loadCfg(self):
         inxmlfile = getConfigData(self.d_cf, MXP_XML_TAGS[0])
         inxmlfile_abspath = os.path.join(self.jobresultabspath, inxmlfile)
+        if not os.path.exists(inxmlfile_abspath):
+            inxmlfile_abspath = os.path.join(self.dataabspath, inxmlfile)
         icf_Parser = MxpStageXmlParser(inxmlfile_abspath, option=MXP_XML_TAGS[0])
         self.d_df_patterns = icf_Parser.iccfs2df()
         self.d_icf = icf_Parser.icf
@@ -135,6 +152,14 @@ class MxpStage(object):
 
         if "init" not in self.stagename.lower():
             self.__loadCfg()
+
+    def validateFile(self, relpath):
+        abspath = consolidatePathSep(os.path.join(self.jobresultabspath, relpath))
+        if not os.path.exists(abspath): # resultpath
+            abspath = consolidatePathSep(os.path.join(self.dataabspath, relpath))
+            if not os.path.exists(abspath): # datapath, soft link
+                return None
+        return abspath
 
     def save(self, path, viaDf=False, extraNodes=None):
         if "init" in self.stagename.lower():

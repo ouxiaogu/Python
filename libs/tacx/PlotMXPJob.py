@@ -11,17 +11,20 @@ from MxpJob import MxpJob
 import matplotlib.pyplot as plt
 import os.path
 import pandas as pd
+from pandas.plotting import scatter_matrix
+import seaborn as sns
 import numpy as np
 import cv2
 import itertools
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../common")
+from PlotConfig import COLORS, addLegend
 from logger import logger
 log = logger.getLogger(__name__)
 
-#sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
-#from ImDescriptors import calcHistSeries, hist_rect
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
+from ImDescriptors import calcHistSeries, hist_rect
 
 fig = plt.figure()
 AX = fig.add_subplot(111)
@@ -32,8 +35,14 @@ AX = fig.add_subplot(111)
 # JOBPATHS = [r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare_yunbo/h/cache/dummydb/result/MXP/job1/DLSEMModelDataPrepare570result1/1',
 #             r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/Calaveras_v2/peyang/jobs/9CalavarasV3/DLSEMDataPrepare/h/cache/dummydb/result/MXP/job1/DLSEMModelDataPrepare570result1/1']
 
-JOBPATHS = ['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/ContourSelection/003_D2DB_AIO_from_400_contourSel_452_453']
-ENABLES = [500, 503]
+JOBPATHS = ['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/D2DBE8test/DL_SEM_model_test/baseline_iD2DB_CSEM',
+           '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/D2DBE8test/DL_SEM_model_test/baseline_iD2DB_1']
+
+#JOBPATHS = ['/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/D2DBE8test/SEM_model_study_E19.02/test_cal_E19.02_2',
+#            '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/D2DBE8test/DL_SEM_model_test/baseline_iD2DB_simple']
+
+
+ENABLES = [500]
 
 from FileUtil import gpfs2WinPath
 JOBPATHS = list(map(gpfs2WinPath, JOBPATHS))
@@ -196,25 +205,60 @@ def plot_scatter_xys():
         dataset = stagedata.dataset[0].loc[:, columns].astype(np.float32)
         #print(dataset.columns, dataset.shape, dataset.head(2), sep='\n')
         #raise ValueError('-')
-        dataset.plot.scatter(x='offset_x', y='offset_y', c=COLORS[i], label='D2DB '+str(enable), ax=ax, )
+        dataset.plot.scatter(x='offset_x', y='offset_y', c=COLORS[i], label='D2DB '+str(enable), ax=ax)
     plt.show()
 
 
 def compareHist():
     #df.loc[:, 'slope'] = df.loc[:, 'slope'].abs()
-    stagedata = MXPStageData(JOBPATHS, enables=ENABLES, result_option='osumccfs')
-    dataset = stagedata.dataset
-    allColNames = ['similarity', 'center_shift', 'final_cost']
+    osumdata = MXPStageData(JOBPATHS, enables=ENABLES, result_option='osumccfs').dataset
+    ocfdata = MXPStageData(JOBPATHS, enables=ENABLES, result_option='occfs').dataset
+    for idx in range(len(osumdata)):
+        for patternid in ocfdata[0].loc[ocfdata[0].costwt>0, 'name'].values:
+            osumdata[idx].loc[osumdata[idx].name==patternid, 'offset_x'] = ocfdata[idx].loc[ocfdata[idx].name==patternid, 'offset_x']
+            osumdata[idx].loc[osumdata[idx].name==patternid, 'offset_y'] = ocfdata[idx].loc[ocfdata[idx].name==patternid, 'offset_y']
+        osumdata[idx].loc[:, 'delta_offsetx'] = abs(osumdata[idx].loc[:, 'offset_x'] - osumdata[idx].loc[:, 'id2db_offset_x'])
+        osumdata[idx].loc[:, 'delta_offsety'] = abs(osumdata[idx].loc[:, 'offset_y'] - osumdata[idx].loc[:, 'id2db_offset_y'])
+        #if len(osumdata[idx].loc[osumdata[idx].delta_offsety > 100, :]) > 0:
+        #    print(osumdata[idx].loc[osumdata[idx].delta_offsety > 100, ['name', 'id2db_offset_x', 'id2db_offset_y', 'offset_x',
+       #'offset_y', 'delta_offsetx', 'delta_offsety']])
+        #osumdata[idx] = osumdata[idx].loc[osumdata[idx].delta_offsety < 100, :]
+    dataset = osumdata
+
+    #dataset = [data.loc[data.name >= 324, :] for data in dataset]
+    #324
+    #allColNames = ['similarity', 'center_shift', 'final_cost']
+    allColNames = ['id2db_ncc', 'id2db_c2c_rms']
+    #allColNames = ['delta_offsetx', 'delta_offsety']
     print(dataset[0].columns)
+    print(len(dataset))
+    labels = ['CSEM iD2DB', 'DLSEM iD2DB']
+    colors = ['b', 'g']
+    
+    
     for num, alpha in enumerate(allColNames):
-        plt.subplot(1, 3, num+1)
+        plt.subplot(1, 2, num+1)
 
         Type0, Type1 = dataset[0][alpha], dataset[1][alpha]
-        print(Type0.describe(), Type1.describe(), sep='\n')
-        plt.hist((Type0, Type1), bins=25, alpha=0.5, color=['b', 'g'], label=['Normal D2DB 500', 'Rule Model D2DB 503'])
+        print(labels[0], Type0.describe(), labels[1], Type1.describe(), sep='\n')
+        #label=['Normal D2DB 500', 'Rule Model D2DB 503']
+        plt.hist((Type0, Type1), bins=25, alpha=0.5, color=colors, label=labels)
+        #plt.hist(Type0, bins=25, alpha=0.5, color=colors[0], label=labels[0])
+        #plt.hist(Type1, bins=25, alpha=0.5, color=colors[1], label=labels[1])
         plt.legend(loc='upper right')
         plt.title(alpha)
-        plt.yscale('log')
+        #plt.yscale('log')
+    
+    
+    #fig2 = plt.figure()
+    #ax = fig2.add_subplot(111)
+    for idx in range(len(dataset)):
+        #dataset[idx] = dataset[idx][allColNames]
+        g = sns.jointplot(x="delta_offsetx", y="delta_offsety", data=dataset[idx], color=colors[idx])
+        g.fig.suptitle(labels[idx])
+        g.ax_joint.legend_.remove()
+        #dataset[idx].plot.scatter(x='delta_offsetx', y='delta_offsety', c=colors[idx], label=labels[idx], ax=ax)
+        
     #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     plt.show()
 

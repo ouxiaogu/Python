@@ -21,7 +21,7 @@ from ContourSelRuleModel import ContourSelRuleModel, addNeighborFeatures
 import sys
 import os, os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
-from SEMContour import SEMContour
+from SEMContourEncrypted import parseContourWrapper
 from MxpStage import MxpStage
 
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
@@ -49,6 +49,8 @@ class ContourSelCalStage(MxpStage):
     srcColNames = 'slope, intensity, ridge_intensity, contrast'
     tgtColName = 'UserLabel'
     outColName = 'ClfLabel'
+    DEFAULT_ADI_COLS = 'ridge_intensity, slope, intensity, NeighborOrientation, NeighborParalism'
+    DEFAULT_AEI_COLS = 'intensity, ridge_intensity, slope, contrast, NeighborParalism'
     neighborColNames = ['NeighborOrientation', 'NeighborParalism'] # used neighbor filters
     allNeighborColNames = ['NeighborContinuity', 'NeighborOrientation', 'NeighborParalism'] 
     debugOn = True
@@ -62,13 +64,15 @@ class ContourSelCalStage(MxpStage):
         self.applyModel = getConfigData(self.d_cf, '.apply_model', 0) > 0
 
     def __getXTrainCols(self):
-        self.srcColNames = getConfigData(self.d_cf, ".X_train_columns", self.srcColNames)
+        jobtype = getConfigData(self.d_cf, ".jobtype", 'adi')
+        self.AEI = False if jobtype.lower() == 'adi' else True
+
+        default_cols = self.DEFAULT_AEI_COLS if self.AEI else self.DEFAULT_ADI_COLS
+        self.srcColNames = getConfigData(self.d_cf, ".X_train_columns", default_cols)
         log.debug("X_train columns: {}".format(self.srcColNames))
         self.srcColNames = [c.strip() for c in self.srcColNames.split(",")]
-        if getConfigData(self.d_cf, "use_neighbor_features", 1) > 0:
+        if any([col in self.srcColNames for col in self.allNeighborColNames]):
             self.useNeighborFeatures = True
-        if self.useNeighborFeatures:
-            self.srcColNames += self.neighborColNames
         self.modelColNames = self.srcColNames + [self.tgtColName]
 
     @staticmethod
@@ -96,20 +100,6 @@ class ContourSelCalStage(MxpStage):
         divides = np.cumsum(divides)
         assert(divides[-1]==nsamples)
         return divides
-
-    def validateContourFile(self, relpath):
-        contourfile = os.path.join(self.jobresultabspath, relpath)
-        if not os.path.exists(contourfile):
-            contourfile = os.path.join(self.jobresultabspath, os.path.join(*relpath.split('\\')))
-        if not os.path.exists(contourfile):
-            return None
-        contour = SEMContour()
-        if contour.parseFile(contourfile):
-            if contour.polygonNum == 0: # in case pattern contour file exists, but it's empty
-                return None
-        else:
-            return None
-        return contourfile
 
     def splitDataSet(self):
         # filter 1: costwt 
@@ -155,15 +145,17 @@ class ContourSelCalStage(MxpStage):
         for _, row in self.d_df_patterns.iterrows(): # loop patterns 
             if row.usage in (USAGE_TYPES[:-1]) :
                 
-                contourfile = self.validateContourFile(row.loc['contour/path'])
-                if contourfile is None:
+                contourfile = self.validateFile(row.loc['contour/path'])
+                log.debug('loadDataSet, read unified contour file: {}'.format(contourfile))
+                contour = parseContourWrapper(contourfile)
+                if contour is None:
                     continue
-                contour = SEMContour()
-                contour.parseFile(contourfile)
                 curdf = contour.toDf()
                 if self.useNeighborFeatures and modeltype != 'rule':
                     curdf = addNeighborFeatures(curdf)
+
                 curdf = curdf.loc[pd.notnull(curdf.loc[:, self.tgtColName]), :] # only use SEM points in ROI
+                curdf.loc[:, 'patternid'] = row.loc['name']
                 
                 # curdf = curdf.loc[:, self.modelColNames]
                 if row.loc['usage'] == USAGE_TYPES[0]: # cal pattern SEM points
@@ -267,7 +259,7 @@ class ContourSelCalStage(MxpStage):
         for patternidx, row in self.d_df_patterns.iterrows():
             if row.loc['costwt'] <= 0:
                 continue
-            contourfile = self.validateContourFile(row.loc['contour/path'])
+            contourfile = self.validateFile(row.loc['contour/path'])
             if contourfile is None:
                 continue
             self.applySingleContour(modeltype, model, Xminmax, contourfile, patternidx)
@@ -276,14 +268,13 @@ class ContourSelCalStage(MxpStage):
         self.applySingleContour(*argv)
 
     def applySingleContour(self, modeltype, model, Xminmax, contourfile, patternidx):
-        if contourfile is None:
-            return
         patternid = os.path.basename(contourfile).strip('_image_contour.txt')
-        
+            
         # apply model into contour
         log.debug("Start processing pattern {} ...".format(patternid))
-        contour = SEMContour()
-        contour.parseFile(contourfile)
+        contour = parseContourWrapper(contourfile)
+        if contour is None:
+            return
         curdf = contour.toDf()
         if modeltype != 'rule':
             if self.useNeighborFeatures:
@@ -316,7 +307,7 @@ class ContourSelCalStage(MxpStage):
         for patternidx, row in self.d_df_patterns.iterrows():
             if row.loc['costwt'] <= 0:
                 continue
-            contourfile = self.validateContourFile(row.loc['contour/path'])
+            contourfile = self.validateFile(row.loc['contour/path'])
             if contourfile is None:
                 continue
             argvs.append((modeltype, model, Xminmax, contourfile, patternidx))

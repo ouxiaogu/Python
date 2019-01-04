@@ -14,7 +14,6 @@ import cvui
 import sys
 import os.path
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
-from SEMContour import SEMContour, ContourBBox
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/common/")
 from logger import logger
 log = logger.getLogger(__name__)
@@ -91,6 +90,7 @@ class ContourTrackbarFilter(object):
         frame = np.zeros_like(self.im)
         imh, imw, _ = self.im.shape
         xini_wnd, yini_wnd = imw*0.04, imh*0.05
+        colh, colw = imh*0.1, imw * 0.2
 
         while (True):
             frame = self.loadFrameData()
@@ -98,11 +98,11 @@ class ContourTrackbarFilter(object):
             # Render the settings window to house the checkbox
             # and the trackbars below.
             # cvui.window(frame, xini_wnd, yini_wnd, 100, 200, '{} filter threshold'.format(self.colname)) # 'Settings'
-            cvui.beginColumn(frame, xini_wnd+1, yini_wnd+10, 200, 100, 6)
+            cvui.beginColumn(frame, xini_wnd+1, yini_wnd+10, colw, colh, 6)
             
             # A trackbar to control the filter threshold values
             cvui.text(frame, xini_wnd+1, yini_wnd+10, '{} filter threshold'.format(self.colname))
-            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 250, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
+            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 1.25*colw, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
             cvui.space(10)
             cvui.text(frame, xini_wnd+1, yini_wnd+100, "{}/{} points is labeled as outlier".format(
                 self.numOutlier, self.numTotal))

@@ -19,7 +19,8 @@ try:
 except:
     WI_CVUI = False
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/tacx/")
-from SEMContour import SEMContour, ContourBBox
+from SEMContour import ContourBBox
+from SEMContourEncrypted import parseContourWrapper
 from MxpStage import MxpStage
 sys.path.insert(0, (os.path.dirname(os.path.abspath(__file__)))+"/../../libs/imutil/")
 from ImGUI import imread_gray
@@ -216,10 +217,13 @@ class ContourSelLabelStage(MxpStage):
             selectedpatternids = getConfigData(self.d_cf, '.select_sample/filter', '')
             selectedpatternids = [c.strip() for c in selectedpatternids.split(",")]
         elif pattern_selection_mode == 'regex':
-            flt = getConfigData(self.d_cf, '.select_sample/filter', '*')
+            flt = getConfigData(self.d_cf, '.select_sample/filter', '.')
+            if flt == '*':
+                flt = '.'
             selectedpatternids = flt
         else:
             selectedpatternids = self.selectLabelingPatternsRandomly()
+        log.debug("sample selection, mode: {}, filter: {}".format(pattern_selection_mode, selectedpatternids))
         return selectedpatternids
 
     def labelSingleContour(self, rawContour, occf, displayIm, displayContour, patternid=''):
@@ -252,7 +256,13 @@ class ContourSelLabelStage(MxpStage):
         origin = (cbbox[0], cbbox[1])
 
         # extract bbox and save bbox into occf
-        bboxcf = addChildNode(occf, 'bbox')
+        key = 'bbox'
+        try: # clear previously added label node
+            labelcf = occf.find(key)
+            occf.remove(labelcf)
+        except:
+            pass
+        bboxcf = addChildNode(occf, key)
         goodContourAreas = []
         outlierAreas = []
         idxGoodRect, idxOutlierRect = 0, 0
@@ -312,7 +322,13 @@ class ContourSelLabelStage(MxpStage):
     
     @staticmethod
     def saveThreshold(occf, thresholds):
-        threscf = addChildNode(occf, 'threshold')
+        key = 'threshold'
+        try: # clear previously added label node
+            labelcf = occf.find(key)
+            occf.remove(labelcf)
+        except:
+            pass
+        threscf = addChildNode(occf, key)
         for kk, vv in thresholds.items():
             setConfigData(threscf, kk, val=str(vv))
         log.debug("thresholds: {}".format(thresholds))
@@ -330,22 +346,27 @@ class ContourSelLabelStage(MxpStage):
         selectedpatternids = self.selectLabelingPatterns()
         log.info("pattern samples to be labeled: {}".format(selectedpatternids))
         pattern_selection_mode = getConfigData(self.d_cf, '.select_sample/mode', 'random')
-
+        totValid = 0
         for idx, occf in enumerate(self.d_ocf.findall('.pattern')):
             if getConfigData(occf, 'costwt') <= 0:
                 continue
             patternid = getConfigData(occf, '.name', '')
 
             if pattern_selection_mode == 'regex':
-                if not re.match(selectedpatternids, patternid):
+                if not re.match(selectedpatternids, patternid): # regex
                     continue
-            elif patternid not in selectedpatternids:
+            elif patternid not in selectedpatternids: # random or explicit
                 continue
 
             # load image and contour
-            imgfile = os.path.join(self.jobresultabspath, getConfigData(occf, '.image/path'))
-            contourfile = os.path.join(self.jobresultabspath, getConfigData(occf, '.contour/path'))
+            imgfile =  getConfigData(occf, '.image/path')
+            imgfile = self.validateFile(imgfile)
+            contourfile = getConfigData(occf, '.contour/path')
+            contourfile = self.validateFile(contourfile)
+            log.debug("pattern {}:\nimage file: {},\ncontour file: {}".format(patternid, imgfile, contourfile))
             im, rawContour = self.loadPatternData(imgfile, contourfile)
+            if rawContour is None:
+                continue
             overlayim, movedcontour = ContourSelLabelStage.updateContourROI(rawContour, im, mode='crop', overlay=True)
             
             # interactively labeling, and apply
@@ -356,14 +377,15 @@ class ContourSelLabelStage(MxpStage):
             newcontourfile = os.path.join(self.jobresultabspath, newcontourfile_relpath)
             labeledconour.saveContour(newcontourfile)
             setConfigData(occf, '.contour/path', newcontourfile_relpath)
+            totValid += 1
+        if totValid == 0:
+            log.error("None pattern is validly labeled, please check log to debug.")
+            sys.exit(-1)
 
     def loadPatternData(self, imgfile='', contourfile=''):
-        bSucceedReadCt = False
         # read contour
-        contour = SEMContour()
-        bSucceedReadCt = contour.parseFile(contourfile)
-        if not bSucceedReadCt:
-            raise OSError("Error, contourfile('{}') cannot be parsed".format(contourfile))
+        contour = parseContourWrapper(contourfile)
+
         # contourPointsVec = [] # depth of 3
         # for polygon in contour.getPolygonData():
         #     contourpoints = []

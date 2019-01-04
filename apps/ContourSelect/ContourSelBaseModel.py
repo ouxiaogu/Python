@@ -85,3 +85,21 @@ class ContourSelBaseModel(object):
             cm[1, 0] = len(contourdf.loc[FP, :])
             cm[1, 1] = len(contourdf.loc[TN, :])
         return cm
+
+    @staticmethod
+    def computeConfusionMatrixBinary(y_true, y_pred):
+        ''' compute the confusion matrix in below format
+            [TP      FN]
+            [FP      TN]
+        '''
+        cm = np.zeros((2,2), dtype=int)
+        for i, y0 in enemurate(y_true):
+            if y0 == y_pred[0] == 0 :
+                cm[0, 0] += 1   # TP
+            elif y0 == 0 and y_pred[0] == 1 :
+                cm[0, 1] += 1   # FN
+            elif y0 == 1 and y_pred[0] == 0 :
+                cm[1, 0] += 1   # FP
+            elif y0 == 1 and y_pred[0] == 1 :
+                cm[1, 1] += 1   # TN
+        return cm

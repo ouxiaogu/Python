@@ -4,7 +4,7 @@ Created: peyang, 2018-11-22 10:47:20
 
 FEM+ D2DB residual error correction task
 
-Last Modified by:  peyang
+Last Modified by:  ouxiaogu
 """
 
 import glob
@@ -22,7 +22,7 @@ from logger import logger
 log = logger.getLogger(__name__)
 
 class D2DBCorrection(object):
-    LUAFILE = os.path.dirname(os.path.abspath(__file__))+"/../../../lua/customized/PatternAlignCorrection.lua"
+    LUAFILE = os.path.dirname(os.path.abspath(__file__))+"/../../../lua/femplus/customized/PatternAlignCorrection.lua"
     ERR_FILE_PREFIX = 'cluster_shiftd_error_result'
     Used_Spec_Cols = ['SEM', 'CENTER_X', 'CENTER_Y']
     Used_Gauge_Cols = ['GaugeClusterId', 'cluster_shift_x', 'cluster_shift_y']

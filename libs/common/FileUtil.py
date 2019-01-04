@@ -13,8 +13,8 @@ import re
 from PlatformUtil import inLinux, inWindows
 import sys
 
-__all__ = [ 'gpfs2WinPath',
-            'splitFileName', 'getFileLabels', 'outfilePath'
+__all__ = [ 'gpfs2WinPath', 'consolidatePathSep',
+            'splitFileName', 'getFileLabels', 'genOutFilePath'
             'FileScanner']
 
 def gpfs2WinPath(src):
@@ -46,13 +46,21 @@ def splitFileName(src):
 def getFileLabels(files):
     return [list(splitFileName(aa))[1] for aa in files]
 
-def outfilePath(src, postfix="_v", extn=None):
+def genOutFilePath(src, postfix="_new", extn=None):
     dirname, filelabel, extension = splitFileName(src)
     extension = extension if extn is None else extn
     dst = os.path.join(dirname, filelabel+postfix+'.'+extension)
     return dst
 
-class FileScanner(object):
+def consolidatePathSep(src):
+    dst = src
+    if inWindows():
+        dst = os.path.join(*src.split('/'))
+    else:
+        dst = os.path.join(*src.split('\\'))
+    return dst
+
+class FileScanner(object): # can be replaced by glob
     '''scan the file and derive all the subfiles and directions'''
     def __init__(self, directory):
         if not os.path.exists(directory):
@@ -107,7 +115,7 @@ class FileScanner(object):
 
 if __name__ == '__main__':
     # '''test 1'''
-    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case01_calaveras_v2/3tmp/peyang/jobs/8GF02/04_callgrind_c2c_job1_leaf/h/work/tachyonjob/fnode445/callgrind_0.out'
+    INDIR = '/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/ContourSelection/007_ContourSel_Tree_debug'
     INDIR = gpfs2WinPath(INDIR)
     print(INDIR)
 
