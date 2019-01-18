@@ -1,0 +1,34 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[latin1]{inputenc}
+
+\title{Decision Tree Equations}
+% \author{Veloci Raptor}
+% \date{03/14/15}
+
+\begin{document}
+\maketitle
+
+1. (Empirical) Entropy
+
+\begin{align*}
+  H(X) &= H(p) = -\sum_{i=1}^{n} p_i \log p_i \\
+  H(D) &= -\sum_{k=1}^K \frac{|C_k|}{|D|} \log_2\frac{|C_k|}{|D|}
+\end{align*}
+
+2. (Empirical) Conditional Entropy
+
+
+\begin{align*}
+  H(Y|X)&=\sum_{i=1}^n p_i H(Y|X=x_i)  & p_i=P(X=x_i),i=1,2,\dots ,n \\
+  H(D|A)&=\sum_{i=1}^n \frac{|D_i|}{|D|} H(D_i)  & i=1,2,\dots ,n \\
+        &=-\sum_{i=1}^n \frac{|D_i|}{|D|} \sum_{k=1}^K \frac{|D_{ik}|}{|D_i|} \log_2\frac{|D_{ik}|}{|D_i|}
+\end{align*}
+
+3. Info Gain
+
+$$ g(D,A) = H(D) - H(D|A) $$
+
+\end{document}

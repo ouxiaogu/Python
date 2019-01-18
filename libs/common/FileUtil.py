@@ -37,10 +37,14 @@ def gpfs2WinPath(src):
 
 def splitFileName(src):
     dirname, basename = os.path.split(src)
-    if (sys.version_info > (3, )):
-        filelabel, extension = basename.rsplit(sep='.', maxsplit=1)
-    else:
-        filelabel, extension = string.rsplit(basename, sep='.', maxsplit=1)
+    try:
+        if (sys.version_info > (3, )):
+            filelabel, extension = basename.rsplit(sep='.', maxsplit=1)
+        else:
+            filelabel, extension = string.rsplit(basename, sep='.', maxsplit=1)
+    except ValueError:
+        filelabel = basename
+        extension = ''
     return dirname, filelabel, extension
 
 def getFileLabels(files):
@@ -136,3 +140,8 @@ if __name__ == '__main__':
 
     # print(re.match('.tif', 'Tech_Demo_rectangular_BWALL_set_8img_08302015_merged.csv'))
     # print(re.search('.tif', r'a.tif'))
+    
+    path = 'test'
+    print(os.path.dirname(path)=='')
+    print(os.path.basename(path))
+    print(splitFileName(path))

@@ -52,9 +52,9 @@ def parseContourWrapper(contourfile):
             contour = contour.fromDf(df)
     return contour
 
-class SEMContourEncrypted(SEMContour):
+class SEMContourEncrypted():
     def __init__(self):
-        super(SEMContourEncrypted, self).__init__()
+        pass 
         
     def parseFile(self, contourfile):
         self.contourEncyptedfile = contourfile
@@ -69,7 +69,8 @@ class SEMContourEncrypted(SEMContour):
     def decrypt(self):
         dst = SEMContour()
         dst.setVersion(self.contourEncypted.getVersion())
-        dst.setHeadTitle(self.contourEncypted.getHeader())
+        header = self.contourEncypted.getHeader().split('\t')
+        dst.setHeadTitle(header)
         dst.setColumnTitle(self.contourEncypted.getInputKeys())
         dst.setshape([self.contourEncypted.getWidth(), self.contourEncypted.getHeight()])
         dst.setPixel(self.contourEncypted.getPixel())
@@ -98,7 +99,13 @@ class SEMContourEncrypted(SEMContour):
         dst.setPolygonData(polygonData)
         return dst
 
+    def saveContour(self, contourfile):
+        self.contour.saveContour(contourfile)
+
 if __name__ == '__main__':
-    contourfile = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/ContourSelection/020_AEI_contour_selection_training/h/data/dummydb/MXP/job1/ContourExtraction400result1/1_image_contour.txt'
-    contourfile = gpfs2WinPath(contourfile)
-    contour = parseContourWrapper(contourfile)
+    contourfile = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/ContourSelection/011_Contour_hook_dbg//h/cache/dummydb/result/MXP/job1/ContourSelection450result1/461_image_contour.txt'
+    #contourfile = gpfs2WinPath(contourfile)
+    #contour = parseContourWrapper(contourfile)
+    ctEncrypt = SEMContourEncrypted()
+    ctEncrypt.parseFile(contourfile)
+    ctEncrypt.saveContour(contourfile)

@@ -18,7 +18,7 @@ g_epslmt  = 1E-9
 
 __all__ = ['SEMContour', 'plot_contour', 'ContourBBox']
 
-class SEMContour:
+class SEMContour(object):
     def __init__(self):
         self.fileHandle = None
         self.version = 0

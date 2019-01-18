@@ -23,7 +23,7 @@ log = logger.getLogger(__name__)
 
 class D2DBCorrection(object):
     LUAFILE = os.path.dirname(os.path.abspath(__file__))+"/../../../lua/femplus/customized/PatternAlignCorrection.lua"
-    ERR_FILE_PREFIX = 'cluster_shiftd_error_result'
+    ERR_FILE_PREFIX = 'clusterShiftedError_result'
     Used_Spec_Cols = ['SEM', 'CENTER_X', 'CENTER_Y']
     Used_Gauge_Cols = ['GaugeClusterId', 'cluster_shift_x', 'cluster_shift_y']
 
@@ -59,13 +59,11 @@ class D2DBCorrection(object):
         outnames = None
         if not os.path.exists(os.path.dirname(self.outspec)):
             log.warning("Output SEM Spec folder doesn't exist at: {}, use job path instead!".format(os.path.dirname(self.outspec)))
+            outnames = [self.jobpath, 'newspec', 'txt']
         else:
-            if os.path.isfile(self.outspec):
-                outnames = splitFileName(self.outspec)
-            elif os.path.isdir(self.outspec):
-                outnames = [self.outspec, 'newspec', 'txt']
-        outnames = [self.jobpath, 'newspec', 'txt'] if outnames is None else outnames
+            outnames = splitFileName(self.outspec)
         self.outnames = outnames
+        log.debug("outnames: {}".format(str(outnames)))
 
     def __validate(self):
         if not isCheckJob(self.jobpath):
@@ -111,6 +109,7 @@ class D2DBCorrection(object):
 
     def updateProcesses(self):
         processtable = self.job.result.getProcessTable()
+        nprocesses = len(processtable)
         filekey_GUICol = pd.read_csv(FEMJob.filekey_GUICol_path, sep='\t')
 
         minRms = (float("inf"), '')
@@ -161,10 +160,10 @@ class D2DBCorrection(object):
             log.info(msg)
 
             if self.wiSpec:
-                self.updateSpec(processid, resultSet)
+                self.updateSpec(processid, resultSet, nprocesses)
         self.job.setJobInfoConfigData('descr', minRms[1])
 
-    def updateSpec(self, processid, resultSet):
+    def updateSpec(self, processid, resultSet, nprocesses):
         corrections = resultSet[D2DBCorrection.Used_Gauge_Cols]
         flt = np.logical_not(
                 np.logical_or(
@@ -183,7 +182,10 @@ class D2DBCorrection(object):
                 outspectable.loc[outspectable['SEM']==name, 'CENTER_Y'] += cluster.loc['cluster_shift_y']
             except:
                 log.warning("GaugeClusterId {} cannot be found in input SEM spec file: {}!".format(name, self.semspec))
-        outspecfile = os.path.join(self.outnames[0], '{}_{}.{}'.format(self.outnames[1], processid, self.outnames[2]))
+        if nprocesses == 1:
+            outspecfile = os.path.join(self.outnames[0], '{}.{}'.format(self.outnames[1], self.outnames[2]))
+        else:
+            outspecfile = os.path.join(self.outnames[0], '{}_{}.{}'.format(self.outnames[1], processid, self.outnames[2]))
         outspectable.to_csv(outspecfile, index=False, sep='\t')
         log.info("Successfully update SEM spec file for process {} into {}".format(processid, outspecfile))
 
