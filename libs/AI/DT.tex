@@ -31,4 +31,20 @@
 
 $$ g(D,A) = H(D) - H(D|A) $$
 
+4. Normalized Info Gain
+
+$$
+  g_R(D,A) = \frac {g(D, A)} {H(D)} = \frac {H(D) - H(D|A)} {H(D)}
+$$
+
+5. DT overall cost function
+
+
+\begin{align*}
+  C_\alpha(T) &= C(T) + \alpha|T| \\
+    &=\sum_{i=1}^{|T|}N_tH_t(T)+\alpha|T| \\
+    &=-\sum_{t=1}^{|T|}\sum_{k=1}^K N_{tk} \log\frac{N_{tk}}{N_t} + \alpha|T|
+\end{align*}
+
+
 \end{document}
