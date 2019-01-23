@@ -29,13 +29,22 @@
 
 3. Info Gain
 
+- For discrete attributes
+
 $$ g(D,A) = H(D) - H(D|A) $$
+
+- For continuous attributes
+
+$$ g(D,A) = H(D) - H(D|A) - \frac {log_2{(n-1)}} {|D|} $$
 
 4. Normalized Info Gain
 
-$$
-  g_R(D,A) = \frac {g(D, A)} {H(D)} = \frac {H(D) - H(D|A)} {H(D)}
-$$
+\begin{align*}
+  g_R(D,A) = \frac {g(D, A)} {H_A(D)} &= \frac {H(D) - H(D|A)} {H_A(D)} \\
+  &= \frac {H(D) - H(D|A)} { -\sum_{i=1}^n \frac{|D_i|}{|D|} \log_2\frac{|D_i|}{|D|} } 
+\end{align*}
+
+where $H_A(D)$ is the entropy of attribute $A$ over dataset $D$.
 
 5. DT overall cost function
 
@@ -47,4 +56,43 @@ $$
 \end{align*}
 
 
+6. Gini ratio
+
+\begin{align*}
+  Gini(p) &= \sum_{k=1}^K p_k(1-p_k) = 1 - \sum_{k=1}^K p_k^2 \\
+  Gini(D) &= \sum_{k=1}^K  \frac{|C_k|}{|D|} (1 - \frac{|C_k|}{|D|}) = 1 - \sum_{k=1}^K \frac{|C_k|}{|D|}^2 \\
+  Gini(D, A) &= \sum_{i=1}^n \frac{|D_i|}{|D|} Gini(D_i)  & i=1,2,\dots ,n
+\end{align*}
+
+
+
+\newpage
+
+7. least sqaure regression tree
+
+
+
+(1) cost function for specific (j,s), j means split attribute $A_j$, s means $A_j$ split at value $s$
+
+   $$
+   \min\limits_{j,s}\left[\min\limits_{c_1}\sum\limits_{x_i\in R_1(j,s)}(y_i-c_1)^2+\min\limits_{c_2}\sum\limits_{x_i\in R_2(j,s)}(y_i-c_2)^2\right]
+   $$
+   
+(2) cost function at each partition, after spliting A with specific (j,s)
+
+\begin{align*}
+   R_1(j,s)=\{x|x^{(j)}\leq s\}, R_2(j,s)=\{x|x^{(j)}> s\} \\
+   \hat{c}_m= \frac{1}{N}\sum\limits_{x_i\in R_m(j,s)} y_j, x\in R_m, m=1,2
+\end{align*}
+
+(3) Loop (1) ~ (2), until met stop criteria
+(4) Split space into $M$ region $R_1, R_2, \dots, R_M$
+
+
+   $$
+   f(x)=\sum_{m=1}^M \hat{c}_mI(x\in R_m)
+   $$
+   
 \end{document}
+
+

@@ -12,7 +12,7 @@ Last Modified by:  ouxiaogu
 from Classifier import Classifier
 
 class DTree(Classifier):
-    """docstring for DTree"""
+    """docstring for Tree"""
     def __init__(self, arg):
         super(DTree, self).__init__()
         self.arg = arg
