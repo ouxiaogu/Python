@@ -11,11 +11,13 @@ Last Modified by:  ouxiaogu
 
 from Classifier import Classifier
 
-class DTree(Classifier):
+class Tree(Classifier):
     """docstring for Tree"""
-    def __init__(self, arg):
+    def __init__(self, arg, criterion='Gini'):
         super(DTree, self).__init__()
-        self.arg = arg
+        self.criterion = criterion
+        self.criterion = criterion
 
-    def 
+    def fit(X, y):
+        
         
