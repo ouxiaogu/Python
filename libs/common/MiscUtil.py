@@ -15,8 +15,7 @@ from logger import logger
 log = logger.getLogger(__name__)
 
 __all__ = ['Range', 'State', 'Command', 'Message', 'parseKW', 'buildKW',
-           'snapFilterSeries', 'snapFilterDF']
-
+           'snapFilterSeries', 'snapFilterDF', 'unique', 'value_counts']
 
 QUOTASTR = '#QUOTA#'
 
@@ -245,3 +244,15 @@ def calPValue(baserms, reducerms, gaugenumber, basetermN):
     F12 = (reducerms**2 - baserms**2) * (gaugenumber - basetermN) / baserms**2
     p = stats.f.sf(F12, 1, gaugenumber - basetermN)
     return p
+
+def unique(seq):
+    # Fast way to get the unique values from an list
+    # use the set.add return none after a succeeded addition
+    seen = set()
+    return [x for x in seq if not (x in seen or seen.add(x))]
+
+def value_counts(seq):
+    # Fast way to get value counts for an list
+    # use the set.add return none after a succeeded addition
+    seen = set()
+    return {x: len(list(filter(lambda tmp: tmp==x, seq))) for x in seq if not (x in seen or seen.add(x))}

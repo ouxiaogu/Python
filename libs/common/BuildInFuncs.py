@@ -6,7 +6,7 @@ Example code for python Build-in functions
 
 Last Modified by:  ouxiaogu
 """
-
+import pandas as pd
 import logging
 logger = logging.getLogger(__name__)
 
@@ -176,6 +176,17 @@ class Bar(Foo):
     def bar(self):
         self.__log.info('bar called')
 
+def test_set():
+    '''
+    A set is an unordered collection with no duplicate elements. 
+    Basic uses include 
+        - membership testing
+        - eliminating duplicate entries. 
+    '''
+    a = 2*[1] + 3*[2]
+    print(pd.Series(a).value_counts().to_dict())
+    print(dict(set((v, len(list(filter(lambda t: t==v, a)))) for v in a)) )
+
 if __name__ == '__main__':
     """
     import argparse
@@ -220,3 +231,5 @@ if __name__ == '__main__':
 
     # >>> INFO:__main__.Foo:foo called
     # >>> INFO:__main__.Bar:bar called
+
+    test_set()
