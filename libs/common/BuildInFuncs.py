@@ -41,6 +41,12 @@ class C:
     def x(self):
         del self._x
 
+def test_C():
+    c = C()
+    print(c.x )
+    c.x = 10
+    print(c.x )
+
 class C2(object): # equivalent to class C
     def __init__(self):
         self._x = None
@@ -75,7 +81,7 @@ class Celsius:
         print("Setting value")
         self._temperature = value
 
-    temperature = property(get_temperature,set_temperature)
+    temperature = property(get_temperature, set_temperature)
     # or use @property, and ${var}.setter
 
 def test_Celsius():
@@ -218,18 +224,26 @@ if __name__ == '__main__':
     print(date2.tostr() )
     date3 = DateTime.from_string2("05-07-2018")
     print(date3.tostr() )
+    """
 
     '''test 4, property'''
     print("\ntest 4, property:\n")
+    test_C()
+    print()
     test_Celsius()
-    """
 
-    '''test 5, logging decorator'''
+    """
+    '''test 5, logging decorator
     bar = Bar()
     bar.foo()
     bar.bar()
+    '''
 
     # >>> INFO:__main__.Foo:foo called
     # >>> INFO:__main__.Bar:bar called
-
+    """
+    
+    """
+    '''test 6, test set'''
     test_set()
+    """

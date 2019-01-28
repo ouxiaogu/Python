@@ -9,6 +9,5 @@ Last Modified by:  ouxiaogu
 
 class Classifier(object):
     """docstring for Classifier"""
-    def __init__(self, arg):
-        super(Classifier, self).__init__()
-        self.arg = arg
+    def __init__(self):
+        pass
