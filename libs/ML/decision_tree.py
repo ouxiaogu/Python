@@ -255,6 +255,7 @@ if __name__ == '__main__':
     #     print(col, "gain_ratio", gain_ratio(df[col], df[cols[-1]]))
     X = df[cols[:-1]].values
     y = df[cols[-1]].values
+    np.random.RandomState(0)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
     
     import sys
@@ -266,9 +267,11 @@ if __name__ == '__main__':
     clf = Tree(eps=0.02, feas=cols, criterion="gr")
     clf.fit(X_train, y_train)
     # test ID3 fit predict
+    print()
     print(clf.tree_)
-    clf.describe_tree(clf.tree_)
-
+    print()
+    print(clf.describe_tree(clf.tree_))
+    print()
     print(clf.predict(X_test))
     # for x_test in X_test:
     #     print(clf.predict(x_test))

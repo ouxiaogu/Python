@@ -228,9 +228,10 @@ class ContourSelLabelStage(MxpStage):
 
     def labelSingleContour(self, rawContour, occf, displayIm, displayContour, patternid=''):
         mode = getConfigData(self.d_cf, '.label_mode', 'bbox')
+        split_attribute = getConfigData(self.d_cf, '.split_attribute', 'ridge_intensity')
         if mode != 'bbox' and WI_CVUI: # label by cvui trackbar 
             log.info("interactively decide the threshold by trackbar")
-            thresholds = ContourSelLabelStage.obtainTrackbarFilter(displayIm, displayContour, patternid)
+            thresholds = ContourSelLabelStage.obtainTrackbarFilter(displayIm, displayContour, patternid, split_attribute)
             ContourSelLabelStage.saveThreshold(occf, thresholds)
             filters = ContourSelLabelStage.thresToFilter(thresholds)
             labeledconour = self.labelByFilter(rawContour, filters)
@@ -314,8 +315,8 @@ class ContourSelLabelStage(MxpStage):
         return filters
 
     @staticmethod
-    def obtainTrackbarFilter(displayIm, displayContour, patternid):
-        drawer = ContourTrackbarFilter(displayIm, displayContour, "Pattern {} Contour Data Labeling...".format(patternid))
+    def obtainTrackbarFilter(displayIm, displayContour, patternid, split_attribute="ridge_intensity"):
+        drawer = ContourTrackbarFilter(displayIm, displayContour, "Pattern {} Contour Data Labeling...".format(patternid, split_attribute))
         drawer.printUsage()
         thresholds = drawer.run()
         return thresholds

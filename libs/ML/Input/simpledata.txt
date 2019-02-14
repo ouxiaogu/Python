@@ -1,0 +1,17 @@
+x1	x2	color
+.15	.83	black
+.09	.55	black
+.29	.35	black
+.38	.70	black
+.52	.48	black
+.57	.73	black
+.73	.75	black
+.47	.06	black
+.10	.29	red
+.08	.15	red
+.23	.16	red
+.70	.19	red
+.62	.47	red
+.91	.27	red
+.65	.90	red
+.75	.36	red
