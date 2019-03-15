@@ -229,9 +229,11 @@ class ContourSelLabelStage(MxpStage):
     def labelSingleContour(self, rawContour, occf, displayIm, displayContour, patternid=''):
         mode = getConfigData(self.d_cf, '.label_mode', 'bbox')
         split_attribute = getConfigData(self.d_cf, '.split_attribute', 'ridge_intensity')
+        trackbar_range = getConfigData(self.d_cf, '.trackbar_range', '')
+        trackbar_range = None if trackbar_range == '' else trackbar_range
         if mode != 'bbox' and WI_CVUI: # label by cvui trackbar 
             log.info("interactively decide the threshold by trackbar")
-            thresholds = ContourSelLabelStage.obtainTrackbarFilter(displayIm, displayContour, patternid, split_attribute)
+            thresholds = ContourSelLabelStage.obtainTrackbarFilter(displayIm, displayContour, patternid, split_attribute, trackbar_range)
             ContourSelLabelStage.saveThreshold(occf, thresholds)
             filters = ContourSelLabelStage.thresToFilter(thresholds)
             labeledconour = self.labelByFilter(rawContour, filters)
@@ -315,8 +317,11 @@ class ContourSelLabelStage(MxpStage):
         return filters
 
     @staticmethod
-    def obtainTrackbarFilter(displayIm, displayContour, patternid, split_attribute="ridge_intensity"):
-        drawer = ContourTrackbarFilter(displayIm, displayContour, "Pattern {} Contour Data Labeling...".format(patternid, split_attribute))
+    def obtainTrackbarFilter(displayIm, displayContour, patternid, split_attribute="ridge_intensity", trackbar_range=None):
+        kwargs = {}
+        if trackbar_range is not None:
+            kwargs['trackbar_range'] = tuple(map(float, [s.strip()  for s in trackbar_range.split(',')]))
+        drawer = ContourTrackbarFilter(displayIm, displayContour, "Pattern {} Contour Data Labeling...".format(patternid), colname=split_attribute, **kwargs)
         drawer.printUsage()
         thresholds = drawer.run()
         return thresholds
@@ -441,7 +446,7 @@ class ContourSelLabelStage(MxpStage):
 
         # process contour, and overlay image
         df = contour.toDf()
-        xini, yini, xend, yend = contour.getBBox()
+        xini, yini, xend, yend = map(lambda d: int(d+0.5), contour.getBBox())
         if mode == 'crop':
             outim = im[yini:yend, xini:xend]
 

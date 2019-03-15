@@ -103,9 +103,9 @@ class SEMContourEncrypted():
         self.contour.saveContour(contourfile)
 
 if __name__ == '__main__':
-    contourfile = r'/gpfs/WW/BD/MXP/SHARED/SEM_IMAGE/IMEC/Case02_calaveras_v3/3Tmp/ContourSelection/011_Contour_hook_dbg//h/cache/dummydb/result/MXP/job1/ContourSelection450result1/461_image_contour.txt'
+    contourfile = r'/gpfs/DEV/FEM/SHARED/MXP_ModelDB/Case0_Collaboration_RD/3Tmp/alvinwang/MXP_rFEM_all_pro_thre_private_binary_core8_ContourSelection_rule4EUV_v1/h/cache/dummydb/result/MXP/job1/ContourSelection450result1/dirBmp_74_522_-40.0_0.0_contour_selected.txt'
     #contourfile = gpfs2WinPath(contourfile)
     #contour = parseContourWrapper(contourfile)
     ctEncrypt = SEMContourEncrypted()
     ctEncrypt.parseFile(contourfile)
-    ctEncrypt.saveContour(contourfile)
+    ctEncrypt.saveContour(contourfile+'.decode')

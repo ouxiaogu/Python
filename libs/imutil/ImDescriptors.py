@@ -31,7 +31,7 @@ __all__ = [ 'RMS_BIN_RANGES', 'ZNCC_BIN_RANGES',
             'addOrdereddDict', 'subOrdereddDict', 'Histogram',
             'im_fft_amplitude_phase', 'power_ratio_in_cutoff_frequency',
              'calculate_cutoff',
-            'statHist'
+            'statOfHist'
         ]
 
 BINS = np.arange(256).reshape(256,1)
@@ -125,8 +125,8 @@ def hist_rect(im=None, hbins=100, hist_in=None, color_hist=True, fit_hist=False)
 
     if fit_hist: # add fitting curve
         # raw & normalized hist, mu & std will have some numerical difference
-        # mu, std, _ = statHist(hist_in, trimmedNum=2) # raw hist
-        mu, std, yscale = statHist(hist, trimmedNum=2, compute_scale=True) # normalized hist
+        # mu, std, _ = statOfHist(hist_in, trimmedNum=2) # raw hist
+        mu, std, yscale = statOfHist(hist, trimmedNum=2, compute_scale=True) # normalized hist
         normfunc = lambda x: yscale/(np.sqrt(2*np.pi)*std) * np.exp( - (x-mu)**2/(2*(std)**2 ))
         pts = np.int32(np.column_stack((BINS, normfunc(BINS))))
         cv2.polylines(histImg, [pts], False, (0, 0, 0), 1)
@@ -169,11 +169,11 @@ class Histogram(object):
         return cdfHisto(self.hist)
 
 
-def fullBinHist(hist):
+def fullBinHist(hist, levels=256):
     '''if hist is OrderedDict type, fill histogram into a full bin histogram version'''
-    dst = np.zeros(256, dtype=np.uint32)
+    dst = np.zeros(levels, dtype=np.uint32)
     if isinstance(hist, OrderedDict):
-        for i in range(256):
+        for i in range(levels):
             if i in hist.keys():
                 dst[i] = hist[i]
     elif isinstance(hist, list) or isinstance(hist, np.ndarray):
@@ -182,7 +182,7 @@ def fullBinHist(hist):
         raise TypeError("fullBinHist, hist type {} is not supported".format(type(type(hist))))
     return dst
 
-def statHist(hist=None, trimmedNum=None, compute_scale=False):
+def statOfHist(hist=None, trimmedNum=None, compute_scale=False):
     """
     statistics based on the histogram
 
@@ -291,7 +291,7 @@ def subOrdereddDict(lhs, rhs):
         lhs[rk] -= rhs[rk]
     return lhs
 
-def calcHist(src, hist_type='list'):
+def calcHist(src, hist_type='list', nbins=256, Lminmax=None):
     '''
     histogram for grayscale image, intensity level is 256
 
@@ -304,6 +304,10 @@ def calcHist(src, hist_type='list'):
         - 'OrderedDict': return hist as length<=256 dict, `hist[k]` to store
           the times of intensity `k` occurs, and will convert to OrderedDict
           and sorted, for the sake of cdfHisto computation
+    nbins : int
+        #bins
+    Lminmax: tuple
+        the min max value current bin
     '''
     htypes = ['list', 'OrderedDict']
     if hist_type not in htypes:
@@ -314,17 +318,32 @@ def calcHist(src, hist_type='list'):
 
     sz = src.size
     arr = src.flatten()
+
+    if Lminmax is None:
+        Lminmax = (0, 255)
+    elif not isinstance(Lminmax, tuple):
+        Lminmax = (np.min(arr), np.max(arr))
+    arr = nbins * (arr - Lminmax[0]) // (Lminmax[1] - Lminmax[0]) # int arr [0, nbins]
+
     hist = None
     if hist_type == 'list':
-        hist = np.zeros(256, dtype=np.int32)
+        hist = np.zeros(nbins, dtype=np.int32)
         for i in range(sz):
-            hist[ arr[i] ] += 1
+            if arr[i] in range(nbins):
+                hist[arr[i]] += 1
+            elif arr[i] == nbins:
+                hist[-1] += 1
     elif hist_type == 'OrderedDict':
         hist = {}
         for i in range(sz):
-            if arr[i] not in hist.keys():
-                hist[arr[i] ] = 0
-            hist[arr[i] ] += 1
+            if arr[i] in range(nbins):
+                if arr[i] not in hist.keys():
+                    hist[arr[i] ] = 0
+                hist[arr[i] ] += 1
+            elif arr[i] == nbins:
+                if nbins-1 not in hist.keys():
+                    hist[nbins-1] = 0
+                hist[nbins-1] += 1
         hist = OrderedDict(sorted(hist.items(), key=lambda kv: kv[0]))
     return hist
 
@@ -520,7 +539,7 @@ def computeSNR(src, restored):
     return ret
 
 if __name__ == '__main__':
-    print(statHist(cv_gaussian_kernel(3)))
-    print(statHist(cv_gaussian_kernel(5)))
-    print(statHist(cv_gaussian_kernel(5, 0.7)))
-    print(statHist(cv_gaussian_kernel(7)))
+    print(statOfHist(cv_gaussian_kernel(3)))
+    print(statOfHist(cv_gaussian_kernel(5)))
+    print(statOfHist(cv_gaussian_kernel(5, 0.7)))
+    print(statOfHist(cv_gaussian_kernel(7)))

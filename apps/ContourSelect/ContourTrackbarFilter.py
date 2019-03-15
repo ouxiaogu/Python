@@ -35,11 +35,11 @@ class ContourTrackbarFilter(object):
         self.contourdf = contour.toDf()
         self.window_name = window_name
         self.colname = colname
+        self.trackbar_range = kwargs.get("trackbar_range", (0, 0.3))
 
         self._init_parms()
 
     def _init_parms(self):
-        self.thres_range = [0., 0.3]
         self.thres = [0.]
         self.numTotal = 0
         self.numOutlier = 0
@@ -102,7 +102,7 @@ class ContourTrackbarFilter(object):
             
             # A trackbar to control the filter threshold values
             cvui.text(frame, xini_wnd+1, yini_wnd+10, '{} filter threshold'.format(self.colname))
-            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 1.25*colw, self.thres, self.thres_range[0], self.thres_range[1], 4, '%.3Lf')
+            cvui.trackbar(frame, xini_wnd+1, yini_wnd+40, 1.25*colw, self.thres, self.trackbar_range[0], self.trackbar_range[1], 4, '%.3Lf')
             cvui.space(10)
             cvui.text(frame, xini_wnd+1, yini_wnd+100, "{}/{} points is labeled as outlier".format(
                 self.numOutlier, self.numTotal))

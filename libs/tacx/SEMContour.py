@@ -117,7 +117,7 @@ class SEMContour(object):
             self.pixel = float(head[0][2])
             self.offset[0] = float(head[0][3])
             self.offset[1] = float(head[0][4])
-            self.bbox = list(map(int, [head[0][5], head[0][6], head[0][7], head[0][8]]))
+            self.bbox = list(map(float, [head[0][5], head[0][6], head[0][7], head[0][8]]))
         else:
             sys.stderr.write('ERROR: Fail to get contour version!\n')
             return False

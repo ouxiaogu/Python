@@ -16,7 +16,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../imutil")
 from ImGUI import *
-from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve, calculate_cutoff, getImageInfo, statHist
+from ImDescriptors import im_fft_amplitude_phase, hist_rect, printImageInfo, hist_lines, hist_curve, calculate_cutoff, getImageInfo, statOfHist
 from ImTransform import normalize, intensityTransform, calcHist, imSub, equalizeHisto, localHistoEqualize, powerFunc, convertTo
 from SpatialFlt import ContraHarmonicMean, adpMean, adpMedian, applyMeanFilter, TrimmedMean, setNLMParams
 from FrequencyFlt import BNRF, BNPF, applyFreqFilter, GLPF
@@ -160,7 +160,7 @@ def try_polyroi_noise_hist(interative=True):
     # print(roihist[80:120:10])
     # np.testing.assert_equal(roihist1, roihist)
     mu, std = norm.fit(roi)
-    # mu, std, _ = statHist(roihist, trimmedNum=2)
+    # mu, std, _ = statOfHist(roihist, trimmedNum=2)
     fig = plt.figure()
     ax = fig.add_subplot(111)
     xends = np.linspace(1, 256, 256)
